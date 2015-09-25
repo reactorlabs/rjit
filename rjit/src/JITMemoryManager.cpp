@@ -19,9 +19,8 @@ uint8_t* JITMemoryManager::allocateDataSection(uintptr_t size,
         size, alignment, sectionID, sectionName, readonly);
 
     if (sectionName.str() == ".llvm_stackmaps") {
-        assert(!new_stackmap_addr);
-        new_stackmap_addr = res;
-        new_stackmap_size = size;
+        stackmapAddr_ = res;
+        stackmapSize_ = size;
     }
 
     return res;

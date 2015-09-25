@@ -39,12 +39,9 @@ Value* loadConstant(SEXP value, Module* m, BasicBlock* b);
 Value* insertCall(Value* fun, std::vector<Value*> args, BasicBlock* b,
                   rjit::JITModule& m, uint64_t function_id);
 
-void setupFunction(Function& f);
+void setupFunction(Function& f, uint64_t functionId);
 
-void recordStackmaps(std::vector<uint64_t> functionIds);
-
-ICCompiler::ICCompiler(int size, JITModule& m, unsigned fid)
-    : m(m), size(size), functionId(fid) {
+ICCompiler::ICCompiler(int size, JITModule& m) : m(m), size(size) {
     // Set up a function type which corresponds to the ICStub signature
     std::vector<Type*> argT;
     for (int i = 0; i < size + 3; i++) {
@@ -56,8 +53,9 @@ ICCompiler::ICCompiler(int size, JITModule& m, unsigned fid)
     auto funT = FunctionType::get(t::SEXP, argT, false);
     ic_t = funT;
 
+    functionId = StackMap::nextStackmapId++;
     f = Function::Create(funT, Function::ExternalLinkage, "callIC", m);
-    setupFunction(*f);
+    setupFunction(*f, functionId);
     b = BasicBlock::Create(getGlobalContext(), "start", f, nullptr);
 
     // Load the args in the same order as the stub
@@ -100,9 +98,6 @@ void* ICCompiler::finalize() {
     // m.dump();
     auto handle = JITCompileLayer::getHandle(m.getM());
     auto ic = JITCompileLayer::get(handle, f->getName());
-
-    recordStackmaps({functionId});
-    new_stackmap_addr = nullptr;
 
     return ic;
 }

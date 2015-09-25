@@ -27,9 +27,6 @@ using namespace llvm;
 
 namespace rjit {
 
-extern uint8_t* new_stackmap_addr;
-extern uintptr_t new_stackmap_size;
-
 class JITMemoryManager : public llvm::SectionMemoryManager {
   private:
     struct MemoryGroup {
@@ -54,6 +51,9 @@ class JITMemoryManager : public llvm::SectionMemoryManager {
         return allocateSection(CodeMem, Size, Alignment);
     }
 
+    uint8_t* stackmapAddr() { return stackmapAddr_; }
+    uintptr_t stackmapSize() { return stackmapSize_; }
+
   private:
     uint8_t* allocateSection(MemoryGroup& MemGroup, uintptr_t Size,
                              unsigned Alignment);
@@ -64,6 +64,9 @@ class JITMemoryManager : public llvm::SectionMemoryManager {
         for (unsigned i = 0, e = CodeMem.AllocatedMem.size(); i != e; ++i)
             sys::Memory::releaseMappedMemory(CodeMem.AllocatedMem[i]);
     }
+
+    uint8_t* stackmapAddr_;
+    uintptr_t stackmapSize_;
 
     MemoryGroup CodeMem;
 };

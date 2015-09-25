@@ -4,6 +4,7 @@
 
 #include "JITMemoryManager.h"
 #include "JITSymbolResolver.h"
+#include "StackMap.h"
 
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -48,8 +49,25 @@ JITCompileLayer::ModuleHandle JITCompileLayer::getHandle(Module* m) {
     std::string err;
     sys::DynamicLibrary::LoadLibraryPermanently(nullptr, &err);
     auto mm = new JITMemoryManager();
-    return compileLayer->addModuleSet(moduleSet,
-                                      std::unique_ptr<SectionMemoryManager>(mm),
-                                      &JITSymbolResolver::singleton);
+    auto handle = compileLayer->addModuleSet(
+        moduleSet, std::unique_ptr<SectionMemoryManager>(mm),
+        &JITSymbolResolver::singleton);
+
+    std::unordered_map<uint64_t, uintptr_t> fids;
+    for (llvm::Function& f : m->getFunctionList()) {
+        auto attrs = f.getAttributes();
+        uint64_t id = -1;
+        Attribute attr_id =
+            attrs.getAttribute(AttributeSet::FunctionIndex, "statepoint-id");
+        bool has_id = attr_id.isStringAttribute() &&
+                      !attr_id.getValueAsString().getAsInteger(10, id);
+        if (has_id)
+            fids[id] = (uintptr_t)JITCompileLayer::get(handle, f.getName());
+    }
+
+    ArrayRef<uint8_t> sm(mm->stackmapAddr(), mm->stackmapSize());
+    StackMap::recordStackmaps(sm, fids);
+
+    return handle;
 }
 }

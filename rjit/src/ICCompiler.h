@@ -5,7 +5,7 @@
 namespace rjit {
 class ICCompiler {
   public:
-    ICCompiler(int size, JITModule& m, unsigned fid);
+    ICCompiler(int size, JITModule& m);
 
     llvm::Function* compileStub();
 
@@ -78,6 +78,7 @@ class ICCompiler {
 
     JITModule& m;
     unsigned size;
+
     unsigned functionId;
 };
 
