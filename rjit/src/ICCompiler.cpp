@@ -18,12 +18,15 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 
+#include "ICCompiler.h"
+
 #include "Compiler.h"
 #include "JITMemoryManager.h"
+#include "JITCompileLayer.h"
 #include "StackMap.h"
 #include "StackMapParser.h"
 
-#include "ICCompiler.h"
+#include "JITCompileLayer.h"
 
 #include "RIntlns.h"
 
@@ -37,8 +40,6 @@ Value* insertCall(Value* fun, std::vector<Value*> args, BasicBlock* b,
                   rjit::JITModule& m, uint64_t function_id);
 
 void setupFunction(Function& f);
-
-ExecutionEngine* jitModule(Module* m);
 
 void recordStackmaps(std::vector<uint64_t> functionIds);
 
@@ -97,8 +98,8 @@ void* ICCompiler::finalize() {
     // FIXME: Allocate a NATIVESXP, or link it to the caller??
 
     // m.dump();
-    ExecutionEngine* engine = jitModule(m.getM());
-    void* ic = engine->getPointerToFunction(f);
+    auto handle = JITCompileLayer::getHandle(m.getM());
+    auto ic = JITCompileLayer::get(handle, f->getName());
 
     recordStackmaps({functionId});
     new_stackmap_addr = nullptr;

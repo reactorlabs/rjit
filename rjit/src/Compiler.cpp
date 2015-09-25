@@ -6,28 +6,23 @@
 #include <llvm/Support/raw_ostream.h>
 #include "llvm/Analysis/Passes.h"
 
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/ExecutionEngine/MCJIT.h"
-#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/Host.h"
+
 #include "llvm/CodeGen/GCStrategy.h"
 #include "llvm/CodeGen/GCs.h"
 
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/Analysis/TargetLibraryInfo.h"
-#include "llvm/Analysis/TargetTransformInfo.h"
-
 #include "Compiler.h"
-#include "JITMemoryManager.h"
+#include "JITCompileLayer.h"
 #include "StackMap.h"
 #include "StackMapParser.h"
-#include "GCPassApi.h"
 #include "ICCompiler.h"
 #include "Symbols.h"
 #include "Runtime.h"
 
 #include "RIntlns.h"
+
+#include <memory>
 
 using namespace llvm;
 
@@ -131,45 +126,6 @@ void setupFunction(Function& f) {
     f.setAttributes(attrs);
 }
 
-ExecutionEngine* jitModule(Module* m) {
-
-    auto memoryManager = new rjit::JITMemoryManager();
-
-    legacy::PassManager pm;
-
-    pm.add(createTargetTransformInfoWrapperPass(TargetIRAnalysis()));
-
-    pm.add(rjit::createPlaceRJITSafepointsPass());
-
-    PassManagerBuilder PMBuilder;
-    PMBuilder.OptLevel = 0;  // Set optimization level to -O0
-    PMBuilder.SizeLevel = 0; // so that no additional phases are run.
-    PMBuilder.populateModulePassManager(pm);
-
-    // TODO: maybe have our own version which is not relocating?
-    pm.add(rjit::createRJITRewriteStatepointsForGCPass());
-    pm.run(*m);
-
-    // create execution engine and finalize the module
-    std::string err;
-    ExecutionEngine* engine =
-        EngineBuilder(std::unique_ptr<Module>(m))
-            .setErrorStr(&err)
-            .setMCJITMemoryManager(
-                 std::unique_ptr<RTDyldMemoryManager>(memoryManager))
-            .setEngineKind(EngineKind::JIT)
-            .create();
-
-    if (!engine) {
-        fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
-        exit(1);
-    }
-
-    engine->finalizeObject();
-
-    return engine;
-}
-
 // record stackmaps will parse the stackmap section of the current module and
 // index all entries.
 void recordStackmaps(std::vector<uint64_t> functionIds) {
@@ -249,12 +205,12 @@ SEXP Compiler::compileFunction(std::string const& name, SEXP ast,
 
 void Compiler::jitAll() {
 
-    ExecutionEngine* engine = jitModule(m.getM());
+    auto handle = JITCompileLayer::getHandle(m.getM());
 
     // perform all the relocations
     for (SEXP s : relocations) {
         auto f = reinterpret_cast<Function*>(TAG(s));
-        auto fp = engine->getPointerToFunction(f);
+        auto fp = JITCompileLayer::get(handle, f->getName());
         SETCAR(s, reinterpret_cast<SEXP>(fp));
     }
     recordStackmaps(functionIds);

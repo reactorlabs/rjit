@@ -1,3 +1,6 @@
+#ifndef JIT_MEMORY_MANAGER_H
+#define JIT_MEMORY_MANAGER_H
+
 #include <llvm/IR/Verifier.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
@@ -66,3 +69,5 @@ class JITMemoryManager : public llvm::SectionMemoryManager {
 };
 }
 // namespace rjit
+
+#endif
