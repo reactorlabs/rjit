@@ -64,7 +64,7 @@ class ICCompiler {
 
     llvm::Value* INTRINSIC(llvm::Value* fun, std::vector<llvm::Value*> args);
 
-    llvm::Type* ic_t;
+    llvm::FunctionType* ic_t;
 
     llvm::Function* f;
     llvm::BasicBlock* b;
@@ -80,6 +80,8 @@ class ICCompiler {
     unsigned size;
 
     unsigned functionId;
+
+    static std::vector<bool> hasStub;
 };
 
 } // namespace rjit

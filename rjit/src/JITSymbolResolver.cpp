@@ -32,6 +32,9 @@ RuntimeDyld::SymbolInfo JITSymbolResolver::findSymbol(const std::string& name) {
 
     } while (false);
 
+    if (res == 0) {
+        std::cout << "Ext symbol " << name << " not found\n";
+    }
     return RuntimeDyld::SymbolInfo(res, JITSymbolFlags::Exported);
 }
 

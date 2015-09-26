@@ -30,6 +30,8 @@
 
 #include "RIntlns.h"
 
+#include <sstream>
+
 using namespace llvm;
 
 namespace rjit {
@@ -40,6 +42,8 @@ Value* insertCall(Value* fun, std::vector<Value*> args, BasicBlock* b,
                   rjit::JITModule& m, uint64_t function_id);
 
 void setupFunction(Function& f, uint64_t functionId);
+
+std::vector<bool> ICCompiler::hasStub;
 
 ICCompiler::ICCompiler(int size, JITModule& m) : m(m), size(size) {
     // Set up a function type which corresponds to the ICStub signature
@@ -77,6 +81,29 @@ ICCompiler::ICCompiler(int size, JITModule& m) : m(m), size(size) {
 }
 
 Function* ICCompiler::compileStub() {
+    std::ostringstream os;
+    os << "icStub_" << size;
+    std::string name = os.str();
+
+    if (hasStub.size() > size && hasStub[size]) {
+        auto here = m.getM()->getFunction(name);
+        if (here) {
+            std::cout << "Reusing " << name << "\n";
+            return here;
+        }
+
+        std::cout << "Importing " << name << "\n";
+        f = Function::Create(ic_t, GlobalValue::ExternalLinkage, name, m);
+        return f;
+    }
+
+    std::cout << "Creating " << name << "\n";
+    if (size >= hasStub.size()) {
+        hasStub.resize(size+1);
+    }
+    hasStub[size] = true;
+    f->setName(name);
+
     Value* res = compileCallStub();
 
     ReturnInst::Create(getGlobalContext(), res, b);
