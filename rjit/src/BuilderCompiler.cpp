@@ -268,9 +268,7 @@ Value* Compiler::compileICCallStub(Value* call, Value* op,
 
     // Record a patch point
     emitStackmap(smid, {{ic_stub}}, m, b.block());
-
-    auto res = CallInst::Create(ic_stub, ic_args, "", b.block());
-    return b.insertCall(res);
+    return b.insertCall(CallInst::Create(ic_stub, ic_args, "", b.block()));
 }
 
 Value* Compiler::compileCall(SEXP call) {
@@ -694,10 +692,10 @@ Value* Compiler::compileForLoop(SEXP ast) {
     // now check if control is smaller than length
 
     //TODO: Need to add the correct ICmpInst for this call
-    Cbr test = Cbr::create(b, ICmpInst::ICMP_ULT, control,
-                                  seqLength, "condition");
-    BranchInst::Create(forBody, context->breakBlock, test, context->b);
-
+    Cbr::create(b, seqLength, forBody, b.breakTarget());
+    // ICmpInst* test = new ICmpInst(*(context->b), ICmpInst::ICMP_ULT, control,
+    //                              seqLength, "condition");                    
+    //BranchInst::Create(forBody, context->breakBlock, test, context->b);
     // move to the for loop body, where we have to set the control variable
     // properly
     b.setBlock(forBody);
@@ -711,8 +709,7 @@ Value* Compiler::compileForLoop(SEXP ast) {
     b.setBlock(b.nextTarget);
 
     //TODO: Need an intrinsic function for BinaryOperator
-    Value* control1 = BinaryOperator::Create(Instruction::Add, control,
-                                             constant(1), "", b.block());
+    Value* control1 = IntegerAdd::ceate(b, control, constant(1));
     control->addIncoming(control1, b.nextTarget());
 
     Branch::create(b, forCond);
@@ -841,8 +838,9 @@ Value* Compiler::compileSwitch(SEXP call) {
     //
     b.addConstantPoolObject(cases);
     Value* caseCharacter = SwitchControlCharacter::create(b, control, call, cases);
-    SwitchInst* swChar = SwitchInst::create(b, caseCharacter, switchNext,
-                                            caseAsts.size(), context->b);
+
+    SwitchInst* swChar = Switch::create(b, caseCharacter, switchNext,
+                                            caseAsts.size());
     // create the phi node at the end
     b.setBlock(switchNext);
     PHINode* result = PHINode::Create(t::SEXP, caseAsts.size(), "", b.block());
@@ -851,22 +849,22 @@ Value* Compiler::compileSwitch(SEXP call) {
     BasicBlock* last;
     for (unsigned i = 0; i < caseAsts.size(); ++i) {
         b.block() = last = b.createBasicBlock("switchCase");
-        swInt->addCase(b.constantPoolSexp(i), last);
+        swInt.addCase(b.constantPoolSexp(i), last);
         if (defaultIdx == -1 or defaultIdx > static_cast<int>(i)) {
-            swChar->addCase(b.constantPoolSexp(i), last);
+            swChar.addCase(b.constantPoolSexp(i), last);
         } else if (defaultIdx < static_cast<int>(i)) {
-            swChar->addCase(b.constantPoolSexp(i - 1), last);
+            swChar.addCase(b.constantPoolSexp(i - 1), last);
         } else {
-            swChar->addCase(b.constantPoolSexp(caseAsts.size() - 1), last);
-            swChar->setDefaultDest(last);
+            swChar.addCase(b.constantPoolSexp(caseAsts.size() - 1), last);
+            swChar.setDefaultDest(last);
         }
         Value* caseResult = compileExpression(caseAsts[i]);
         Branch::create(b, switchNext);
         result->addIncoming(caseResult, b.block());
     }
-    if (swChar->getDefaultDest() == switchNext)
-        swChar->setDefaultDest(last);
-    swInt->setDefaultDest(last);
+    if (swChar.getDefaultDest() == switchNext)
+        swChar.setDefaultDest(last);
+    swInt.setDefaultDest(last);
     b.setBlock(switchNext);
     return result;
 }
