@@ -34,6 +34,23 @@ Builder::Context::Context(std::string const & name, Module * m, bool isPromise) 
     isReturnJumpNeeded = isPromise;
 }
 
+SEXP Builder::createNativeSXP(RFunctionPtr fptr, SEXP ast,
+                     std::vector<SEXP> const& objects, Function* f) {
+    SEXP objs = allocVector(VECSXP, objects.size() + 1);
+    PROTECT(objs);
+    SET_VECTOR_ELT(objs, 0, ast);
+    for (size_t i = 0; i < objects.size(); ++i)
+        SET_VECTOR_ELT(objs, i + 1, objects[i]);
+    SEXP result = CONS(reinterpret_cast<SEXP>(fptr), objs);
+    UNPROTECT(
+        objects.size() +
+        1); // all objects in objects + objs itself which is now part of result
+    SET_TAG(result, reinterpret_cast<SEXP>(f));
+    SET_TYPEOF(result, NATIVESXP);
+    return result;
+}
+
+
 
 
 } // namespace ir

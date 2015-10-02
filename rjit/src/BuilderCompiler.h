@@ -1,5 +1,5 @@
-#ifndef COMPILER_H_
-#define COMPILER_H_
+#ifndef BUILDERCOMPILER_H_
+#define BUILDERCOMPILER_H_
 
 #include "JITModule.h"
 
@@ -24,33 +24,33 @@ class Compiler {
     void jitAll();
 
   private:
-    
+    /**
     class Context {
       public:
         Context(std::string const& name, llvm::Module* m);
 
         void addObject(SEXP object);
 
-        /** True if return jump is needed instead of return - this happens in
-         * promises
-         */
+         True if return jump is needed instead of return - this happens in
+          promises
+         
         bool returnJump;
 
-        /** True if result of the expression should be visible, false otherwise.
-         * Each expression resets the visibleResult to true.
-         */
+        True if result of the expression should be visible, false otherwise.
+         Each expression resets the visibleResult to true.
+        
         bool visibleResult;
 
         llvm::Function* f;
 
         llvm::BasicBlock* b;
 
-        /** Basic block to which break() statements should jump.
-         */
+        Basic block to which break() statements should jump.
+        
         llvm::BasicBlock* breakBlock;
 
-        /** Basic block to which next() statements should jump.
-         */
+        Basic block to which next() statements should jump.
+        
         llvm::BasicBlock* nextBlock;
 
         llvm::Value* rho;
@@ -59,7 +59,8 @@ class Compiler {
 
         unsigned functionId;
     };
-
+    */
+    
     /** Compiles an expression.
 
       The expression as a result is always visible by default, which can be
@@ -256,12 +257,39 @@ class Compiler {
                                       llvm::APInt(32, value));
     }
 
-    template <typename... Values>
-    llvm::Value* INTRINSIC(llvm::Value* fun, Values... args) {
-        return INTRINSIC(fun, std::vector<llvm::Value*>({args...}));
+    // template <typename... Values>
+    // llvm::Value* INTRINSIC(llvm::Value* fun, Values... args) {
+    //    return INTRINSIC(fun, std::vector<llvm::Value*>({args...}));
+    //}
+
+ template<typename B, typename U>
+llvm::Value * compileBinaryOrUnary(SEXP call) {
+    Value* lhs = compileExpression(CAR(CDR(call)));
+    if (CDR(CDR(call)) != R_NilValue) {
+        Value* rhs = compileExpression(CAR(CDR(CDR(call))));
+        return B::create(lhs, rhs, call, b.rho());
+    } else {
+        return = U::create(lhs, call, b.rho());
+    }
+}
+
+
+
+    template<typename B> 
+    llvm::Value * compileBinary(SEXP call){
+      Value* lhs = compileExpression(CAR(CDR(call)));
+      Value* rhs = compileExpression(CAR(CDR(CDR(call))));
+      return B::create(lsh, rhs, call, b.rho())
     }
 
-    llvm::Value* INTRINSIC(llvm::Value* fun, std::vector<llvm::Value*> args);
+template<typename U>
+llvm::Value * compileUnary(SEXP call){
+    Value* op = compileExpression(CAR(CDR(call)));
+    return U::create(op, call, b.rho());
+}
+
+
+    //llvm::Value* INTRINSIC(llvm::Value* fun, std::vector<llvm::Value*> args);
 
     /** Current compilation module.
 
@@ -276,7 +304,7 @@ class Compiler {
       context contains information about current return condition and
       visibility, break and next targets, R objects required and so on.
      */
-    Context* context;
+    //Context* context;
 
     /** List of relocations to be done when compiling.
 
@@ -292,4 +320,4 @@ class Compiler {
 
 } // namespace rjit
 
-#endif // COMPILER_H_
+#endif // BUILDERCOMPILER_H_

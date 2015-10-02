@@ -2,8 +2,9 @@
 #define BUILDER_H
 
 #include "llvm.h"
-
+#include "JITModule.h"
 #include "RIntlns.h"
+#include "JITCompileLayer.h"
 
 #include "Types.h"
 #include "StackMap.h"
@@ -11,8 +12,10 @@
 namespace rjit {
 
 // TODO This should be static of builder
-// TODO this guy also unprotects the objects - perhaps the caller should do this so that it is more explicit and consistent
-SEXP createNativeSXP(RFunctionPtr fptr, SEXP ast, std::vector<SEXP> const& objects, llvm::Function* f);
+// TODO this guy also unprotects the objects - perhaps the caller should do 
+//  this so that it is more explicit and consistent
+// SEXP createNativeSXP(RFunctionPtr fptr, SEXP ast, std::vector<SEXP> const& 
+//    objects, llvm::Function* f);
 
 namespace ir {
 
@@ -80,6 +83,7 @@ public:
         return c_->rho;
     }
 
+
     /** Creates new context for given function name.
 
       Creates the llvm Function and initial basic block objects, sets the function attributes and context's rho value.
@@ -118,7 +122,9 @@ public:
 
     /** Closes a function context.
 
-      Returns the SEXP corresponding to that function w/o the native code, which will be added at the time the module is jitted. The function's SEXP is therefore automatically added to the relocations for the module.
+      Returns the SEXP corresponding to that function w/o the native code, 
+      which will be added at the time the module is jitted. The function's 
+      SEXP is therefore automatically added to the relocations for the module.
      */
     SEXP closeFunction() {
         assert((contextStack_.empty() or (contextStack_.top()->f != c_->f)) and "Not a function context");
@@ -157,6 +163,7 @@ public:
             llvm::ConstantInt::get(llvm::getGlobalContext(), llvm::APInt(64, (std::uint64_t)value)),
             t::SEXP);
     }
+
 
     /** Given a llvm::Value *, returns the SEXP from constant pool it points to.
      */
@@ -209,6 +216,52 @@ public:
     }
 
 
+    // Getter for context function and environment
+    llvm::Function * f(){
+        return c_->f;
+    }
+
+    /**  Setters for Jump and Visible
+     */
+    void setResultJump(bool value){
+       c_->isReturnJumpNeeded = value;
+    }
+
+    void setResultVisible(bool value){
+       c_->isResultVisible = value;
+    }
+
+    void jitAll() {
+
+        auto handle = JITCompileLayer::getHandle(m_);
+
+        // perform all the relocations
+        for (SEXP s : relocations_) {
+            auto f = reinterpret_cast<Function*>(TAG(s));
+            auto fp = JITCompileLayer::getFunctionPointer(handle, f->getName());
+            SETCAR(s, reinterpret_cast<SEXP>(fp));
+        }
+    }
+
+    void addConstantPoolObject(SEXP object){
+        c_->addConstantPoolObject(object);
+    }
+
+    void setBlock(BasicBlock * block){
+        c_->b = block;
+    }
+
+    /** Set the breakTarget.
+     */
+    void setBreakTarget(BasicBlock * block){
+        c_->breakTarget = block;
+    }
+
+    /** Set the nextTarget.
+     */
+    void setNextTarget(BasicBlock * block){
+        c_->nextTarget = block;
+    }
 
 
 
@@ -252,10 +305,19 @@ private:
 
         /** Constant pool of the function.
 
-          The constant pool always starts with the AST of the function being compiled, followed by any additional constants (notably created promises).
+          The constant pool always starts with the AST of the function being compiled, 
+          followed by any additional constants (notably created promises).
          */
         std::vector<SEXP> cp;
+
+
+        /**  Need return function for f, cp, and b.
+         */ 
+
     };
+
+    SEXP createNativeSXP(RFunctionPtr fptr, SEXP ast, std::vector<SEXP> const& 
+    objects, llvm::Function* f);
 
     /** The module into which we are currently building.
      */

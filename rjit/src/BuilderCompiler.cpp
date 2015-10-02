@@ -19,6 +19,9 @@
 #include "ICCompiler.h"
 #include "Symbols.h"
 #include "Runtime.h"
+#include "ir/Builder.h"
+#include "ir/intrinsics.h"
+#include "ir/ir.h"
 
 #include "RIntlns.h"
 
@@ -60,6 +63,8 @@ void emitStackmap(uint64_t id, std::vector<Value*> values, rjit::JITModule& m,
 
 namespace rjit {
 
+/**
+
 SEXP createNativeSXP(RFunctionPtr fptr, SEXP ast,
                      std::vector<SEXP> const& objects, Function* f) {
     SEXP objs = allocVector(VECSXP, objects.size() + 1);
@@ -75,8 +80,7 @@ SEXP createNativeSXP(RFunctionPtr fptr, SEXP ast,
     SET_TYPEOF(result, NATIVESXP);
     return result;
 }
-
-
+*/
 
 /** Converts given SEXP to a bitcode constant.
  * The SEXP address is taken as an integer constant into LLVM which is then
@@ -85,12 +89,17 @@ SEXP createNativeSXP(RFunctionPtr fptr, SEXP ast,
  * We are using it because it removes one level of indirection when reading
  * it from the constants vector as R bytecode compiler does.
  */
+
+/**
 Value* loadConstant(SEXP value, Module* m, BasicBlock* b) {
     return ConstantExpr::getCast(
         Instruction::IntToPtr,
         ConstantInt::get(getGlobalContext(), APInt(64, (std::uint64_t)value)),
         rjit::t::SEXP);
 }
+*/
+
+/**
 
 Value* insertCall(Value* fun, std::vector<Value*> args, BasicBlock* b,
                   rjit::JITModule& m, uint64_t function_id) {
@@ -129,12 +138,18 @@ void setupFunction(Function& f, uint64_t functionId) {
 
     f.setAttributes(attrs);
 }
+*/
+
+ /**
 
 void Compiler::Context::addObject(SEXP object) {
     PROTECT(object);
     objects.push_back(object);
 }
 
+*/ 
+
+/**
 Compiler::Context::Context(std::string const& name, llvm::Module* m) {
     f = llvm::Function::Create(t::sexp_sexpsexpint,
                                llvm::Function::ExternalLinkage, name, m);
@@ -150,40 +165,35 @@ Compiler::Context::Context(std::string const& name, llvm::Module* m) {
     b = llvm::BasicBlock::Create(llvm::getGlobalContext(), "start", f, nullptr);
     returnJump = false;
 }
+*/
+
+/***************  The new compiler with builder will start here. Everything above ***********
+  *                         should be in the builder.cpp or builder.
+  */
 
 SEXP Compiler::compileFunction(std::string const& name, SEXP ast,
                                bool isPromise) {
-    Context* old = context;
-    context = new Context(name, m);
-    if (isPromise)
-        context->returnJump = true;
+
+    
+    b.openFunction(name, ast, isPromise);
+
+    //Context * old = b.getContext();
+
     Value* last = compileExpression(ast);
+
     // since we are going to insert implicit return, which is a simple return
     // even from a promise
-    context->returnJump = false;
+    b.setJump(false);
     if (last != nullptr)
         compileReturn(last, /*tail=*/true);
     // now we create the NATIVESXP
-    SEXP result = createNativeSXP(nullptr, ast, context->objects, context->f);
+    // NATIVESXP should be a static builder, but this is not how it works 
+    // at the moment
+    SEXP result = b.closeFunction();
     // add the non-jitted SEXP to relocations
-    relocations.push_back(result);
-    // dump the function IR before we add statepoints
-    context->f->dump();
-    delete context;
-    context = old;
+    // dump the function IR before wwe add statepoints
+    b.f().dump();
     return result;
-}
-
-void Compiler::jitAll() {
-
-    auto handle = JITCompileLayer::getHandle(m.getM());
-
-    // perform all the relocations
-    for (SEXP s : relocations) {
-        auto f = reinterpret_cast<Function*>(TAG(s));
-        auto fp = JITCompileLayer::getFunctionPointer(handle, f->getName());
-        SETCAR(s, reinterpret_cast<SEXP>(fp));
-    }
 }
 
 /** Compiles an expression.
@@ -195,7 +205,7 @@ void Compiler::jitAll() {
   call.
   */
 Value* Compiler::compileExpression(SEXP value) {
-    context->visibleResult = true;
+    b.setResultVisible(true);
     switch (TYPEOF(value)) {
     case SYMSXP:
         return compileSymbol(value);
@@ -221,8 +231,8 @@ Value* Compiler::compileExpression(SEXP value) {
 /** Compiles user constant, which constant marked with userConstant intrinsic.
   */
 Value* Compiler::compileConstant(SEXP value) {
-    Value* result = constant(value);
-    INTRINSIC(m.userConstant, result);
+    Value* result = b.constantPoolSexp(value);
+    userConstant::create(b, result);
     return result;
 }
 
@@ -230,8 +240,12 @@ Value* Compiler::compileConstant(SEXP value) {
  * intrinsic.
   */
 Value* Compiler::compileSymbol(SEXP value) {
-    return INTRINSIC(m.genericGetVar, constant(value), context->rho);
+    return genericGetVar::create(b, value, rho);
 }
+
+/** Inline caching for a function (call) with operator (op)
+ *  that have arguments (callArgs).
+ */
 
 Value* Compiler::compileICCallStub(Value* call, Value* op,
                                    std::vector<Value*>& callArgs) {
@@ -248,14 +262,15 @@ Value* Compiler::compileICCallStub(Value* call, Value* op,
     // Additional IC arguments
     ic_args.push_back(call);
     ic_args.push_back(op);
-    ic_args.push_back(context->rho);
-    ic_args.push_back(context->f);
+    ic_args.push_back(b.rho());
+    ic_args.push_back(b.f());
     ic_args.push_back(ConstantInt::get(getGlobalContext(), APInt(64, smid)));
 
     // Record a patch point
-    emitStackmap(smid, {{ic_stub}}, m, context->b);
+    emitStackmap(smid, {{ic_stub}}, m, b.block());
 
-    return INTRINSIC(ic_stub, ic_args);
+    auto res = CallInst::Create(ic_stub, ic_args, "", b.block());
+    return b.insertCall(res);
 }
 
 Value* Compiler::compileCall(SEXP call) {
@@ -265,20 +280,20 @@ Value* Compiler::compileCall(SEXP call) {
         // it is a complex function, first get the value of the function and
         // then check it
         f = compileExpression(CAR(call));
-        INTRINSIC(m.checkFunction, f);
+        checkFunction::create(b, f);
     } else {
         // it is simple function - try compiling it with intrinsics
         f = compileIntrinsic(call);
         if (f != nullptr)
             return f;
         // otherwise just do get function
-        f = INTRINSIC(m.getFunction, constant(CAR(call)), context->rho);
+        f = getFunction::create(b, CAR(call), rho);
     }
 
     std::vector<Value*> args;
     compileArguments(CDR(call), args);
 
-    return compileICCallStub(constant(call), f, args);
+    return compileICCallStub(b.constantPoolSexp(call), f, args);
 }
 
 void Compiler::compileArguments(SEXP argAsts, std::vector<Value*>& res) {
@@ -297,16 +312,17 @@ Value* Compiler::compileArgument(SEXP arg, SEXP name) {
     case STRSXP:
     case NILSXP:
         // literals are self-evaluating
-        return constant(arg);
+        return b.constantPoolSexp(arg);
         break;
     case SYMSXP:
         if (arg == R_DotsSymbol) {
-            return constant(arg);
+            return b.constantPoolSexp(arg);
         }
     default: {
         SEXP code = compileFunction("promise", arg, /*isPromise=*/true);
-        context->addObject(code);
-        return constant(code);
+        //Should the objects be inside the builder?
+        b.addConstantPoolObject(code);
+        return b.constantPoolSexp(code);
     }
     }
 }
@@ -333,7 +349,7 @@ Value* Compiler::compileIntrinsic(SEXP call) {
     return compileFunctionDefinition(CDR(call));
     CASE(symbol::Return) {
         return (CDR(call) == R_NilValue)
-                   ? compileReturn(constant(R_NilValue))
+                   ? compileReturn(b.constantPoolSexp(R_NilValue))
                    : compileReturn(compileExpression(CAR(CDR(call))));
     }
     CASE(symbol::Assign)
@@ -357,37 +373,37 @@ Value* Compiler::compileIntrinsic(SEXP call) {
     CASE(symbol::Switch)
     return compileSwitch(call);
     CASE(symbol::Add)
-    return compileBinaryOrUnary(m.genericAdd, m.genericUnaryPlus, call);
+    return compileBinaryOrUnary<GenericAdd, GenericUnaryPlus>(call);
     CASE(symbol::Sub)
-    return compileBinaryOrUnary(m.genericSub, m.genericUnaryMinus, call);
+    return compileBinaryOrUnary<GenericSub, GenericUnaryMinus>(call);
     CASE(symbol::Mul)
-    return compileBinary(m.genericMul, call);
+    return compileBinary<GenericMul>(call);
     CASE(symbol::Div)
-    return compileBinary(m.genericDiv, call);
+    return compileBinary<GenericDiv>(call);
     CASE(symbol::Pow)
-    return compileBinary(m.genericPow, call);
+    return compileBinary<GenericPow>(call);
     CASE(symbol::Sqrt)
-    return compileUnary(m.genericSqrt, call);
+    return compileUnary<GenericSqrt>(call);
     CASE(symbol::Exp)
-    return compileUnary(m.genericExp, call);
+    return compileUnary<GenericExp>(call);
     CASE(symbol::Eq)
-    return compileBinary(m.genericEq, call);
+    return compileBinary<GenericEq>(call);
     CASE(symbol::Ne)
-    return compileBinary(m.genericNe, call);
+    return compileBinary<GenericNe>(call);
     CASE(symbol::Lt)
-    return compileBinary(m.genericLt, call);
+    return compileBinary<GenericLt>(call);
     CASE(symbol::Le)
-    return compileBinary(m.genericLe, call);
+    return compileBinary<GenericLe>(call);
     CASE(symbol::Ge)
-    return compileBinary(m.genericGe, call);
+    return compileBinary<GenericGe>(call);
     CASE(symbol::Gt)
-    return compileBinary(m.genericGt, call);
+    return compileBinary<GenericGt>(call);
     CASE(symbol::BitAnd)
-    return compileBinary(m.genericBitAnd, call);
+    return compileBinary<GenericBitAnd>(call);
     CASE(symbol::BitOr)
-    return compileBinary(m.genericBitOr, call);
+    return compileBinary<GenericBitOr>(call);
     CASE(symbol::Not)
-    return compileUnary(m.genericNot, call);
+    return compileUnary<GenericNot>(call);
 
     return nullptr;
 #undef CASE
@@ -404,7 +420,7 @@ Value* Compiler::compileBlock(SEXP block) {
         block = CDR(block);
     }
     if (result == nullptr)
-        result = constant(R_NilValue);
+        result = b.constantPoolSexp(R_NilValue);
     return result;
 }
 
@@ -419,7 +435,7 @@ Value* Compiler::compileParenthesis(SEXP arg) {
     if (arg == symbol::Ellipsis)
         return nullptr; // we can't yet do this
     Value* result = compileExpression(arg);
-    context->visibleResult = true;
+    b.setResultVisible(true);
     return result;
 }
 
@@ -431,9 +447,8 @@ Value* Compiler::compileParenthesis(SEXP arg) {
 Value* Compiler::compileFunctionDefinition(SEXP fdef) {
     SEXP forms = CAR(fdef);
     SEXP body = compileFunction("function", CAR(CDR(fdef)));
-    context->addObject(body);
-    return INTRINSIC(m.createClosure, constant(forms), constant(body),
-                     context->rho);
+    b.addConstantPoolObject(body);
+    return createClosure::create(b, forms, body, b.rho());
 }
 
 /** Simple assignments (that is to a symbol) are compiled using the
@@ -445,10 +460,23 @@ Value* Compiler::compileAssignment(SEXP e) {
     if (TYPEOF(CAR(e)) != SYMSXP)
         return nullptr;
     Value* v = compileExpression(CAR(CDR(e)));
-    INTRINSIC(m.genericSetVar, constant(CAR(e)), v, context->rho);
-    context->visibleResult = false;
+    genericSetVar::create(b, CAR(e), v, b.rho());
+    b.isResultVisible(false);
     return v;
 }
+
+/**
+Value* Compiler::compileAssignment(SEXP e) {
+    e = CDR(e);
+    // intrinsic only handles simple assignments
+    if (TYPEOF(CAR(e)) != SYMSXP)
+        return nullptr;
+    Value* v = compileExpression(CAR(CDR(e)));
+    genericSetVar::create(b, constant(CAR(e)), v, rho);
+    isResultVisible = false;
+    return v;
+}
+*/
 
 /** Super assignment is compiled as genericSetVarParentIntrinsic
  */
@@ -458,8 +486,8 @@ Value* Compiler::compileSuperAssignment(SEXP e) {
     if (TYPEOF(CAR(e)) != SYMSXP)
         return nullptr;
     Value* v = compileExpression(CAR(CDR(e)));
-    INTRINSIC(m.genericSetVarParent, constant(CAR(e)), v, context->rho);
-    context->visibleResult = false;
+    genericSetVarParent::create(b, CAR(e), v, b.rho());
+    b.isResultVisible(false);
     return v;
 }
 
@@ -468,22 +496,20 @@ Value* Compiler::compileSuperAssignment(SEXP e) {
  * promises, we must use longjmp, which is done by calling returnJump intrinsic.
   */
 Value* Compiler::compileReturn(Value* value, bool tail) {
-    if (not context->visibleResult)
-        INTRINSIC(m.markInvisible);
-    if (context->returnJump) {
-        INTRINSIC(m.returnJump, value, context->rho);
+    if (not b.getResultVisible())
+        markInvisible::create(b);
+    if (b.getReturnJump())) {
+        returnJump::create(b, value, b.rho());
         // we need to have a return instruction as well to fool LLVM into
         // believing the basic block has a terminating instruction
-        ReturnInst::Create(getGlobalContext(), constant(R_NilValue),
-                           context->b);
+        Return::create(R_NilValue);
     } else {
-        ReturnInst::Create(getGlobalContext(), value, context->b);
+        Return::create(value);
     }
     // this is here to allow compilation of wrong code where statements are even
     // after return
     if (not tail)
-        context->b =
-            BasicBlock::Create(getGlobalContext(), "deadcode", context->f);
+       b.setBlock(b.createBasicBlock("deadcode"));
     return nullptr;
 }
 
@@ -499,40 +525,36 @@ Value* Compiler::compileCondition(SEXP e) {
     e = CDR(e);
     SEXP falseAst = (e != R_NilValue) ? CAR(e) : nullptr;
     Value* cond2 = compileExpression(condAst);
-    Value* cond = INTRINSIC(m.convertToLogicalNoNA, cond2, constant(condAst));
-    BasicBlock* ifTrue =
-        BasicBlock::Create(getGlobalContext(), "ifTrue", context->f, nullptr);
-
-    BasicBlock* ifFalse =
-        BasicBlock::Create(getGlobalContext(), "ifFalse", context->f, nullptr);
-    BasicBlock* next =
-        BasicBlock::Create(getGlobalContext(), "next", context->f, nullptr);
-    ICmpInst* test = new ICmpInst(*(context->b), ICmpInst::ICMP_EQ, cond,
-                                  constant(TRUE), "condition");
-    BranchInst::Create(ifTrue, ifFalse, test, context->b);
+    Value* cond = convertToLogicalNoNA::create(b, cond2, condAst);
+    BasicBlock* ifTrue = b.createBasicBlock("ifTrue");
+    BasicBlock* ifFalse = b.createBasicBlock("ifFalse");
+    BasicBlock* next = b.createBasicBlock("next");
+    Cbr::create(b, cond, ifTrue, ifFalse);
+    //    *(context->b), ICmpInst::ICMP_EQ, cond, constant(TRUE), "condition");
+    // BranchInst::Create(ifTrue, ifFalse, test, context->b);
 
     // true case has to be always present
-    context->b = ifTrue;
+    b.setBlock(ifTrue);
     Value* trueResult = compileExpression(trueAst);
-    JUMP(next);
-    ifTrue = context->b;
+    Branch::create(b, next);
+    ifTrue = b.block();
 
     // false case may not be present in which case invisible R_NilValue should
     // be returned
-    context->b = ifFalse;
+    b.setBlock(ifFalse);
     Value* falseResult;
     if (falseAst == nullptr) {
-        falseResult = constant(R_NilValue);
-        context->visibleResult = false;
+        falseResult = b.constantPoolSexp(R_NilValue);
+        b.setResultVisible(false);
     } else {
         falseResult = compileExpression(falseAst);
-        ifFalse = context->b;
+        ifFalse = b.block();
     }
-    JUMP(next);
+    Branch::create(b, next);
 
     // add a phi node for the result
-    context->b = next;
-    PHINode* phi = PHINode::Create(t::SEXP, 2, "", context->b);
+    b.setBlock(next);
+    PHINode* phi = PHINode::Create(t::SEXP, 2, "", b);
     phi->addIncoming(trueResult, ifTrue);
     phi->addIncoming(falseResult, ifFalse);
     return phi;
@@ -545,12 +567,12 @@ Value* Compiler::compileCondition(SEXP e) {
   TODO The error is probably not right.
    */
 Value* Compiler::compileBreak(SEXP ast) {
-    assert(context->breakBlock != nullptr and "Break outside loop");
-    JUMP(context->breakBlock);
+    llvm::BasicBlock * bb = b.breakTarget();
+    Branch::create(b, bb);
     // TODO this is really simple, but fine for us - dead code elimination will
     // remove the block if required
-    context->b = BasicBlock::Create(getGlobalContext(), "deadcode", context->f);
-    return constant(R_NilValue);
+    b.setBlock(b.createBasicBlock("deadcode"));
+    return b.constantPoolSexp(R_NilValue);
 }
 
 /** Compiles next. Whenever we see next in the compiler, we know it is for a
@@ -560,12 +582,12 @@ Value* Compiler::compileBreak(SEXP ast) {
   TODO The error is probably not right.
    */
 Value* Compiler::compileNext(SEXP ast) {
-    assert(context->nextBlock != nullptr and "Next outside loop");
-    JUMP(context->nextBlock);
+    llvm::BasicBlock * bb = b.nextTarget();
+    Branch::create(bb);
     // TODO this is really simple, but fine for us - dead code elimination will
     // remove the block if required
-    context->b = BasicBlock::Create(getGlobalContext(), "deadcode", context->f);
-    return constant(R_NilValue);
+    b.setBlock(b.createBasicBlock("deadcode"));
+    return b.constantPoolSexp(R_NilValue);
 }
 
 /** Compiles repeat loop. This is simple infinite loop. Only break can exit it.
@@ -577,24 +599,20 @@ Value* Compiler::compileRepeatLoop(SEXP ast) {
     if (not canSkipLoopContext(bodyAst))
         return nullptr;
     // save old loop pointers from the context
-    BasicBlock* oldBreak = context->breakBlock;
-    BasicBlock* oldNext = context->nextBlock;
     // create the body and next basic blocks
-    context->nextBlock = BasicBlock::Create(getGlobalContext(), "repeatBody",
-                                            context->f, nullptr);
-    context->breakBlock = BasicBlock::Create(getGlobalContext(), "repeatBreak",
-                                             context->f, nullptr);
-    JUMP(context->nextBlock);
-    context->b = context->nextBlock;
+    b.openLoop();
+
+    Branch::create(b, b.nextBlock());
+    b.setBlock(b.nextTarget());
+    
     compileExpression(bodyAst);
-    JUMP(context->nextBlock);
-    context->b = context->breakBlock;
+    Branch::create(b, b.nextTarget());
+    b.setBlock(b.breakTarget());
     // restore the old loop pointers in the context
-    context->breakBlock = oldBreak;
-    context->nextBlock = oldNext;
+    b.closeLoop();
     // return R_NilValue
-    context->visibleResult = false;
-    return constant(R_NilValue);
+    b.setResultVisible(false);
+    return b.constantPoolSexp(R_NilValue);
 }
 
 /** Compiles while loop.
@@ -607,34 +625,26 @@ Value* Compiler::compileWhileLoop(SEXP ast) {
     if (not canSkipLoopContext(bodyAst))
         return nullptr;
     // save old loop pointers from the context
-    BasicBlock* oldBreak = context->breakBlock;
-    BasicBlock* oldNext = context->nextBlock;
     // create the body and next basic blocks
-    context->nextBlock = BasicBlock::Create(getGlobalContext(), "whileCond",
-                                            context->f, nullptr);
-    context->breakBlock = BasicBlock::Create(getGlobalContext(), "whileBreak",
-                                             context->f, nullptr);
-    JUMP(context->nextBlock);
-    context->b = context->nextBlock;
+    b.openLoop();
+
+    Branch::create(b, b.nextTarget());
+    b.setBlock(b.nextTarget());
     // compile the condition
     Value* cond2 = compileExpression(condAst);
-    Value* cond = INTRINSIC(m.convertToLogicalNoNA, cond2, constant(condAst));
-    BasicBlock* whileBody = BasicBlock::Create(getGlobalContext(), "whileBody",
-                                               context->f, nullptr);
-    ICmpInst* test = new ICmpInst(*(context->b), ICmpInst::ICMP_EQ, cond,
-                                  constant(TRUE), "condition");
-    BranchInst::Create(whileBody, context->breakBlock, test, context->b);
+    Value* cond = ConvertToLogicalNoNA::create(b , cond2, condAst);
+    BasicBlock* whileBody = b.createBasicBlock("whileBody");
+    Cbr::create(b, cond, whileBody, b.breakTarget());
     // compile the body
-    context->b = whileBody;
+    b.setBlock(whileBody);
     compileExpression(bodyAst);
-    JUMP(context->nextBlock);
-    context->b = context->breakBlock;
+    Branch::create(b, b.breakTarget());
+    b.setBlock(b.breakTarget());
     // restore the old loop pointers in the context
-    context->breakBlock = oldBreak;
-    context->nextBlock = oldNext;
+    b.closeLoop();
     // return R_NilValue
-    context->visibleResult = false;
-    return constant(R_NilValue);
+    b.setResultVisible(false);
+    return b.constantPoolSexp(R_NilValue);
 }
 
 /** For loop is compiled into the following structure:
@@ -666,55 +676,52 @@ Value* Compiler::compileForLoop(SEXP ast) {
     if (not canSkipLoopContext(bodyAst))
         return nullptr;
     // save old loop pointers from the context
-    BasicBlock* oldBreak = context->breakBlock;
-    BasicBlock* oldNext = context->nextBlock;
+    b.openLoop();
     // create the body and next basic blocks
-    context->nextBlock =
-        BasicBlock::Create(getGlobalContext(), "forNext", context->f, nullptr);
-    context->breakBlock =
-        BasicBlock::Create(getGlobalContext(), "forBreak", context->f, nullptr);
     // This is a simple basic block to which all next's jump and which then
     // jumps to forCond so that there is a simpler phi node at forCond.
-    BasicBlock* forCond =
-        BasicBlock::Create(getGlobalContext(), "forCond", context->f, nullptr);
-    BasicBlock* forBody =
-        BasicBlock::Create(getGlobalContext(), "forBody", context->f, nullptr);
+    BasicBlock* forCond = b.createBasicBlock("forCond");
+    BasicBlock* forBody =b.createBasicBlock("forBody");
     // now initialize the loop control structures
     Value* seq2 = compileExpression(seqAst);
-    Value* seq = INTRINSIC(m.startFor, seq2, context->rho);
-    Value* seqLength = INTRINSIC(m.loopSequenceLength, seq, constant(ast));
-    BasicBlock* forStart = context->b;
-    JUMP(forCond);
-    context->b = forCond;
+    Value* seq = StartFor::create(b, seq2, b.rho());
+    Value* seqLength = LoopSequenceLength::create(b, seq, ast);
+    BasicBlock* forStart = b.block();
+    Branch::create(b, forCond);
+    b.setBlock(forCond);
     PHINode* control = PHINode::Create(t::Int, 2, "loopControl", context->b);
     control->addIncoming(constant(0), forStart);
     // now check if control is smaller than length
-    ICmpInst* test = new ICmpInst(*(context->b), ICmpInst::ICMP_ULT, control,
+
+    //TODO: Need to add the correct ICmpInst for this call
+    Cbr test = Cbr::create(b, ICmpInst::ICMP_ULT, control,
                                   seqLength, "condition");
     BranchInst::Create(forBody, context->breakBlock, test, context->b);
+
     // move to the for loop body, where we have to set the control variable
     // properly
-    context->b = forBody;
-    Value* controlValue = INTRINSIC(m.getForLoopValue, seq, control);
-    INTRINSIC(m.genericSetVar, constant(controlAst), controlValue,
-              context->rho);
+    b.setBlock(forBody);
+    Value* controlValue = GetForLoopValue::create(b, seq, control);
+    GenericSetVar::create(b, controlAst, controlValue, b.rho());
     // now compile the body of the loop
     compileExpression(bodyAst);
-    JUMP(context->nextBlock);
+    Brnach::create(b,b.nextTarget());
     // in the next block, increment the internal control variable and jump to
     // forCond
-    context->b = context->nextBlock;
+    b.setBlock(b.nextTarget);
+
+    //TODO: Need an intrinsic function for BinaryOperator
     Value* control1 = BinaryOperator::Create(Instruction::Add, control,
-                                             constant(1), "", context->b);
-    control->addIncoming(control1, context->nextBlock);
-    JUMP(forCond);
-    context->b = context->breakBlock;
+                                             constant(1), "", b.block());
+    control->addIncoming(control1, b.nextTarget());
+
+    Branch::create(b, forCond);
+    b.setBlock(b.breakTarget());
     // restore the old loop pointers in the context
-    context->breakBlock = oldBreak;
-    context->nextBlock = oldNext;
+    b.closeLoop();
     // return R_NilValue
-    context->visibleResult = false;
-    return constant(R_NilValue);
+    b.setResultVisible(false);
+    return b.constantPoolSexp(R_NilValue);
 }
 
 /** Determines whether we can skip creation of the loop context or not. The code
@@ -805,25 +812,24 @@ Value* Compiler::compileSwitch(SEXP call) {
     }
     // actual switch compilation - get the control value and check it
     Value* control = compileExpression(condAst);
-    INTRINSIC(m.checkSwitchControl, control, constant(call));
-    Value* ctype = INTRINSIC(m.sexpType, control);
-    ICmpInst* cond = new ICmpInst(*context->b, ICmpInst::ICMP_EQ, ctype,
-                                  constant(STRSXP), "");
-    BasicBlock* switchIntegral = BasicBlock::Create(
-        getGlobalContext(), "switchIntegral", context->f, nullptr);
-    BasicBlock* switchCharacter = BasicBlock::Create(
-        getGlobalContext(), "switchCharacter", context->f, nullptr);
-    BasicBlock* switchNext = BasicBlock::Create(
-        getGlobalContext(), "switchNext", context->f, nullptr);
-    BranchInst::Create(switchCharacter, switchIntegral, cond, context->b);
+   
+    CheckSwitchControl::create(b, control, call);
+    Value* ctype = SexpType::create(b, control);
+    //
+    Cbr::create(b, ctype, switchCharacter, switchIntegral); 
+    //
+    BasicBlock* switchIntegral = b.createBasicBlock("switchIntegral");
+    BasicBlock* switchCharacter = b.createBasicBlock("switchCharacter");
+    BasicBlock* switchNext = b.createBasicBlock("switchNext");
+
     // integral switch is simple
-    context->b = switchIntegral;
-    Value* caseIntegral =
-        INTRINSIC(m.switchControlInteger, control, constant(caseAsts.size()));
-    SwitchInst* swInt = SwitchInst::Create(caseIntegral, switchNext,
-                                           caseAsts.size(), context->b);
+    b.setBlock(switchIntegral);
+    
+    Value* caseIntegral = SwitchControlInteger::create(b, control, caseAsts.size());
+    SwitchInst* swInt = SwitchInst::create(b, caseIntegral, switchNext,
+                                           caseAsts.size(), b.block());
     // for character switch we need to construct the vector,
-    context->b = switchCharacter;
+    b.setBlock(switchCharacter);
     SEXP cases;
     if (defaultIdx != -2) {
         cases = allocVector(STRSXP, caseNames.size());
@@ -832,37 +838,36 @@ Value* Compiler::compileSwitch(SEXP call) {
     } else {
         cases = R_NilValue;
     }
-    context->addObject(cases);
-    Value* caseCharacter = INTRINSIC(m.switchControlCharacter, control,
-                                     constant(call), constant(cases));
-    SwitchInst* swChar = SwitchInst::Create(caseCharacter, switchNext,
+    //
+    b.addConstantPoolObject(cases);
+    Value* caseCharacter = SwitchControlCharacter::create(b, control, call, cases);
+    SwitchInst* swChar = SwitchInst::create(b, caseCharacter, switchNext,
                                             caseAsts.size(), context->b);
     // create the phi node at the end
-    context->b = switchNext;
-    PHINode* result = PHINode::Create(t::SEXP, caseAsts.size(), "", context->b);
+    b.setBlock(switchNext);
+    PHINode* result = PHINode::Create(t::SEXP, caseAsts.size(), "", b.block());
     // walk the cases and create their blocks, add them to switches and their
     // results to the phi node
     BasicBlock* last;
     for (unsigned i = 0; i < caseAsts.size(); ++i) {
-        context->b = last = BasicBlock::Create(getGlobalContext(), "switchCase",
-                                               context->f, nullptr);
-        swInt->addCase(constant(i), last);
+        b.block() = last = b.createBasicBlock("switchCase");
+        swInt->addCase(b.constantPoolSexp(i), last);
         if (defaultIdx == -1 or defaultIdx > static_cast<int>(i)) {
-            swChar->addCase(constant(i), last);
+            swChar->addCase(b.constantPoolSexp(i), last);
         } else if (defaultIdx < static_cast<int>(i)) {
-            swChar->addCase(constant(i - 1), last);
+            swChar->addCase(b.constantPoolSexp(i - 1), last);
         } else {
-            swChar->addCase(constant(caseAsts.size() - 1), last);
+            swChar->addCase(b.constantPoolSexp(caseAsts.size() - 1), last);
             swChar->setDefaultDest(last);
         }
         Value* caseResult = compileExpression(caseAsts[i]);
-        JUMP(switchNext);
-        result->addIncoming(caseResult, context->b);
+        Branch::create(b, switchNext);
+        result->addIncoming(caseResult, b.block());
     }
     if (swChar->getDefaultDest() == switchNext)
         swChar->setDefaultDest(last);
     swInt->setDefaultDest(last);
-    context->b = switchNext;
+    b.setBlock(switchNext);
     return result;
 }
 
@@ -870,38 +875,30 @@ Value* Compiler::compileSwitch(SEXP call) {
  * of call arguments. Takes the binary and unary intrinsics to be used and the
  * full call ast.
   */
-Value* Compiler::compileBinaryOrUnary(Function* b, Function* u, SEXP call) {
-    Value* lhs = compileExpression(CAR(CDR(call)));
-    Value* res;
-    if (CDR(CDR(call)) != R_NilValue) {
-        Value* rhs = compileExpression(CAR(CDR(CDR(call))));
-        res = INTRINSIC(b, lhs, rhs, constant(call), context->rho);
-    } else {
-        res = INTRINSIC(u, lhs, constant(call), context->rho);
-    }
-    return res;
-}
 
 /** Compiles binary operator using the given intrinsic and full call ast.
-  */
+  
 Value* Compiler::compileBinary(Function* f, SEXP call) {
     Value* lhs = compileExpression(CAR(CDR(call)));
     Value* rhs = compileExpression(CAR(CDR(CDR(call))));
     return INTRINSIC(f, lhs, rhs, constant(call), context->rho);
 }
 
-/** Compiles unary operator using the given intrinsic and full call ast.
-  */
+
+// Compiles unary operator using the given intrinsic and full call ast.
+  
 Value* Compiler::compileUnary(Function* f, SEXP call) {
     Value* op = compileExpression(CAR(CDR(call)));
     return INTRINSIC(f, op, constant(call), context->rho);
 }
 
 Value* Compiler::constant(SEXP value) {
-    return loadConstant(value, m.getM(), context->b);
+    return loadConstant(value, m.getM(), b);
 }
 
 Value* Compiler::INTRINSIC(llvm::Value* fun, std::vector<Value*> args) {
     return insertCall(fun, args, context->b, m, context->functionId);
 }
+*/
+
 }
