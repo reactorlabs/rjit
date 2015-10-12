@@ -7,7 +7,7 @@
 #include "RIntlns.h"
 
 #ifndef __APPLE__
-#include <bits/libc-lock.h>
+//#include <bits/libc-lock.h>
 #endif
 
 #include <dlfcn.h>

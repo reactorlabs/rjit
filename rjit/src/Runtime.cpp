@@ -1,6 +1,7 @@
 #include "Runtime.h"
 #include "ICCompiler.h"
 #include "StackMap.h"
+#include "ir/Builder.h"
 
 using namespace rjit;
 
@@ -25,9 +26,9 @@ extern "C" void patchIC(void* ic, uint64_t stackmapId, void* caller) {
 
 extern "C" void* compileIC(uint64_t numargs, SEXP call, SEXP fun, SEXP rho,
                            uint64_t stackmapId) {
-    JITModule m("ic");
+    ir::Builder b("ic");
 
-    ICCompiler compiler(numargs, m);
+    ICCompiler compiler(numargs, b);
 
     return compiler.compile(call, fun, rho);
 }

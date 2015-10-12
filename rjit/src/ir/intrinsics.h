@@ -136,16 +136,16 @@ class GetForLoopValue: public Intrinsic {
 public:
     llvm::Value * seq() { return getValue(0); }
 
-    int index() { return getValueInt(1); }
+    llvm::Value * index() { return getValue(1); }
 
     GetForLoopValue(llvm::Instruction * ins):
         Intrinsic(ins) {
     }
 
-    static GetForLoopValue create(Builder & b, llvm::Value * seq, int index) {
+    static GetForLoopValue create(Builder & b, llvm::Value * seq, llvm::Value * index) {
         std::vector<llvm::Value *> args_;
         args_.push_back(seq);
-        args_.push_back(Builder::integer(index));
+        args_.push_back(index);
         llvm::CallInst * ins = llvm::CallInst::Create(b.intrinsic<GetForLoopValue>(), args_, "", b);
         b.insertCall(ins);
         setIRType(ins, ::rjit::ir::Type::GetForLoopValue);

@@ -119,7 +119,7 @@ public:
     }
 
     static Return create(Builder & b, llvm::Value * value) {
-        llvm::ReturnInst::Create(llvm::getGlobalContext(),value, b);
+        return llvm::ReturnInst::Create(llvm::getGlobalContext(),value, b);
     }
 };
 
@@ -210,11 +210,15 @@ public:
 
 /** Conditional branch.
 
-  Takes three arguments, the condition on which it jumps (this can be any integer) and true and false blocks.
+  Takes three arguments, the condition on which it jumps 
+  (this can be any integer) and true and false blocks.
 
   Conditional branch consists of ICmpInst followed by BranchInst internally.
 
-  TODO We might want to change this in the future and get the comparison out of the branch, but for now, this is the only branch we have and it is a showcase for matching multiple llvm bitcodes to single ir.
+  TODO We might want to change this in the future and get 
+  the comparison out of the branch, but for now, this is the 
+  only branch we have and it is a showcase for matching multiple 
+  llvm bitcodes to single ir.
  */
 class Cbr : public Instruction {
 public:
@@ -257,6 +261,15 @@ public:
 
     static Switch create(Builder & b, llvm::Value * cond, llvm::BasicBlock * defaultTarget, int numCases) {
         return llvm::SwitchInst::Create(cond, defaultTarget, numCases, b);
+    }
+
+    void setDefaultDest(llvm::BasicBlock* target){
+        ins<llvm::SwitchInst>()->setDefaultDest(target);
+
+    }
+
+    llvm::BasicBlock* getDefaultDest(){
+        return ins<llvm::SwitchInst>()->getDefaultDest(); 
     }
 
 };
