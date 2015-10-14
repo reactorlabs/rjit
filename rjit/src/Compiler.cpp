@@ -28,33 +28,6 @@ using namespace llvm;
 
 namespace {
 
-void emitStackmap(uint64_t id, std::vector<Value*> values, rjit::JITModule& m,
-                  BasicBlock* b) {
-    ConstantInt* const_0 =
-        ConstantInt::get(m.getContext(), APInt(32, StringRef("0"), 10));
-    Constant* const_null =
-        ConstantExpr::getCast(Instruction::IntToPtr, const_0, rjit::t::i8ptr);
-    ConstantInt* const_num_bytes = ConstantInt::get(
-        m.getContext(), APInt(32, rjit::patchpointSize, false));
-    ConstantInt* const_id =
-        ConstantInt::get(m.getContext(), APInt(64, id, false));
-
-    std::vector<Value*> sm_args;
-
-    // Args to the stackmap
-    sm_args.push_back(const_id);
-    sm_args.push_back(const_num_bytes);
-    sm_args.push_back(const_null);
-    sm_args.push_back(const_0);
-
-    // Values to record
-    for (auto arg : values) {
-        sm_args.push_back(arg);
-    }
-
-    CallInst::Create(m.patchpoint, sm_args, "", b);
-}
-
 SEXP createNativeSXP(RFunctionPtr fptr, SEXP ast,
                      std::vector<SEXP> const& objects, Function* f) {
     SEXP objs = allocVector(VECSXP, objects.size() + 1);
@@ -89,22 +62,20 @@ Value* loadConstant(SEXP value, Module* m, BasicBlock* b) {
         rjit::t::SEXP);
 }
 
-Value* insertCall(Value* fun, std::vector<Value*> args, BasicBlock* b,
-                  rjit::JITModule& m, uint64_t function_id) {
+Value* insertCall(Value* fun, std::vector<Value*> args, Function* f,
+                  BasicBlock* b, rjit::JITModule& m, bool safepoint) {
 
     auto res = CallInst::Create(fun, args, "", b);
 
-    if (function_id != (uint64_t)-1) {
-        assert(function_id > 1);
-        assert(function_id < StackMap::nextStackmapId);
-
+    if (safepoint) {
         AttributeSet PAL;
         {
             SmallVector<AttributeSet, 4> Attrs;
             AttributeSet PAS;
             {
                 AttrBuilder B;
-                B.addAttribute("statepoint-id", std::to_string(function_id));
+                auto id = JITCompileLayer::singleton.getSafepointId(f);
+                B.addAttribute("statepoint-id", std::to_string(id));
                 PAS = AttributeSet::get(m.getContext(), ~0U, B);
             }
             Attrs.push_back(PAS);
@@ -116,14 +87,11 @@ Value* insertCall(Value* fun, std::vector<Value*> args, BasicBlock* b,
     return res;
 }
 
-void setupFunction(Function& f, uint64_t functionId) {
+void setupFunction(Function& f) {
     f.setGC("rjit");
     auto attrs = f.getAttributes();
     attrs = attrs.addAttribute(f.getContext(), AttributeSet::FunctionIndex,
                                "no-frame-pointer-elim", "true");
-    attrs = attrs.addAttribute(f.getContext(), AttributeSet::FunctionIndex,
-                               "statepoint-id", std::to_string(functionId));
-
     f.setAttributes(attrs);
 }
 
@@ -135,8 +103,7 @@ void Compiler::Context::addObject(SEXP object) {
 Compiler::Context::Context(std::string const& name, llvm::Module* m) {
     f = llvm::Function::Create(t::sexp_sexpsexpint,
                                llvm::Function::ExternalLinkage, name, m);
-    functionId = StackMap::nextStackmapId++;
-    setupFunction(*f, functionId);
+    setupFunction(*f);
     llvm::Function::arg_iterator args = f->arg_begin();
     llvm::Value* body = args++;
     body->setName("body");
@@ -171,7 +138,7 @@ SEXP Compiler::compileFunction(std::string const& name, SEXP ast,
 
 void Compiler::jitAll() {
 
-    auto engine = JITCompileLayer::getEngine(m.getM());
+    auto engine = JITCompileLayer::singleton.getEngine(m.getM());
 
     // perform all the relocations
     for (SEXP s : relocations) {
@@ -234,9 +201,12 @@ Value* Compiler::compileSymbol(SEXP value) {
 
 Value* Compiler::compileICCallStub(Value* call, Value* op,
                                    std::vector<Value*>& callArgs) {
-    uint64_t smid = StackMap::nextStackmapId++;
+    uint64_t smid = JITCompileLayer::singleton.getSafepointId(context->f);
 
-    auto ic_stub = ICCompiler::getStub(callArgs.size(), m);
+    auto size = callArgs.size();
+    auto ic_stub = ICCompiler::getStub(size, m);
+
+    JITCompileLayer::singleton.setPatchpoint(smid, size);
 
     std::vector<Value*> ic_args;
     // Closure arguments
@@ -251,10 +221,24 @@ Value* Compiler::compileICCallStub(Value* call, Value* op,
     ic_args.push_back(context->f);
     ic_args.push_back(ConstantInt::get(getGlobalContext(), APInt(64, smid)));
 
-    // Record a patch point
-    emitStackmap(smid, {{ic_stub}}, m, context->b);
+    auto res = CallInst::Create(ic_stub, ic_args, "", context->b);
+    AttributeSet PAL;
+    {
+        SmallVector<AttributeSet, 4> Attrs;
+        AttributeSet PAS;
+        {
+            AttrBuilder B;
+            B.addAttribute("statepoint-id", std::to_string(smid));
+            B.addAttribute("statepoint-num-patch-bytes",
+                           std::to_string(patchpointSize));
+            PAS = AttributeSet::get(m.getContext(), ~0U, B);
+        }
+        Attrs.push_back(PAS);
+        PAL = AttributeSet::get(m.getContext(), Attrs);
+    }
+    res->setAttributes(PAL);
 
-    return INTRINSIC(ic_stub, ic_args);
+    return res;
 }
 
 Value* Compiler::compileCall(SEXP call) {
@@ -920,6 +904,6 @@ Value* Compiler::constant(SEXP value) {
 }
 
 Value* Compiler::INTRINSIC(llvm::Value* fun, std::vector<Value*> args) {
-    return insertCall(fun, args, context->b, m, context->functionId);
+    return insertCall(fun, args, context->f, context->b, m, true);
 }
 }

@@ -40,10 +40,10 @@ namespace rjit {
 
 Value* loadConstant(SEXP value, Module* m, BasicBlock* b);
 
-Value* insertCall(Value* fun, std::vector<Value*> args, BasicBlock* b,
-                  rjit::JITModule& m, uint64_t function_id);
+Value* insertCall(Value* fun, std::vector<Value*> args, Function* f,
+                  BasicBlock* b, rjit::JITModule& m, bool safepoint);
 
-void setupFunction(Function& f, uint64_t functionId);
+void setupFunction(Function& f);
 
 std::vector<bool> ICCompiler::hasStub;
 
@@ -62,15 +62,13 @@ ICCompiler::ICCompiler(unsigned size, JITModule& m, std::string name)
 
     auto funT = FunctionType::get(t::SEXP, argT, false);
     ic_t = funT;
-
-    functionId = StackMap::nextStackmapId++;
 }
 
 void ICCompiler::initFunction() {
     assert(!f);
 
     f = Function::Create(ic_t, Function::ExternalLinkage, name, m);
-    setupFunction(*f, functionId);
+    setupFunction(*f);
     b = BasicBlock::Create(getGlobalContext(), "start", f, nullptr);
 
     // Load the args in the same order as the stub
@@ -124,7 +122,7 @@ void* ICCompiler::finalize() {
     // FIXME: Allocate a NATIVESXP, or link it to the caller??
 
     // m.dump();
-    auto engine = JITCompileLayer::getEngine(m.getM());
+    auto engine = JITCompileLayer::singleton.getEngine(m.getM());
     auto ic = engine->getPointerToFunction(f);
 
     return ic;
@@ -453,11 +451,11 @@ Value* ICCompiler::constant(SEXP value) {
 
 Value* ICCompiler::INTRINSIC_NO_SAFEPOINT(llvm::Value* fun,
                                           std::vector<Value*> args) {
-    return insertCall(fun, args, b, m, -1);
+    return insertCall(fun, args, f, b, m, false);
 }
 
 Value* ICCompiler::INTRINSIC(llvm::Value* fun, std::vector<Value*> args) {
-    return insertCall(fun, args, b, m, functionId);
+    return insertCall(fun, args, f, b, m, true);
 }
 
 } // namespace rjit

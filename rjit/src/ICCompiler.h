@@ -12,10 +12,10 @@ class ICCompiler {
 
     void* compile(SEXP inCall, SEXP inFun, SEXP inRho);
 
+    static std::string stubName(unsigned size);
+
   private:
     void initFunction();
-
-    static std::string stubName(unsigned size);
 
     void* finalize();
 
@@ -86,8 +86,6 @@ class ICCompiler {
 
     JITModule& m;
     unsigned size;
-
-    unsigned functionId;
 
     static std::vector<bool> hasStub;
 };

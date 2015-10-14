@@ -55,8 +55,6 @@ class Compiler {
         llvm::Value* rho;
 
         std::vector<SEXP> objects;
-
-        unsigned functionId;
     };
 
     /** Compiles an expression.
