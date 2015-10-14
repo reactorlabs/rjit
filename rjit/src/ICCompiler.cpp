@@ -284,23 +284,13 @@ bool ICCompiler::compileGenericIc(SEXP inCall, SEXP inFun) {
 }
 
 Value* ICCompiler::compileCall(SEXP call, SEXP op) {
-    // TODO: only emit one branch depending on the type we currently see
-
-    BasicBlock* icTest2 =
-        BasicBlock::Create(getGlobalContext(), "icTest2", f, nullptr);
     BasicBlock* icMatch =
         BasicBlock::Create(getGlobalContext(), "icMatch", f, nullptr);
     BasicBlock* icMiss =
         BasicBlock::Create(getGlobalContext(), "icMiss", f, nullptr);
     BasicBlock* end = BasicBlock::Create(getGlobalContext(), "end", f, nullptr);
 
-    // TODO: Do we really have to test for ast changes all the time?
-    Value* test = new ICmpInst(*b, ICmpInst::ICMP_EQ, this->call,
-                               constant(call), "guard");
-    BranchInst::Create(icTest2, icMiss, test, b);
-
-    b = icTest2;
-
+    Value* test;
     switch (TYPEOF(op)) {
     case SPECIALSXP: {
         // Specials only care about the ast, so we can call any special through
