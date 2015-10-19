@@ -6,20 +6,20 @@ build:
     - script:
         name: setup (without llvm) and run tests
         code: |
-            ${WERCKER_SOURCE_DIR}/tools/setup.sh -l -d . 
+            ${WERCKER_SOURCE_DIR}/tools/setup.sh -h
   after-steps:
     - script:
         name: determine slack user name
         code: |
-            source ${WERCKER_SOURCE_DIR}/tools/wercker.sh
+            source ${WERCKER_SOURCE_DIR}/tools/wercker.sh && echo $SLACK_USER
+    - wantedly/pretty-slack-notify:
+        webhook_url: https://hooks.slack.com/services/T084REP36/B0B99DJ6B/$SLACK_TOKEN
+        channel: r-on-llvm
+        username: cibot
+        branches: ^master$
     - sherzberg/slack-notify:
         subdomain: just-r
         token: $SLACK_TOKEN
         channel: "@$SLACK_USER"
         username: cibot
         icon_url: https://avatars3.githubusercontent.com/u/1695193?s=140
-    - wantedly/pretty-slack-notify:
-        webhook_url: $SLACK_TOKEN
-        channel: r-on-llvm
-        username: cibot
-        branches: ^master$
