@@ -19,5 +19,5 @@ build:
         branches: ^master$
     - wantedly/pretty-slack-notify:
         webhook_url: https://hooks.slack.com/services/T084REP36/B0B99DJ6B/$SLACK_TOKEN
-        channel: @$SLACK_USER
+        channel: "@$SLACK_USER"
         username: cibot
