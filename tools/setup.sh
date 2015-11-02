@@ -275,4 +275,4 @@ if [ $SKIP_BUILD -eq 0 ]; then
     ${SRC_DIR}/tools/tests
 fi
 # save success result for CI
-echo "SETUP_SUCCESS=1" >> "${SCR_DIR}/.local.config"
+echo "\nSETUP_SUCCESS=1" >> "${SRC_DIR}/.local.config"
