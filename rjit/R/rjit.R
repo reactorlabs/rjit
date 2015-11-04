@@ -46,5 +46,11 @@ jit.compileEnvironment <- function(environment, moduleName ="rjit module") {
     invisible(NULL)
 }
 
+jit.getIR <- function(what) {
+    if(typeof(what) == "closure")
+        what = .Internal(bodyCode(what));
+    invisible(.Call("jitGetIR", what))
+}
+
 jit.enable <- function() .Call("jitEnable");
 jit.disable <- function() .Call("jitDisable");
