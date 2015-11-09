@@ -27,4 +27,4 @@ echo ""
 echo "==> Running testr samples"
 tools/testr_tests.sh
 # save success result for CI
-echo "\nINTEGRATION_TESTS_SUCCESS=1" >> "${SCRIPTPATH}/../.local.config"
+echo "INTEGRATION_TESTS_SUCCESS=1" >> "${SCRIPTPATH}/../.test_results"
