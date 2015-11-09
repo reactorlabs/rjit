@@ -22,11 +22,13 @@ if [ -z "$WERCKER_ROOT"]; then
     STATUS="failure"
   fi
   COMMIT_ID=$BUILD_VCS_NUMBER
+  GIT_BRANCH=`git rev-parse --abbrev-ref HEAD`
   SLACK_NOTIFIER_ICON_URL="https://secure.gravatar.com/avatar/a08fc43441db4c2df2cef96e0cc8c045?s=140"
   BUILD_URL="https://reactor.ccs.neu.edu:8111/"
 else
 # running at wercker
   CI="Wercker"
+  GIT_BRANCH=$WERCKER_GIT_BRANCH
   SLACK_NOTIFIER_ICON_URL="https://secure.gravatar.com/avatar/a08fc43441db4c2df2cef96e0cc8c045?s=140"
   STATUS=$WERCKER_RESULT
   COMMIT_ID=$WERCKER_GIT_COMMIT
@@ -34,7 +36,6 @@ else
 fi
 
 STARTED_BY=`git --no-pager show -s --format="%aN" $COMMIT_ID`
-GIT_BRANCH=`git rev-parse --abbrev-ref HEAD`
 
 case $STARTED_BY in
     RomanTsegelskyi|"Roman Tsegelskyi")

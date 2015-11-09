@@ -13,6 +13,6 @@ build:
             ${WERCKER_SOURCE_DIR}/tools/integration_tests.sh
   after-steps:
     - script:
-        name: integration tests
+        name: Slack Notifications
         code: |
             ${WERCKER_SOURCE_DIR}/tools/ci.sh
