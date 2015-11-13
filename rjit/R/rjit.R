@@ -52,5 +52,11 @@ jit.getIR <- function(what) {
     invisible(.Call("jitGetIR", what))
 }
 
+jit.checkACall <- function(what, env= environment(what)) {
+    if(typeof(what) == "closure")
+        what = .Internal(bodyCode(what));
+    invisible(.Call("checkACall", what));
+}
+
 jit.enable <- function() .Call("jitEnable");
 jit.disable <- function() .Call("jitDisable");

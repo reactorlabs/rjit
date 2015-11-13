@@ -189,6 +189,8 @@ Value* Compiler::compileCall(SEXP call) {
     std::vector<Value*> args;
     compileArguments(CDR(call), args);
 
+    // TODO aghosn: try to return a CallInst
+    // return CallInst::Create(f, args, "", b.block());
     return compileICCallStub(ir::Constant::create(b, call), f, args);
 }
 

@@ -21,6 +21,8 @@
 
 #include "llvm/Support/DynamicLibrary.h"
 
+#include "AgressiveInlining.h"
+
 using namespace llvm;
 
 namespace rjit {
