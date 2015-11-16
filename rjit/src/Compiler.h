@@ -5,12 +5,6 @@
 
 #include "RDefs.h"
 
-#include "AgressiveInlining.h"
-
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/Module.h>
-#include <llvm/Transforms/Utils/Cloning.h>
-
 namespace rjit {
 
 #define JUMP(block) BranchInst::Create(block, context->b)

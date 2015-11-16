@@ -46,16 +46,30 @@ jit.compileEnvironment <- function(environment, moduleName ="rjit module") {
     invisible(NULL)
 }
 
-jit.getIR <- function(what) {
+jit.prototype <- function(what) {
     if(typeof(what) == "closure")
         what = .Internal(bodyCode(what));
-    invisible(.Call("jitGetIR", what))
+    invisible(.Call("prototypeInlining", what))
 }
 
-jit.checkACall <- function(what, env= environment(what)) {
-    if(typeof(what) == "closure")
-        what = .Internal(bodyCode(what));
-    invisible(.Call("checkACall", what));
+jit.containsPrototype <- function(what) {
+    invisible(.Call("containsPrototype", what))
+}
+
+jit.inlineFunctions <- function(what, whut) {
+    if (typeof(what) == "closure") {
+        bcf = .Internal(bodyCode(what))
+    }else {
+        bcf = what
+    }
+
+    if(typeof(whut) == "closure") {
+        bcg = .Internal(bodyCode(whut))
+    }else {
+        bcg = whut
+    }
+
+    .Call("inlineFunctions", bcf, bcg)
 }
 
 jit.enable <- function() .Call("jitEnable");
