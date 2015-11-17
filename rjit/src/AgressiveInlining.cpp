@@ -18,38 +18,58 @@
 
 #include "R.h"
 
+#define PRINT_DEBUG_TRUE
+#ifdef PRINT_DEBUG_TRUE
+#define DEBB(x) x;
+#else
+#define DEBB(x)
+#endif
+
 using namespace rjit;
 namespace osr {
 
-/**
- * @brief      We generate the llvm IR for the function without the
- *			   instrumentation (safepoints)
- *
- * @param[in]  expression
- *
- * @return     NATIVESXP
- */
-REXPORT SEXP prototypeInlining(SEXP expression) {
-    Compiler c("module");
-    SEXP result = c.compile("name_here", expression);
-
-    // TODO the bookkeeping by registering the function with a correct name.
-    std::string name = DeparseUtils::getName(expression);
-    printf("The name when adding it %s.\n", name.c_str());
-    llvm::Function* f = reinterpret_cast<llvm::Function*>(TAG(result));
-    osr::InliningEnv::getInstance().store[name] = f;
-    return result;
+llvm::CallInst* getCall(llvm::Function* f) {
+    llvm::CallInst* call = NULL;
+    for (inst_iterator I = inst_begin(f), E = inst_end(f); I != E; ++I) {
+        call = dynamic_cast<llvm::CallInst*>(&(*I));
+        if (call != NULL) {
+            // Big hack
+            std::string name = call->getCalledFunction()->getName().str();
+            if (name.find("icStub") != std::string::npos) {
+                // get the first argument to check if we can get the called
+                // function
+                // according to Oli this is the first argument
+                // for the moment only return the icStub
+                return call;
+            }
+        }
+    }
+    return NULL;
 }
 
-REXPORT SEXP containsPrototype(SEXP expression) {
-    std::string name = DeparseUtils::getName(expression);
+llvm::Instruction* getConstant(llvm::Function* f) {
+    llvm::CallInst* call = NULL;
+    for (inst_iterator I = inst_begin(f), E = inst_end(f); I != E; ++I) {
+        call = dynamic_cast<llvm::CallInst*>(&(*I));
+        if (call != NULL) {
+            std::string name = call->getCalledFunction()->getName().str();
+            if (name.find("userLiteral") != std::string::npos) {
+                return &(*I);
+            }
+        }
+    }
+    return NULL;
+}
 
-    printf("The name when looking for it %s.\n", name.c_str());
-    if (InliningEnv::getInstance().storeContains(name))
-        printf("Yeah, we found it in the store.\n");
-    else
-        printf("Neeh, never seen it.\n");
-    return R_NilValue;
+int getNumberOfBasicBlocks(llvm::Function* f) {
+    int bb = 0;
+    for (llvm::Function::iterator i = f->begin(), e = f->end(); i != e; ++i) {
+        printf("WE HAVE A BLOCK:\n");
+        i->dump();
+        printf("END OF BLOCK\n");
+        ++bb;
+    }
+    return bb;
 }
 
 // TODO aghosn this is what we gonna do for the moment.
@@ -59,52 +79,60 @@ REXPORT SEXP inlineFunctions(SEXP outter, SEXP inner) {
     SEXP g = c.compile("g", inner);
     llvm::Function* llvmF = reinterpret_cast<llvm::Function*>(TAG(f));
     llvm::Function* llvmG = reinterpret_cast<llvm::Function*>(TAG(g));
-    printf("The outter function before \n");
-    llvmF->dump();
-    printf("\n\n");
-    printf("The inner function before \n");
-    llvmG->dump();
-    printf("\n\n");
-    // TODO do the inlining.
+
+    DEBB(printf("The outter function before \n"); llvmF->dump();
+         printf("Has #blocks: %d\n", getNumberOfBasicBlocks(llvmF));
+         printf("\n\n"); printf("The inner function before \n"); llvmG->dump();
+         printf("Has #blocks: %d\n", getNumberOfBasicBlocks(llvmG));
+         printf("\n\n");)
+    // Get all instructions in the inner function.
     std::vector<llvm::Instruction*> v;
     for (inst_iterator it = inst_begin(llvmG), e = inst_end(llvmG); it != e;
          ++it) {
         v.push_back(&(*it));
     }
 
-    printf("The outter function before \n");
-    llvmF->dump();
-    printf("\n\n");
-    printf("The inner function before \n");
-    llvmG->dump();
-    printf("\n\n");
-
     // find the call inside the outter function
-    llvm::CallInst* call = NULL;
-    for (inst_iterator I = inst_begin(llvmF), E = inst_end(llvmF); I != E;
-         ++I) {
-        call = dynamic_cast<llvm::CallInst*>(&(*I));
-        if (call != NULL) {
-            // TODO try to id the function, this is not the correct one.
-            for (std::vector<llvm::Instruction*>::iterator it = v.begin();
-                 it != v.end(); ++it) {
-                (*it)->removeFromParent();
-                (*it)->insertBefore(call);
+    llvm::CallInst* call = getCall(llvmF);
+    llvm::Instruction* arg = NULL;
+
+    if (call != NULL) {
+        // insert the instructions
+        for (std::vector<llvm::Instruction*>::iterator it = v.begin();
+             it != v.end(); ++it) {
+            llvm::CallInst* inarg = dynamic_cast<llvm::CallInst*>(*it);
+            if (inarg != NULL &&
+                (inarg->getCalledFunction()->getName().str().find(
+                     "genericGetVar") != std::string::npos)) {
+
+                arg = *it;
             }
-
-            printf("What f looks like now\n");
-            llvmF->dump();
-
-            // llvm::BasicBlock* parent = call->getParent();
-            // creates a problem
-            call->removeFromParent();
-            printf("After removing the parent");
-
-            return R_NilValue;
+            (*it)->removeFromParent();
+            (*it)->insertBefore(call);
         }
+        if (arg != NULL) {
+            llvm::Instruction* value = getConstant(llvmF);
+            arg->replaceAllUsesWith(value);
+            arg->removeFromParent();
+        }
+
+        call->removeFromParent();
+        // MAGIC
+        inst_begin(llvmF)->removeFromParent();
+        (--inst_end(llvmF))->removeFromParent();
+        (--(--inst_end(llvmF)))->removeFromParent();
+        // MAGIC END
+        printf("after removing the dead code\n");
+        llvmF->dump();
+        printf("Has #blocks: %d\n", getNumberOfBasicBlocks(llvmF));
+        llvmG->removeFromParent();
+        c.removeFromRelocations(g);
+        // TODO instrument
+        c.jitAll();
+        return f;
     }
 
-    // TODO do the instrumentation
+    DEBB(printf("Failure of inlining, the call found was NULL\n"));
 
     // TODO create a valid closure to return
     return R_NilValue;

@@ -46,16 +46,6 @@ jit.compileEnvironment <- function(environment, moduleName ="rjit module") {
     invisible(NULL)
 }
 
-jit.prototype <- function(what) {
-    if(typeof(what) == "closure")
-        what = .Internal(bodyCode(what));
-    invisible(.Call("prototypeInlining", what))
-}
-
-jit.containsPrototype <- function(what) {
-    invisible(.Call("containsPrototype", what))
-}
-
 jit.inlineFunctions <- function(what, whut) {
     if (typeof(what) == "closure") {
         bcf = .Internal(bodyCode(what))

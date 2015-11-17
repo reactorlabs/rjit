@@ -73,6 +73,10 @@ void Compiler::jitAll() {
     }
 }
 
+void Compiler::removeFromRelocations(SEXP f) {
+    std::remove(relocations.begin(), relocations.end(), f);
+}
+
 /** Compiles an expression.
 
   The expression as a result is always visible by default, which can be changed

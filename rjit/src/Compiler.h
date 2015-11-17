@@ -23,6 +23,8 @@ class Compiler {
 
     void jitAll();
 
+    void removeFromRelocations(SEXP f);
+
   private:
     /** Compiles an expression.
 
