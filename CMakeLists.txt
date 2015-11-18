@@ -9,7 +9,7 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
-add_definitions(--std=c++11 -Wall -Werror)
+add_definitions(--std=c++11 -Wall -O2)
 
 # set R
 
@@ -21,7 +21,7 @@ include_directories(${R_INCLUDE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/rjit/src)
 
 # TODO for now, make all builds debug
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 file(WRITE ${CMAKE_SOURCE_DIR}/.local.config  "BUILD_DIR=${CMAKE_BINARY_DIR}\nROOT_DIR=${CMAKE_SOURCE_DIR}\nR_HOME=${R_HOME}\nLLVM_CMAKE=${LLVM_DIR}\nTESTR_DIR=${TESTR_DIR}")
 

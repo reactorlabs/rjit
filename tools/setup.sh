@@ -202,7 +202,7 @@ if [ $SKIP_LLVM -eq 0 ]; then
     echo "-> building llvm to ${LLVM_BUILD_DIR}"
     mkdir -p $LLVM_BUILD_DIR
     cd $LLVM_BUILD_DIR
-    cmake -G "$GEN" -DLLVM_OPTIMIZED_TABLEGEN=1 -DLLVM_ENABLE_RTTI=1 -DLLVM_TARGETS_TO_BUILD="X86;CppBackend" -DCMAKE_BUILD_TYPE=Debug --enable-debug-symbols --with-oprofile ${LLVM_SRC}
+    cmake -G "$GEN" -DLLVM_OPTIMIZED_TABLEGEN=1 -DLLVM_ENABLE_RTTI=1 -DLLVM_TARGETS_TO_BUILD="X86;CppBackend" -DCMAKE_BUILD_TYPE=Release --enable-debug-symbols --with-oprofile ${LLVM_SRC}
 
     echo "Building llvm now -- this might take quite a while.... (if it fails rerun setup with fewer threads (-j))"
     $M
