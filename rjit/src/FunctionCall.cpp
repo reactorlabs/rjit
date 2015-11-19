@@ -5,16 +5,17 @@
 
 namespace osr {
 
-FunctionCall::FunctionCall(llvm::CallInst* getFunc, Inst_Vector args,
-                           llvm::CallInst* icStub)
-    : getFunc(getFunc), args(args), icStub(icStub) {}
-
 Pos_N_Args FunctionCall::extractArguments(llvm::Function* f, unsigned int pos) {
 
     Inst_Vector* result = new Inst_Vector();
     llvm::inst_iterator I = Utils::advance(inst_begin(f), pos);
     llvm::inst_iterator E = inst_end(f);
     llvm::CallInst* stub = NULL;
+
+    // Skip the getFunction line
+    if (I != E)
+        ++I;
+
     while (I != E) {
         stub = dynamic_cast<llvm::CallInst*>(&(*I));
         // TODO good for now but would be better to check that this is the
@@ -23,7 +24,7 @@ Pos_N_Args FunctionCall::extractArguments(llvm::Function* f, unsigned int pos) {
         // through
         // the Use of the instruction.
         if (stub != NULL &&
-            NAME_CONTAINS(stub->getCalledFunction(), "icStub")) {
+            NAME_CONTAINS(stub->getCalledFunction(), ICSTUB_NAME)) {
             return Pos_N_Args(I, result);
         }
 
@@ -33,7 +34,17 @@ Pos_N_Args FunctionCall::extractArguments(llvm::Function* f, unsigned int pos) {
     return Pos_N_Args(E, result);
 }
 
-FunctionCalls* getFunctionCalls(llvm::Function* f) {
+Inst_Vector* FunctionCall::getCallArguments() {
+    Inst_Vector* result = new Inst_Vector();
+    if (this->icStub == NULL) {
+        return result;
+    }
+    // TODO try to implement when I found how to get the actual arguments.
+    // It might be the uses as I have seen before.
+    return result;
+}
+
+FunctionCalls* FunctionCall::getFunctionCalls(llvm::Function* f) {
 
     FunctionCalls* result = new FunctionCalls();
     llvm::CallInst* gf = NULL;
@@ -46,10 +57,8 @@ FunctionCalls* getFunctionCalls(llvm::Function* f) {
         if (gf != NULL && IS_GET_FUNCTION(gf)) {
             Pos_N_Args res = FunctionCall::extractArguments(f, I.getPos());
             ics = dynamic_cast<llvm::CallInst*>(&(*(res.first)));
-            if (gf != NULL) {
-                std::string name = Utils::getIcStubName(res.second->size());
-                if (IS_NAMED(gf->getCalledFunction(), name)) {
-                    ics = gf;
+            if (ics != NULL) {
+                if (NAME_CONTAINS(ics->getCalledFunction(), ICSTUB_NAME)) {
                     result->push_back(new FunctionCall(gf, *(res.second), ics));
                 }
             }

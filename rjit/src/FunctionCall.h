@@ -5,6 +5,8 @@
 
 #define GETFUNCTION_NAME "getFunction"
 
+#define ICSTUB_NAME "icStub"
+
 #define IS_NAMED(x, y) ((x)->getName().str().compare((y)) == 0)
 
 #define IS_GET_FUNCTION(x)                                                     \
@@ -27,11 +29,27 @@ typedef std::pair<llvm::inst_iterator, Inst_Vector*> Pos_N_Args;
 class FunctionCall {
   public:
     FunctionCall(llvm::CallInst* getFunc, Inst_Vector args,
-                 llvm::CallInst* icStub);
+                 llvm::CallInst* icStub)
+        : getFunc(getFunc), args(args), icStub(icStub) {}
 
-    static FunctionCalls getFunctionCalls(llvm::Function* f);
+    static FunctionCalls* getFunctionCalls(llvm::Function* f);
 
     static Pos_N_Args extractArguments(llvm::Function* f, unsigned int pos);
+
+    Inst_Vector* getCallArguments();
+
+    void printFunctionCall() {
+        printf("------------------------------------------------\n");
+        printf("The getFunction:\n");
+        getFunc->dump();
+        printf("The intermediary args:\n");
+        for (Inst_Vector::iterator it = args.begin(); it != args.end(); ++it) {
+            (*it)->dump();
+        }
+        printf("The icStub:\n");
+        icStub->dump();
+        printf("------------------------------------------------\n");
+    }
 
   private:
     llvm::CallInst* getFunc;

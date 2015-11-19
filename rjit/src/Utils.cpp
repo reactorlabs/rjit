@@ -17,12 +17,7 @@
 
 #include "R.h"
 
-#define PRINT_DEBUG_TRUE
-#ifdef PRINT_DEBUG_TRUE
-#define DEBB(x) x;
-#else
-#define DEBB(x)
-#endif
+#include "FunctionCall.h"
 
 using namespace rjit;
 namespace osr {
@@ -33,5 +28,18 @@ REXPORT SEXP printWithoutSP(SEXP expr) {
     llvm::Function* rfunction = reinterpret_cast<llvm::Function*>(TAG(result));
     rfunction->dump();
     return result;
+}
+
+REXPORT SEXP extractFunctionCalls(SEXP expr) {
+    Compiler c("module");
+    SEXP result = c.compile("rfunction", expr);
+    llvm::Function* rfunction = reinterpret_cast<llvm::Function*>(TAG(result));
+    rfunction->dump();
+    FunctionCalls* calls = FunctionCall::getFunctionCalls(rfunction);
+    for (FunctionCalls::iterator it = calls->begin(); it != calls->end();
+         ++it) {
+        (*it)->printFunctionCall();
+    }
+    return R_NilValue;
 }
 }
