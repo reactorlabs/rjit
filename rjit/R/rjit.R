@@ -82,5 +82,24 @@ jit.extractFunctionCalls <- function(what) {
     }
 }
 
+jit.testCloning <- function(what, whut) {
+    if(typeof(what) == "closure") {
+        bc = .Internal(bodyCode(what))
+        bc1 = .Internal(bodyCode(whut))
+        native = .Call("testCloning", bc, bc1)
+        f = .Internal(bcClose(formals(what), native, env))
+        attrs = attributes(what)
+        if (!is.null(attrs))
+            attributes(f) = attrs
+        if (isS4(what))
+            f = asS4(f)
+        f
+    }else if (any(c("language", "symbol", "logical", "integer", "double", "complex", "character") == typeof(what))) {
+        .Call("testCloning", what, whut)
+    } else {
+       stop("Only bytecode expressions and asts can be jitted.")
+    }
+}
+
 jit.enable <- function() .Call("jitEnable");
 jit.disable <- function() .Call("jitDisable");

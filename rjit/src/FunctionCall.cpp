@@ -34,16 +34,6 @@ Pos_N_Args FunctionCall::extractArguments(llvm::Function* f, unsigned int pos) {
     return Pos_N_Args(E, result);
 }
 
-Inst_Vector* FunctionCall::getCallArguments() {
-    Inst_Vector* result = new Inst_Vector();
-    if (this->icStub == NULL) {
-        return result;
-    }
-    // TODO try to implement when I found how to get the actual arguments.
-    // It might be the uses as I have seen before.
-    return result;
-}
-
 FunctionCalls* FunctionCall::getFunctionCalls(llvm::Function* f) {
 
     FunctionCalls* result = new FunctionCalls();
@@ -66,6 +56,25 @@ FunctionCalls* FunctionCall::getFunctionCalls(llvm::Function* f) {
     }
 
     return result;
+}
+
+void FunctionCall::printFunctionCall() {
+    printf("------------------------------------------------\n");
+    printf("The getFunction:\n");
+    getFunc->dump();
+    printf("The intermediary args:\n");
+    for (Inst_Vector::iterator it = args.begin(); it != args.end(); ++it) {
+        (*it)->dump();
+    }
+    printf("The icStub:\n");
+    icStub->dump();
+    printf("------------------------------------------------\n");
+}
+
+int FunctionCall::getNumbArguments() {
+    std::string name = icStub->getCalledFunction()->getName().str();
+    printf("The name %s\n", name.c_str());
+    return ((int)name.back() - '0');
 }
 
 } // namespace osr

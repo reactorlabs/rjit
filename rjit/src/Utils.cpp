@@ -18,6 +18,7 @@
 #include "R.h"
 
 #include "FunctionCall.h"
+#include "FunctionExtractor.h"
 
 using namespace rjit;
 namespace osr {
@@ -41,5 +42,20 @@ REXPORT SEXP extractFunctionCalls(SEXP expr) {
         (*it)->printFunctionCall();
     }
     return R_NilValue;
+}
+
+REXPORT SEXP testCloning(SEXP outter, SEXP inner) {
+    Compiler c("module");
+    SEXP rO = c.compile("outter", outter);
+    SEXP rI = c.compile("inner", inner);
+    llvm::Function* llvmO = reinterpret_cast<llvm::Function*>(TAG(rO));
+    llvm::Function* llvmI = reinterpret_cast<llvm::Function*>(TAG(rI));
+    FunctionExtractor* fe = new FunctionExtractor(llvmI);
+    FunctionCalls* calls = FunctionCall::getFunctionCalls(llvmO);
+    for (FunctionCalls::iterator it = calls->begin(); it != calls->end();
+         ++it) {
+        fe->insertValues(*it);
+    }
+    return rO;
 }
 }

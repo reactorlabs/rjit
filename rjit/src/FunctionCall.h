@@ -2,6 +2,7 @@
 #define FUNCTION_CALL_H
 
 #include "llvm.h"
+#include <llvm/IR/InstIterator.h>
 
 #define GETFUNCTION_NAME "getFunction"
 
@@ -15,9 +16,8 @@
 #define NAME_CONTAINS(x, y)                                                    \
     ((((x)->getName().str()).find((y))) != std::string::npos)
 
-#define ADVANCE(I, n)                                                          \
-    for (unsigned int i = 0; i < n; ++i, ++I) {                                \
-    }
+#define GET_VAR_NAME "genericGetVar"
+#define IS_GET_VAR(x) IS_NAMED((x)->getCalledFunction(), GET_VAR_NAME)
 
 namespace osr {
 
@@ -26,6 +26,11 @@ class FunctionCall;
 typedef std::vector<FunctionCall*> FunctionCalls;
 typedef std::pair<llvm::inst_iterator, Inst_Vector*> Pos_N_Args;
 
+/**
+ * @brief      Wrapper for a function call in rjit. Enables to expose
+ *             all parts easily. Also provides a function to get all calls
+ *             from a function.
+ */
 class FunctionCall {
   public:
     FunctionCall(llvm::CallInst* getFunc, Inst_Vector args,
@@ -36,20 +41,11 @@ class FunctionCall {
 
     static Pos_N_Args extractArguments(llvm::Function* f, unsigned int pos);
 
-    Inst_Vector* getCallArguments();
+    void printFunctionCall();
 
-    void printFunctionCall() {
-        printf("------------------------------------------------\n");
-        printf("The getFunction:\n");
-        getFunc->dump();
-        printf("The intermediary args:\n");
-        for (Inst_Vector::iterator it = args.begin(); it != args.end(); ++it) {
-            (*it)->dump();
-        }
-        printf("The icStub:\n");
-        icStub->dump();
-        printf("------------------------------------------------\n");
-    }
+    Inst_Vector* getArgs() { return &args; }
+
+    int getNumbArguments();
 
   private:
     llvm::CallInst* getFunc;
