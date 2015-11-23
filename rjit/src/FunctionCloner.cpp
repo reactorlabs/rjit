@@ -34,6 +34,8 @@ llvm::Function* FunctionCloner::insertValues(FunctionCall* fc) {
         }
     }
     // TODO kind of a hack here. Put the arguments inside of the function
+    // TODO try to get the return instruction also.
+    // TODO see how we could use the valueMap
     Inst_Vector args = *(fc->getArgs());
     for (Inst_Vector::iterator it = getVars.begin(), ait = args.begin();
          (it != getVars.end()) && (ait != args.end()); ++it, ++ait) {
@@ -42,35 +44,19 @@ llvm::Function* FunctionCloner::insertValues(FunctionCall* fc) {
         ci->insertBefore(*it);
         (*it)->replaceAllUsesWith(ci);
         (*it)->removeFromParent();
-        // VMap[(*it)] = (*ait);
     }
+    return duplicateFunction;
+}
 
-    // Split the block to insert the code
-    llvm::Value* parent = fc->getGetFunc()->getParent();
-    // check that this is a basic block
-    llvm::BasicBlock* bb = dynamic_cast<llvm::BasicBlock*>(parent);
-    printf("BEFORE THE POSSIBLE RETURN \n");
-    if (bb == NULL)
-        return nullptr; // failure
-
-    llvm::BasicBlock* dead = bb->splitBasicBlock(fc->getGetFunc(), "DEAD");
-    BB_Vector* blocks = this->getBBs(duplicateFunction);
-    // TODO this is wrong, correct it
-    llvm::Function* pf = dynamic_cast<llvm::Function*>(bb->getParent());
-    for (BB_Vector::iterator it = blocks->begin(); it != blocks->end(); ++it) {
-        (*it)->removeFromParent();
-        (*it)->insertInto(pf, dead);
+RInst_Vector* FunctionCloner::getReturnInsts() {
+    RInst_Vector* res = new RInst_Vector();
+    llvm::ReturnInst* ret = nullptr;
+    for (inst_iterator it = inst_begin(this->f), e = inst_end(this->f); it != e;
+         ++it) {
+        ret = dynamic_cast<llvm::ReturnInst*>(&(*it));
+        if (ret != NULL)
+            res->push_back(ret);
     }
-
-    bb->getTerminator()->setSuccessor(0, (*(blocks->begin())));
-    duplicateFunction->removeFromParent();
-
-    // take away the rest of the code after the call
-
-    printf("Let's see the result\n");
-    pf->dump();
-    // optional: remove the rest in a clean way if possible.
-    // if not tail call, must set the continuation correctly.
-    return nullptr;
+    return res;
 }
 }

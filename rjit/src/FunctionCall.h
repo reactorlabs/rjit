@@ -48,6 +48,7 @@ class FunctionCall {
     int getNumbArguments();
 
     llvm::CallInst* getGetFunc() { return getFunc; }
+    llvm::CallInst* getIcStub() { return icStub; }
 
   private:
     llvm::CallInst* getFunc;

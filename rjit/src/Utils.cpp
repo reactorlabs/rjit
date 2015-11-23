@@ -19,6 +19,7 @@
 
 #include "FunctionCall.h"
 #include "FunctionCloner.h"
+#include "OSRInliner.h"
 
 using namespace rjit;
 namespace osr {
@@ -77,14 +78,8 @@ REXPORT SEXP testCloning(SEXP outter, SEXP inner) {
     SEXP rI = c.compile("inner", inner);
     llvm::Function* llvmO = reinterpret_cast<llvm::Function*>(TAG(rO));
     llvm::Function* llvmI = reinterpret_cast<llvm::Function*>(TAG(rI));
-    FunctionCloner* fe = new FunctionCloner(llvmI);
-    FunctionCalls* calls = FunctionCall::getFunctionCalls(llvmO);
+    OSRInliner::inlineThisInThat(llvmO, llvmI);
 
-    for (FunctionCalls::iterator it = calls->begin(); it != calls->end();
-         ++it) {
-        fe->insertValues(*it);
-    }
-    // llvmO->replaceAllUsesWith(result); //TODO crashes here.
     c.jitAll();
     return rO;
 }
