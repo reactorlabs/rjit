@@ -1,5 +1,5 @@
-#ifndef FUNCTIONEXTRACTOR_H
-#define FUNCTIONEXTRACTOR_H
+#ifndef FunctionCloner_H
+#define FunctionCloner_H
 
 #include "llvm.h"
 #include "FunctionCall.h"
@@ -7,6 +7,7 @@
 namespace osr {
 
 typedef std::vector<llvm::Instruction*> Inst_Vector;
+typedef std::vector<llvm::BasicBlock*> BB_Vector;
 /**
  * @brief      Enables to make a copy of a function's body in order to inline
  * 						 it directly inside another
@@ -17,12 +18,20 @@ typedef std::vector<llvm::Instruction*> Inst_Vector;
  * and
  * inlines it.
  */
-class FunctionExtractor {
+class FunctionCloner {
   public:
-    FunctionExtractor(llvm::Function* f) : f(f) {}
+    FunctionCloner(llvm::Function* f) : f(f) {}
 
     llvm::Function* cloneF();
     llvm::Function* insertValues(FunctionCall* fc);
+
+    static BB_Vector* getBBs(llvm::Function* f) {
+        BB_Vector* res = new BB_Vector();
+        for (auto it = f->begin(); it != f->end(); ++it) {
+            res->push_back(it);
+        }
+        return res;
+    }
 
   private:
     llvm::Function* f;

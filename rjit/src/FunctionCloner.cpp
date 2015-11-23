@@ -1,12 +1,12 @@
-#include "FunctionExtractor.h"
 #include <llvm/Transforms/Utils/Cloning.h>
+#include <llvm/IR/CFG.h> // the successor function
 
-#include "llvm/IR/CFG.h" // the successor function
+#include "FunctionCloner.h"
 
 using namespace llvm;
 namespace osr {
 
-llvm::Function* FunctionExtractor::cloneF() {
+llvm::Function* FunctionCloner::cloneF() {
     llvm::ValueToValueMapTy VMap;
     llvm::Function* duplicateFunction =
         llvm::CloneFunction(this->f, VMap, false);
@@ -14,7 +14,7 @@ llvm::Function* FunctionExtractor::cloneF() {
     return duplicateFunction;
 }
 
-llvm::Function* FunctionExtractor::insertValues(FunctionCall* fc) {
+llvm::Function* FunctionCloner::insertValues(FunctionCall* fc) {
     int nArgs = fc->getNumbArguments();
     // Really not the best way of doing it but we'll try.
     llvm::ValueToValueMapTy VMap;
@@ -44,7 +44,33 @@ llvm::Function* FunctionExtractor::insertValues(FunctionCall* fc) {
         (*it)->removeFromParent();
         // VMap[(*it)] = (*ait);
     }
-    duplicateFunction->dump();
-    return duplicateFunction;
+
+    // Split the block to insert the code
+    llvm::Value* parent = fc->getGetFunc()->getParent();
+    // check that this is a basic block
+    llvm::BasicBlock* bb = dynamic_cast<llvm::BasicBlock*>(parent);
+    printf("BEFORE THE POSSIBLE RETURN \n");
+    if (bb == NULL)
+        return nullptr; // failure
+
+    llvm::BasicBlock* dead = bb->splitBasicBlock(fc->getGetFunc(), "DEAD");
+    BB_Vector* blocks = this->getBBs(duplicateFunction);
+    // TODO this is wrong, correct it
+    llvm::Function* pf = dynamic_cast<llvm::Function*>(bb->getParent());
+    for (BB_Vector::iterator it = blocks->begin(); it != blocks->end(); ++it) {
+        (*it)->removeFromParent();
+        (*it)->insertInto(pf, dead);
+    }
+
+    bb->getTerminator()->setSuccessor(0, (*(blocks->begin())));
+    duplicateFunction->removeFromParent();
+
+    // take away the rest of the code after the call
+
+    printf("Let's see the result\n");
+    pf->dump();
+    // optional: remove the rest in a clean way if possible.
+    // if not tail call, must set the continuation correctly.
+    return nullptr;
 }
 }

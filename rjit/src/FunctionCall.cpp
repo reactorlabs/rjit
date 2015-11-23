@@ -73,7 +73,6 @@ void FunctionCall::printFunctionCall() {
 
 int FunctionCall::getNumbArguments() {
     std::string name = icStub->getCalledFunction()->getName().str();
-    printf("The name %s\n", name.c_str());
     return ((int)name.back() - '0');
 }
 

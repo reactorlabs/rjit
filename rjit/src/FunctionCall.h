@@ -47,6 +47,8 @@ class FunctionCall {
 
     int getNumbArguments();
 
+    llvm::CallInst* getGetFunc() { return getFunc; }
+
   private:
     llvm::CallInst* getFunc;
     Inst_Vector args;
