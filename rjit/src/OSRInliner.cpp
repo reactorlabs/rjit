@@ -1,4 +1,6 @@
 #include "OSRInliner.h"
+#include <llvm/IR/Dominators.h>
+#include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
 namespace osr {
 
@@ -18,7 +20,7 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
         callBlock->splitBasicBlock(fc->getGetFunc(), "DEADCALL");
 
     // If there are more instructions
-    // after the icStub, we break get the next inst and split the block there
+    // after the icStub, we get the next inst and split the block there
     llvm::BasicBlock* continuation = nullptr;
     llvm::BasicBlock::iterator it(fc->getIcStub());
     ++it;
@@ -57,8 +59,10 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
                 printf("ERROR parent of return is null\n");
                 return nullptr;
             }
-            parentReturn->splitBasicBlock(calleeReturns->at(0), "DEADRETURN");
+            llvm::BasicBlock* split = parentReturn->splitBasicBlock(
+                calleeReturns->at(0), "DEADRETURN");
             parentReturn->getTerminator()->setSuccessor(0, continuation);
+            llvm::DeleteDeadBlock(split);
             // calleeReturns->at(0)->removeFromParent();
         }
     }
@@ -66,6 +70,8 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
     // Clean up the vectors
     blocks->clear();
     calleeReturns->clear();
+    // Remove the deadblock
+    llvm::DeleteDeadBlock(deadBlock);
     // remove the toInline from the module now that it has been mutilated
     toInline->removeFromParent();
 

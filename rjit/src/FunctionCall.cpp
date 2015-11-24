@@ -27,7 +27,6 @@ Pos_N_Args FunctionCall::extractArguments(llvm::Function* f, unsigned int pos) {
             NAME_CONTAINS(stub->getCalledFunction(), ICSTUB_NAME)) {
             return Pos_N_Args(I, result);
         }
-
         result->push_back(&(*I));
         ++I;
     }

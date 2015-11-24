@@ -19,6 +19,8 @@
 #define GET_VAR_NAME "genericGetVar"
 #define IS_GET_VAR(x) IS_NAMED((x)->getCalledFunction(), GET_VAR_NAME)
 
+#define CONSTANT_NAME "constant"
+
 namespace osr {
 
 typedef std::vector<llvm::Instruction*> Inst_Vector;
