@@ -5,13 +5,14 @@
 
 namespace osr {
 
-Pos_N_Args FunctionCall::extractArguments(llvm::Function* f, unsigned int pos) {
+Pos_Args_Consts FunctionCall::extractArguments(llvm::Function* f,
+                                               unsigned int pos) {
 
-    Inst_Vector* result = new Inst_Vector();
+    Inst_Vector* args = new Inst_Vector();
     llvm::inst_iterator I = Utils::advance(inst_begin(f), pos);
     llvm::inst_iterator E = inst_end(f);
     llvm::CallInst* stub = NULL;
-
+    llvm::CallInst* constantCall = NULL;
     // Skip the getFunction line
     if (I != E)
         ++I;
@@ -25,12 +26,17 @@ Pos_N_Args FunctionCall::extractArguments(llvm::Function* f, unsigned int pos) {
         // the Use of the instruction.
         if (stub != NULL &&
             NAME_CONTAINS(stub->getCalledFunction(), ICSTUB_NAME)) {
-            return Pos_N_Args(I, result);
+            Pos_Args_Consts result = {I, args, constantCall};
+            return result;
+        } else if (stub != NULL &&
+                   NAME_CONTAINS(stub->getCalledFunction(), CONSTANT_NAME)) {
+            constantCall = stub;
         }
-        result->push_back(&(*I));
+        args->push_back(&(*I));
         ++I;
     }
-    return Pos_N_Args(E, result);
+    Pos_Args_Consts result = {E, args, constantCall};
+    return result;
 }
 
 FunctionCalls* FunctionCall::getFunctionCalls(llvm::Function* f) {
@@ -44,11 +50,12 @@ FunctionCalls* FunctionCall::getFunctionCalls(llvm::Function* f) {
     for (; I != E; ++I) {
         gf = dynamic_cast<llvm::CallInst*>(I.get());
         if (gf != NULL && IS_GET_FUNCTION(gf)) {
-            Pos_N_Args res = FunctionCall::extractArguments(f, I.getPos());
-            ics = dynamic_cast<llvm::CallInst*>(&(*(res.first)));
+            Pos_Args_Consts res = FunctionCall::extractArguments(f, I.getPos());
+            ics = dynamic_cast<llvm::CallInst*>(&(*(res.it)));
             if (ics != NULL) {
                 if (NAME_CONTAINS(ics->getCalledFunction(), ICSTUB_NAME)) {
-                    result->push_back(new FunctionCall(gf, *(res.second), ics));
+                    result->push_back(
+                        new FunctionCall(gf, *(res.args), res.consts, ics));
                 }
             }
         }

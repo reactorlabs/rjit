@@ -1,5 +1,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/IR/CFG.h> // the successor function
+#include <llvm/IR/Verifier.h>
+#include <llvm/Support/raw_ostream.h>
 
 #include "FunctionCloner.h"
 
@@ -20,9 +22,36 @@ llvm::Function* FunctionCloner::insertValues(FunctionCall* fc) {
     llvm::ValueToValueMapTy VMap;
     llvm::Function* duplicateFunction =
         llvm::CloneFunction(this->f, VMap, false);
+    // TODO not sure about that
     this->f->getParent()->getFunctionList().push_back(duplicateFunction);
     Inst_Vector getVars;
     int counter = 0;
+
+    /*llvm::Value* consts = NULL;
+    //Identify the reference to constants and keep it around
+    if (oldConsts) {
+        for (unsigned i = 0, e = oldConsts->getNumOperands(); i < e; ++i) {
+            if (llvm::Argument *OpArg = dyn_cast<Argument>(I.getOperand(i)) &&
+                NAME_CONTAINS(OpArg, CONSTANT_NAME)) {
+                consts = OpArg;
+                break;
+            }
+        }
+        //TODO replace here
+    }*/
+
+    llvm::Function* outter = fc->getFunction();
+    if (outter) {
+        llvm::Function::arg_iterator OAI = outter->arg_begin();
+        llvm::Function::arg_iterator AI = duplicateFunction->arg_begin();
+        // Not sure this works since we replace..
+        for (; AI != duplicateFunction->arg_end() && OAI != outter->arg_end();
+             ++AI, ++OAI) {
+            (*AI).replaceAllUsesWith(&(*OAI));
+            // TODO for debugging
+        }
+    }
+
     // TODO kind of hack here. Find a better of identifying param vars.
     for (inst_iterator it = inst_begin(duplicateFunction),
                        e = inst_end(duplicateFunction);
@@ -34,7 +63,6 @@ llvm::Function* FunctionCloner::insertValues(FunctionCall* fc) {
         }
     }
     // TODO kind of a hack here. Put the arguments inside of the function
-    // TODO try to get the return instruction also.
     // TODO see how we could use the valueMap
     Inst_Vector args = *(fc->getArgs());
     for (Inst_Vector::iterator it = getVars.begin(), ait = args.begin();
@@ -45,6 +73,10 @@ llvm::Function* FunctionCloner::insertValues(FunctionCall* fc) {
         (*it)->replaceAllUsesWith(ci);
         (*it)->removeFromParent();
     }
+
+    // Clean up
+    getVars.clear();
+    args.clear();
     return duplicateFunction;
 }
 

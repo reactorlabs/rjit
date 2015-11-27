@@ -1,6 +1,8 @@
 #include "OSRInliner.h"
 #include <llvm/IR/Dominators.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/Support/raw_ostream.h>
 
 namespace osr {
 
@@ -74,10 +76,26 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
     llvm::DeleteDeadBlock(deadBlock);
     // remove the toInline from the module now that it has been mutilated
     toInline->removeFromParent();
+    delete toInline;
 
     outter->dump();
-    // TODO fix the return statements ..
 
+    for (auto it = outter->arg_begin(); it != outter->arg_end(); ++it) {
+        printf("Number of uses: %d\n", (*it).getNumUses());
+    }
+    /*std::string result;
+   llvm::raw_string_ostream rso(result);
+   if(!llvm::verifyFunction(*outter, &rso)) {
+       printf("The duplicate is FINE \n");
+   }else {
+       printf("PROBLEMMMMMMM with duplicate %s\n", rso.str().c_str());
+   }
+   printf("testing the module");
+   if(!llvm::verifyModule(*(outter->getParent()), &rso)) {
+       printf("The module is fiiiiiine\n");
+   } else {
+       printf("The module is malformed\n");
+   }*/
     return outter;
 }
 

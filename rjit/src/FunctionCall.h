@@ -27,6 +27,11 @@ typedef std::vector<llvm::Instruction*> Inst_Vector;
 class FunctionCall;
 typedef std::vector<FunctionCall*> FunctionCalls;
 typedef std::pair<llvm::inst_iterator, Inst_Vector*> Pos_N_Args;
+typedef struct {
+    llvm::inst_iterator it;
+    Inst_Vector* args;
+    llvm::CallInst* consts;
+} Pos_Args_Consts;
 
 /**
  * @brief      Wrapper for a function call in rjit. Enables to expose
@@ -36,25 +41,35 @@ typedef std::pair<llvm::inst_iterator, Inst_Vector*> Pos_N_Args;
 class FunctionCall {
   public:
     FunctionCall(llvm::CallInst* getFunc, Inst_Vector args,
-                 llvm::CallInst* icStub)
-        : getFunc(getFunc), args(args), icStub(icStub) {}
+                 llvm::CallInst* consts, llvm::CallInst* icStub)
+        : getFunc(getFunc), args(args), consts(consts), icStub(icStub) {}
 
     static FunctionCalls* getFunctionCalls(llvm::Function* f);
 
-    static Pos_N_Args extractArguments(llvm::Function* f, unsigned int pos);
+    static Pos_Args_Consts extractArguments(llvm::Function* f,
+                                            unsigned int pos);
 
     void printFunctionCall();
-
-    Inst_Vector* getArgs() { return &args; }
 
     int getNumbArguments();
 
     llvm::CallInst* getGetFunc() { return getFunc; }
+    Inst_Vector* getArgs() { return &args; }
+    llvm::CallInst* getConsts() { return consts; }
     llvm::CallInst* getIcStub() { return icStub; }
+    llvm::Function* getFunction() {
+        if (consts && consts->getParent() && consts->getParent()->getParent()) {
+            llvm::Function* func =
+                dynamic_cast<llvm::Function*>(consts->getParent()->getParent());
+            return func;
+        }
+        return nullptr;
+    }
 
   private:
     llvm::CallInst* getFunc;
     Inst_Vector args;
+    llvm::CallInst* consts;
     llvm::CallInst* icStub;
 };
 } // namespace osr
