@@ -27,19 +27,6 @@ llvm::Function* FunctionCloner::insertValues(FunctionCall* fc) {
     Inst_Vector getVars;
     int counter = 0;
 
-    /*llvm::Value* consts = NULL;
-    //Identify the reference to constants and keep it around
-    if (oldConsts) {
-        for (unsigned i = 0, e = oldConsts->getNumOperands(); i < e; ++i) {
-            if (llvm::Argument *OpArg = dyn_cast<Argument>(I.getOperand(i)) &&
-                NAME_CONTAINS(OpArg, CONSTANT_NAME)) {
-                consts = OpArg;
-                break;
-            }
-        }
-        //TODO replace here
-    }*/
-
     llvm::Function* outter = fc->getFunction();
     if (outter) {
         llvm::Function::arg_iterator OAI = outter->arg_begin();
