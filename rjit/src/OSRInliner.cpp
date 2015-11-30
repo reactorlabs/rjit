@@ -19,7 +19,7 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
     // Split the basic block in order to put the entire content of the call
     // inside an unreachable block
     llvm::BasicBlock* deadBlock =
-        callBlock->splitBasicBlock(fc->getGetFunc(), "DEADCALL");
+        callBlock->splitBasicBlock(fc->getIcStub(), "DEADCALL");
 
     // If there are more instructions
     // after the icStub, we get the next inst and split the block there
@@ -40,6 +40,8 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
         // inserts the block before the deadBlock
         (*it)->insertInto(outter, deadBlock);
     }
+
+    fc->getGetFunc()->removeFromParent();
 
     // Handle the returns: simple case, one return
     if (calleeReturns->size() == 1) {
@@ -65,7 +67,6 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
                 calleeReturns->at(0), "DEADRETURN");
             parentReturn->getTerminator()->setSuccessor(0, continuation);
             llvm::DeleteDeadBlock(split);
-            // calleeReturns->at(0)->removeFromParent();
         }
     }
 
@@ -79,10 +80,6 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
     delete toInline;
 
     outter->dump();
-
-    for (auto it = outter->arg_begin(); it != outter->arg_end(); ++it) {
-        printf("Number of uses: %d\n", (*it).getNumUses());
-    }
     /*std::string result;
    llvm::raw_string_ostream rso(result);
    if(!llvm::verifyFunction(*outter, &rso)) {

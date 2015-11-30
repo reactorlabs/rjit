@@ -35,7 +35,6 @@ llvm::Function* FunctionCloner::insertValues(FunctionCall* fc) {
         for (; AI != duplicateFunction->arg_end() && OAI != outter->arg_end();
              ++AI, ++OAI) {
             (*AI).replaceAllUsesWith(&(*OAI));
-            // TODO for debugging
         }
     }
 
@@ -51,19 +50,19 @@ llvm::Function* FunctionCloner::insertValues(FunctionCall* fc) {
     }
     // TODO kind of a hack here. Put the arguments inside of the function
     // TODO see how we could use the valueMap
-    Inst_Vector args = *(fc->getArgs());
-    for (Inst_Vector::iterator it = getVars.begin(), ait = args.begin();
-         (it != getVars.end()) && (ait != args.end()); ++it, ++ait) {
+    /* Inst_Vector args = *(fc->getArgs());
+     for (Inst_Vector::iterator it = getVars.begin(), ait = args.begin();
+          (it != getVars.end()) && (ait != args.end()); ++it, ++ait) {
 
-        llvm::Instruction* ci = (*ait)->clone();
-        ci->insertBefore(*it);
-        (*it)->replaceAllUsesWith(ci);
-        (*it)->removeFromParent();
-    }
+         llvm::Instruction* ci = (*ait)->clone();
+         ci->insertBefore(*it);
+         (*it)->replaceAllUsesWith(ci);
+         (*it)->removeFromParent();
+     }*/
 
     // Clean up
     getVars.clear();
-    args.clear();
+    // args.clear();
     return duplicateFunction;
 }
 
