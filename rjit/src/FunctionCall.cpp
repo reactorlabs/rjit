@@ -5,37 +5,27 @@
 
 namespace osr {
 
+// TODO modify to use the use of getFunction instead.
 Pos_Args_Consts FunctionCall::extractArguments(llvm::Function* f,
-                                               unsigned int pos) {
+                                               llvm::inst_iterator it) {
 
     Inst_Vector* args = new Inst_Vector();
-    llvm::inst_iterator I = Utils::advance(inst_begin(f), pos);
-    llvm::inst_iterator E = inst_end(f);
-    llvm::CallInst* stub = NULL;
-    llvm::CallInst* constantCall = NULL;
-    // Skip the getFunction line
-    if (I != E)
-        ++I;
-
-    while (I != E) {
-        stub = dynamic_cast<llvm::CallInst*>(&(*I));
-        // TODO good for now but would be better to check that this is the
-        // actual call
-        // to the function that we took in getFunction. Probably can do that
-        // through
-        // the Use of the instruction.
-        if (stub != NULL &&
-            NAME_CONTAINS(stub->getCalledFunction(), ICSTUB_NAME)) {
-            Pos_Args_Consts result = {I, args, constantCall};
+    llvm::CallInst* stub = nullptr;
+    llvm::CallInst* constantCall = nullptr;
+    llvm::inst_iterator end = inst_end(f);
+    ++it;
+    for (; it != end; ++it) {
+        stub = dynamic_cast<llvm::CallInst*>(&(*it));
+        if (stub && IS_STUB(stub)) {
+            Pos_Args_Consts result = {it, args, constantCall};
             return result;
-        } else if (stub != NULL &&
-                   NAME_CONTAINS(stub->getCalledFunction(), CONSTANT_NAME)) {
+        } else if (stub && IS_CONSTANT_CALL(stub)) {
             constantCall = stub;
+        } else {
+            args->push_back(&(*it));
         }
-        args->push_back(&(*I));
-        ++I;
     }
-    Pos_Args_Consts result = {E, args, constantCall};
+    Pos_Args_Consts result = {end, args, constantCall};
     return result;
 }
 
@@ -43,21 +33,19 @@ Pos_Args_Consts FunctionCall::extractArguments(llvm::Function* f,
 FunctionCalls* FunctionCall::getFunctionCalls(llvm::Function* f) {
 
     FunctionCalls* result = new FunctionCalls();
-    llvm::CallInst* gf = NULL;
-    llvm::CallInst* ics = NULL;
-    inst_iterator_wrap I(inst_begin(f));
-    inst_iterator_wrap E(inst_end(f));
+    llvm::CallInst* gf = nullptr;
+    llvm::CallInst* ics = nullptr;
 
-    for (; I != E; ++I) {
-        gf = dynamic_cast<llvm::CallInst*>(I.get());
-        if (gf != NULL && IS_GET_FUNCTION(gf)) {
-            Pos_Args_Consts res = FunctionCall::extractArguments(f, I.getPos());
+    for (llvm::inst_iterator it = inst_begin(f), e = inst_end(f); it != e;
+         ++it) {
+        gf = dynamic_cast<llvm::CallInst*>(&(*it));
+        if (gf && IS_GET_FUNCTION(gf)) {
+            llvm::inst_iterator copy = it;
+            Pos_Args_Consts res = FunctionCall::extractArguments(f, copy);
             ics = dynamic_cast<llvm::CallInst*>(&(*(res.it)));
-            if (ics != NULL) {
-                if (NAME_CONTAINS(ics->getCalledFunction(), ICSTUB_NAME)) {
-                    result->push_back(
-                        new FunctionCall(gf, *(res.args), res.consts, ics));
-                }
+            if (ics && IS_STUB(ics)) {
+                result->push_back(
+                    new FunctionCall(gf, *(res.args), res.consts, ics));
             }
         }
     }

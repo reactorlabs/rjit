@@ -8,18 +8,18 @@
 #define CONSTANT_NAME "constant"
 #define ICSTUB_NAME "icStub"
 #define LITERAL_NAME "userLiteral"
+#define GET_VAR_NAME "genericGetVar"
 
 #define IS_NAMED(x, y) ((x)->getName().str().compare((y)) == 0)
-
-#define IS_GET_FUNCTION(x)                                                     \
-    IS_NAMED(((x)->getCalledFunction()), GETFUNCTION_NAME)
-
 #define NAME_CONTAINS(x, y)                                                    \
     ((((x)->getName().str()).find((y))) != std::string::npos)
 
-#define GET_VAR_NAME "genericGetVar"
+#define IS_GET_FUNCTION(x)                                                     \
+    IS_NAMED(((x)->getCalledFunction()), GETFUNCTION_NAME)
 #define IS_GET_VAR(x) IS_NAMED((x)->getCalledFunction(), GET_VAR_NAME)
 #define IS_CALL_NAMED(x, y) IS_NAMED((x)->getCalledFunction(), (y))
+#define IS_STUB(x) NAME_CONTAINS((x)->getCalledFunction(), ICSTUB_NAME)
+#define IS_CONSTANT_CALL(x) IS_CALL_NAMED((x), CONSTANT_NAME)
 
 namespace osr {
 
@@ -47,7 +47,7 @@ class FunctionCall {
     static FunctionCalls* getFunctionCalls(llvm::Function* f);
 
     static Pos_Args_Consts extractArguments(llvm::Function* f,
-                                            unsigned int pos);
+                                            llvm::inst_iterator it);
 
     void printFunctionCall();
 
