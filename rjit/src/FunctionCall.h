@@ -41,13 +41,14 @@ typedef struct {
 class FunctionCall {
   public:
     FunctionCall(llvm::CallInst* getFunc, Inst_Vector args,
-                 llvm::CallInst* consts, llvm::CallInst* icStub)
-        : getFunc(getFunc), args(args), consts(consts), icStub(icStub) {}
+                 llvm::CallInst* icStub)
+        : getFunc(getFunc), args(args), icStub(icStub) {}
 
     static FunctionCalls* getFunctionCalls(llvm::Function* f);
 
-    static Pos_Args_Consts extractArguments(llvm::Function* f,
-                                            llvm::inst_iterator it);
+    static Inst_Vector* extractArguments(llvm::Function* f,
+                                         llvm::inst_iterator it,
+                                         llvm::Instruction* end);
 
     void printFunctionCall();
 
@@ -55,12 +56,12 @@ class FunctionCall {
 
     llvm::CallInst* getGetFunc() { return getFunc; }
     Inst_Vector* getArgs() { return &args; }
-    llvm::CallInst* getConsts() { return consts; }
     llvm::CallInst* getIcStub() { return icStub; }
     llvm::Function* getFunction() {
-        if (consts && consts->getParent() && consts->getParent()->getParent()) {
-            llvm::Function* func =
-                dynamic_cast<llvm::Function*>(consts->getParent()->getParent());
+        if (getFunc && getFunc->getParent() &&
+            getFunc->getParent()->getParent()) {
+            llvm::Function* func = dynamic_cast<llvm::Function*>(
+                getFunc->getParent()->getParent());
             return func;
         }
         return nullptr;
@@ -69,7 +70,6 @@ class FunctionCall {
   private:
     llvm::CallInst* getFunc;
     Inst_Vector args;
-    llvm::CallInst* consts;
     llvm::CallInst* icStub;
 };
 } // namespace osr

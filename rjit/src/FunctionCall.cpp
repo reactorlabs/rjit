@@ -6,27 +6,16 @@
 namespace osr {
 
 // TODO modify to use the use of getFunction instead.
-Pos_Args_Consts FunctionCall::extractArguments(llvm::Function* f,
-                                               llvm::inst_iterator it) {
-
+Inst_Vector* FunctionCall::extractArguments(llvm::Function* f,
+                                            llvm::inst_iterator it,
+                                            llvm::Instruction* ic) {
     Inst_Vector* args = new Inst_Vector();
-    llvm::CallInst* stub = nullptr;
-    llvm::CallInst* constantCall = nullptr;
     llvm::inst_iterator end = inst_end(f);
-    ++it;
-    for (; it != end; ++it) {
-        stub = dynamic_cast<llvm::CallInst*>(&(*it));
-        if (stub && IS_STUB(stub)) {
-            Pos_Args_Consts result = {it, args, constantCall};
-            return result;
-        } else if (stub && IS_CONSTANT_CALL(stub)) {
-            constantCall = stub;
-        } else {
-            args->push_back(&(*it));
-        }
+    ++it; // skip the getFunction
+    for (; it != end && (&(*it) != ic); ++it) {
+        args->push_back(&(*it));
     }
-    Pos_Args_Consts result = {end, args, constantCall};
-    return result;
+    return args;
 }
 
 // TODO this is bad and I should feel bad
@@ -39,13 +28,16 @@ FunctionCalls* FunctionCall::getFunctionCalls(llvm::Function* f) {
     for (llvm::inst_iterator it = inst_begin(f), e = inst_end(f); it != e;
          ++it) {
         gf = dynamic_cast<llvm::CallInst*>(&(*it));
-        if (gf && IS_GET_FUNCTION(gf)) {
-            llvm::inst_iterator copy = it;
-            Pos_Args_Consts res = FunctionCall::extractArguments(f, copy);
-            ics = dynamic_cast<llvm::CallInst*>(&(*(res.it)));
+        // TODO we assume there is only one use for the getFunc
+        if (gf && IS_GET_FUNCTION(gf) && gf->getNumUses() == 1) {
+            ics = dynamic_cast<llvm::CallInst*>(gf->user_back());
             if (ics && IS_STUB(ics)) {
-                result->push_back(
-                    new FunctionCall(gf, *(res.args), res.consts, ics));
+                llvm::inst_iterator argsIt = it;
+                Inst_Vector* args =
+                    extractArguments(f, argsIt, gf->user_back());
+                result->push_back(new FunctionCall(gf, *args, ics));
+            } else {
+                // TODO error malformed IR or wrong assumptions on my side
             }
         }
     }
