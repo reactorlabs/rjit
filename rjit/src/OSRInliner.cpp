@@ -1,8 +1,9 @@
 #include "OSRInliner.h"
-#include <llvm/IR/Dominators.h>
+
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/raw_ostream.h>
+#include "Utils.h"
 
 namespace osr {
 
@@ -98,7 +99,8 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
 
 llvm::Function* OSRInliner::inlineThisInThat(llvm::Function* outter,
                                              llvm::Function* inner) {
-    if (outter == nullptr || inner == nullptr) {
+    Utils u = Utils::getInstance();
+    if (outter == nullptr || inner == nullptr || u.contexts.empty()) {
         return outter;
     }
 
@@ -109,7 +111,7 @@ llvm::Function* OSRInliner::inlineThisInThat(llvm::Function* outter,
     llvm::Function* withArgs = nullptr;
     for (FunctionCalls::iterator it = calls->begin(); it != calls->end();
          ++it) {
-        withArgs = fe->insertValues(*it);
+        withArgs = fe->insertValues(*it, u.contexts.at(0)->cp.size());
         OSRInliner::inlineFunctionCall(*it, outter, withArgs);
     }
     return nullptr;

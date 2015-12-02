@@ -25,6 +25,8 @@ class Compiler {
 
     void removeFromRelocations(SEXP f);
 
+    ir::Builder* getBuilder() { return &b; }
+
   private:
     /** Compiles an expression.
 

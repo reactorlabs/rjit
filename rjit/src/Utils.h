@@ -11,6 +11,15 @@
 
 namespace osr {
 
+typedef struct CW {
+    std::vector<SEXP> cp;
+    llvm::Function* f;
+    CW(std::vector<SEXP> CP, llvm::Function* F) {
+        cp = CP;
+        f = F;
+    }
+} ContWrapper;
+
 class Utils {
   public:
     static Utils& getInstance() {
@@ -31,8 +40,24 @@ class Utils {
         return I;
     }
 
+    void activate() { this->active = true; }
+
+    void deactivate() {
+        this->active = false;
+        contexts.clear();
+    }
+
+    bool isActive() { return this->active; }
+
+    SEXP finalize(ContWrapper* outter, ContWrapper* inner) {
+        return R_NilValue;
+    }
+
+    std::vector<ContWrapper*> contexts;
+
   private:
-    Utils() {}
+    bool active;
+    Utils() : active(false) {}
 };
 
 class inst_iterator_wrap {

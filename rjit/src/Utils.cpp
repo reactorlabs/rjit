@@ -74,12 +74,27 @@ REXPORT SEXP extractFunctionCalls(SEXP expr) {
 
 REXPORT SEXP testCloning(SEXP outter, SEXP inner) {
     Compiler c("module");
+    Utils::getInstance().activate();
     SEXP rO = c.compile("outter", outter);
     SEXP rI = c.compile("inner", inner);
     llvm::Function* llvmO = reinterpret_cast<llvm::Function*>(TAG(rO));
     llvm::Function* llvmI = reinterpret_cast<llvm::Function*>(TAG(rI));
     OSRInliner::inlineThisInThat(llvmO, llvmI);
-
+    Utils u = Utils::getInstance();
+    std::vector<SEXP> v1 = u.contexts.at(0)->cp;
+    std::vector<SEXP> v2 = u.contexts.at(1)->cp;
+    v1.insert(v1.end(), v2.begin(), v2.end());
+    SEXP objs = allocVector(VECSXP, v1.size());
+    PROTECT(objs);
+    for (size_t i = 0; i < v1.size(); ++i)
+        SET_VECTOR_ELT(objs, i, v1[i]);
+    /*RFunctionPtr fptr = nullptr;
+    SEXP result = CONS(reinterpret_cast<SEXP>(fptr), objs);
+    UNPROTECT(v1.size() + 1);
+    SET_TAG(result, reinterpret_cast<SEXP>(llvmO));
+    SET_TYPEOF(result, NATIVESXP);*/
+    SETCDR(rO, objs);
+    Utils::getInstance().deactivate();
     c.jitAll();
     return rO;
 }

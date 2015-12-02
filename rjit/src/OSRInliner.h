@@ -14,6 +14,21 @@ class OSRInliner {
     static llvm::Function* inlineFunctionCall(FunctionCall* fc,
                                               llvm::Function* outter,
                                               llvm::Function* toInline);
+
+    static OSRInliner* getInstance() {
+        static OSRInliner instance;
+        return &instance;
+    }
+
+    void activate() { this->active = true; }
+
+    void deactivate() { this->active = false; }
+
+    bool isActive() { return this->active; }
+
+  private:
+    OSRInliner() : active(false){};
+    bool active;
 };
 } // namespace osr
 #endif

@@ -16,53 +16,40 @@ llvm::Function* FunctionCloner::cloneF() {
     return duplicateFunction;
 }
 
-llvm::Function* FunctionCloner::insertValues(FunctionCall* fc) {
-    int nArgs = fc->getNumbArguments();
-    // Really not the best way of doing it but we'll try.
+llvm::Function* FunctionCloner::insertValues(FunctionCall* fc, int offset) {
     llvm::ValueToValueMapTy VMap;
     llvm::Function* duplicateFunction =
         llvm::CloneFunction(this->f, VMap, false);
-    // TODO not sure about that
     this->f->getParent()->getFunctionList().push_back(duplicateFunction);
-    Inst_Vector getVars;
-    int counter = 0;
 
     llvm::Function* outter = fc->getFunction();
     if (outter) {
         llvm::Function::arg_iterator OAI = outter->arg_begin();
         llvm::Function::arg_iterator AI = duplicateFunction->arg_begin();
-        // Not sure this works since we replace..
         for (; AI != duplicateFunction->arg_end() && OAI != outter->arg_end();
              ++AI, ++OAI) {
             (*AI).replaceAllUsesWith(&(*OAI));
         }
-    }
 
-    // TODO kind of hack here. Find a better of identifying param vars.
-    for (inst_iterator it = inst_begin(duplicateFunction),
-                       e = inst_end(duplicateFunction);
-         it != e && counter < nArgs; ++it) {
-        llvm::CallInst* call = dynamic_cast<llvm::CallInst*>(&(*it));
-        if (call != NULL && IS_GET_VAR(call)) {
-            counter++;
-            getVars.push_back(&(*it));
+        // NOT GOOD how we update the access to the constant pool
+        for (inst_iterator it = inst_begin(duplicateFunction),
+                           e = inst_end(duplicateFunction);
+             it != e; ++it) {
+            llvm::CallInst* call = dynamic_cast<llvm::CallInst*>(&(*it));
+            if (call) {
+                for (unsigned int i = 0; i < call->getNumArgOperands(); ++i) {
+                    llvm::ConstantInt* index = dynamic_cast<llvm::ConstantInt*>(
+                        call->getArgOperand(i));
+                    if (index) {
+                        int64_t value = index->getSExtValue();
+                        call->setArgOperand(
+                            i, ConstantInt::get(getGlobalContext(),
+                                                APInt(32, value + offset)));
+                    }
+                }
+            }
         }
     }
-    // TODO kind of a hack here. Put the arguments inside of the function
-    // TODO see how we could use the valueMap
-    /* Inst_Vector args = *(fc->getArgs());
-     for (Inst_Vector::iterator it = getVars.begin(), ait = args.begin();
-          (it != getVars.end()) && (ait != args.end()); ++it, ++ait) {
-
-         llvm::Instruction* ci = (*ait)->clone();
-         ci->insertBefore(*it);
-         (*it)->replaceAllUsesWith(ci);
-         (*it)->removeFromParent();
-     }*/
-
-    // Clean up
-    getVars.clear();
-    // args.clear();
     return duplicateFunction;
 }
 

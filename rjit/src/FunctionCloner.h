@@ -24,7 +24,7 @@ class FunctionCloner {
     FunctionCloner(llvm::Function* f) : f(f) {}
 
     llvm::Function* cloneF();
-    llvm::Function* insertValues(FunctionCall* fc);
+    llvm::Function* insertValues(FunctionCall* fc, int offset);
 
     // TODO move that in another class
     static BB_Vector* getBBs(llvm::Function* f) {
