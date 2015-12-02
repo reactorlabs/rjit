@@ -21,9 +21,6 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
     // inside an unreachable block
     llvm::BasicBlock* deadBlock =
         callBlock->splitBasicBlock(fc->getGetFunc(), "DEADCALL");
-
-    // If there are more instructions
-    // after the icStub, we get the next inst and split the block there
     llvm::BasicBlock* continuation = nullptr;
     llvm::BasicBlock::iterator it(fc->getIcStub());
     ++it;
@@ -31,18 +28,16 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
         continuation = deadBlock->splitBasicBlock(*it, "CONT");
     }
 
-    // Get the return instructions inside the callee and the caller
+    // Get the return instructions inside the callee
+    // TODO highly inefficient
     RInst_Vector* calleeReturns = FunctionCloner(toInline).getReturnInsts();
 
-    // Insert the blocks from the function to Inline
-    BB_Vector* blocks = FunctionCloner::getBBs(toInline);
+    // Insert the blocks from the function to inline
+    BB_Vector* blocks = Utils::getBBs(toInline);
     for (BB_Vector::iterator it = blocks->begin(); it != blocks->end(); ++it) {
         (*it)->removeFromParent();
-        // inserts the block before the deadBlock
         (*it)->insertInto(outter, deadBlock);
     }
-
-    // fc->getGetFunc()->removeFromParent();
 
     // Handle the returns: simple case, one return
     if (calleeReturns->size() == 1) {
@@ -50,18 +45,16 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
         fc->getIcStub()->replaceAllUsesWith(theRet);
     }
 
-    // TODO check that it had only one successor?
     if (!blocks->empty()) {
-        // Execution continues from the callBlock to the first block of the
-        // inlined function
+        // It must have a unique successor since we just created the block
         callBlock->getTerminator()->setSuccessor(0, *(blocks->begin()));
 
-        // Remove the return by a jump to the continuation
+        // Replace the return by a jump to the continuation
         if (continuation != nullptr && calleeReturns->size() == 1) {
             llvm::BasicBlock* parentReturn = dynamic_cast<llvm::BasicBlock*>(
                 calleeReturns->at(0)->getParent());
             if (parentReturn == NULL) {
-                printf("ERROR parent of return is null\n");
+                printf("ERROR parent of return is null\n"); // TODO
                 return nullptr;
             }
             llvm::BasicBlock* split = parentReturn->splitBasicBlock(
@@ -71,29 +64,14 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
         }
     }
 
-    // Clean up the vectors
     blocks->clear();
     calleeReturns->clear();
-    // Remove the deadblock
     llvm::DeleteDeadBlock(deadBlock);
-    // remove the toInline from the module now that it has been mutilated
     toInline->removeFromParent();
     delete toInline;
 
     outter->dump();
-    /*std::string result;
-   llvm::raw_string_ostream rso(result);
-   if(!llvm::verifyFunction(*outter, &rso)) {
-       printf("The duplicate is FINE \n");
-   }else {
-       printf("PROBLEMMMMMMM with duplicate %s\n", rso.str().c_str());
-   }
-   printf("testing the module");
-   if(!llvm::verifyModule(*(outter->getParent()), &rso)) {
-       printf("The module is fiiiiiine\n");
-   } else {
-       printf("The module is malformed\n");
-   }*/
+
     return outter;
 }
 

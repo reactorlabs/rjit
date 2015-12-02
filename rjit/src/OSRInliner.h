@@ -6,29 +6,36 @@
 #include "FunctionCloner.h"
 
 namespace osr {
+/**
+ * @brief      Provides static functions to inline a function into another one.
+ */
 class OSRInliner {
   public:
-    // TODO do a per call function
+    /**
+     * @brief      Inlines inner calls into outter
+     *
+     * @param      outter  llvm::Function*
+     * @param      inner   llvm::Function*
+     *
+     * @return     outter with the inlined calls
+     */
     static llvm::Function* inlineThisInThat(llvm::Function* outter,
                                             llvm::Function* inner);
+    /**
+     * @brief      Inlines fc call to inner into outter
+     *
+     * @param      fc        FunctionCall*
+     * @param      outter    llvm::Function*
+     * @param      inner     llvm::Function*
+     *
+     * @return     outter with the inlined call to inner
+     */
     static llvm::Function* inlineFunctionCall(FunctionCall* fc,
                                               llvm::Function* outter,
-                                              llvm::Function* toInline);
-
-    static OSRInliner* getInstance() {
-        static OSRInliner instance;
-        return &instance;
-    }
-
-    void activate() { this->active = true; }
-
-    void deactivate() { this->active = false; }
-
-    bool isActive() { return this->active; }
+                                              llvm::Function* inner);
 
   private:
-    OSRInliner() : active(false){};
-    bool active;
+    OSRInliner(){};
 };
 } // namespace osr
 #endif

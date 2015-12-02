@@ -16,13 +16,13 @@ llvm::Function* FunctionCloner::cloneF() {
     return duplicateFunction;
 }
 
+// TODO the functions is highly inefficient!
 llvm::Function* FunctionCloner::insertValues(FunctionCall* fc, int offset) {
     llvm::ValueToValueMapTy VMap;
     llvm::Function* duplicateFunction =
         llvm::CloneFunction(this->f, VMap, false);
     this->f->getParent()->getFunctionList().push_back(duplicateFunction);
     Inst_Vector getVars;
-    int counter = 0;
 
     llvm::Function* outter = fc->getFunction();
     if (outter) {
@@ -52,14 +52,17 @@ llvm::Function* FunctionCloner::insertValues(FunctionCall* fc, int offset) {
         }
 
         if (call != NULL && IS_GET_VAR(call)) {
-            counter++;
             getVars.push_back(&(*it));
         }
     }
 
     Inst_Vector args = *(fc->getArgs());
+    // TODO this is bad and I should feel bad
+    int counter = 0;
+    int numArgs = fc->getNumbArguments();
     for (Inst_Vector::iterator it = getVars.begin(), ait = args.begin();
-         (it != getVars.end()) && (ait != args.end()); ++it, ++ait) {
+         (it != getVars.end()) && (ait != args.end()) && (counter < numArgs);
+         ++it, ++ait, ++counter) {
 
         llvm::Instruction* ci = (*ait)->clone();
         ci->insertBefore(*it);

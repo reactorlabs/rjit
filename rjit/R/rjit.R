@@ -68,7 +68,7 @@ jit.testInline <- function(what, whut, fake) {
     if(typeof(what) == "closure") {
         bc = .Internal(bodyCode(what))
         bc1 = .Internal(bodyCode(whut))
-        native = .Call("testCloning", bc, bc1)
+        native = .Call("testInline", bc, bc1)
         f = .Internal(bcClose(formals(what), native, env))
         attrs = attributes(what)
         if (!is.null(attrs))
@@ -77,7 +77,7 @@ jit.testInline <- function(what, whut, fake) {
             f = asS4(f)
         f
     }else if (any(c("language", "symbol", "logical", "integer", "double", "complex", "character") == typeof(what))) {
-        .Call("testCloning", what, whut)
+        .Call("testInline", what, whut)
     } else {
        stop("Only bytecode expressions and asts can be jitted.")
     }

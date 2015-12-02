@@ -10,6 +10,7 @@
 #include <sstream>
 
 namespace osr {
+typedef std::vector<llvm::BasicBlock*> BB_Vector;
 
 typedef struct CW {
     std::vector<SEXP> cp;
@@ -49,8 +50,19 @@ class Utils {
 
     bool isActive() { return this->active; }
 
-    SEXP finalize(ContWrapper* outter, ContWrapper* inner) {
-        return R_NilValue;
+    /**
+     * @brief      { function_description }
+     *
+     * @param      f     { parameter_description }
+     *
+     * @return     { description_of_the_return_value }
+     */
+    static BB_Vector* getBBs(llvm::Function* f) {
+        BB_Vector* res = new BB_Vector();
+        for (auto it = f->begin(); it != f->end(); ++it) {
+            res->push_back(it);
+        }
+        return res;
     }
 
     std::vector<ContWrapper*> contexts;

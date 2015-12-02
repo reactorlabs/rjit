@@ -39,6 +39,7 @@ Pos_Args_Consts FunctionCall::extractArguments(llvm::Function* f,
     return result;
 }
 
+// TODO this is bad and I should feel bad
 FunctionCalls* FunctionCall::getFunctionCalls(llvm::Function* f) {
 
     FunctionCalls* result = new FunctionCalls();
