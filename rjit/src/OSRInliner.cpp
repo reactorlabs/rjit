@@ -20,7 +20,7 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
     // Split the basic block in order to put the entire content of the call
     // inside an unreachable block
     llvm::BasicBlock* deadBlock =
-        callBlock->splitBasicBlock(fc->getIcStub(), "DEADCALL");
+        callBlock->splitBasicBlock(fc->getGetFunc(), "DEADCALL");
 
     // If there are more instructions
     // after the icStub, we get the next inst and split the block there
@@ -42,7 +42,7 @@ llvm::Function* OSRInliner::inlineFunctionCall(FunctionCall* fc,
         (*it)->insertInto(outter, deadBlock);
     }
 
-    fc->getGetFunc()->removeFromParent();
+    // fc->getGetFunc()->removeFromParent();
 
     // Handle the returns: simple case, one return
     if (calleeReturns->size() == 1) {
