@@ -11,6 +11,8 @@
 #include "FunctionCall.h"
 
 namespace osr {
+typedef std::vector<llvm::Instruction*> Inst_Vector;
+typedef std::vector<llvm::ReturnInst*> RInst_Vector;
 
 typedef struct {
     llvm::Function* f;
@@ -90,7 +92,10 @@ class ABInliner {
                                               llvm::ReturnInst* iRet);
     // TODO this is useful only for now.
     void activate() { active = true; }
-    void deactivate() { active = false; }
+    void deactivate() {
+        active = false;
+        contexts.clear();
+    }
     bool isActive() { return active; }
 
     std::vector<ContextWrapper*> contexts;

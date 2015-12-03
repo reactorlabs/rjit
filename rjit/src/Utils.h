@@ -12,43 +12,13 @@
 namespace osr {
 typedef std::vector<llvm::BasicBlock*> BB_Vector;
 
-typedef struct CW {
-    std::vector<SEXP> cp;
-    llvm::Function* f;
-    CW(std::vector<SEXP> CP, llvm::Function* F) {
-        cp = CP;
-        f = F;
-    }
-} ContWrapper;
-
 class Utils {
   public:
-    static Utils& getInstance() {
-        static Utils instance;
-        return instance;
-    }
-
     static std::string getIcStubName(unsigned int i) {
         std::ostringstream oss;
         oss << "icStub_" << (i);
         return oss.str();
     }
-
-    inline static llvm::inst_iterator advance(llvm::inst_iterator I,
-                                              unsigned int pos) {
-        for (unsigned int i = 0; i < pos; ++i, ++(I)) {
-        }
-        return I;
-    }
-
-    void activate() { this->active = true; }
-
-    void deactivate() {
-        this->active = false;
-        contexts.clear();
-    }
-
-    bool isActive() { return this->active; }
 
     /**
      * @brief      { function_description }
@@ -72,11 +42,7 @@ class Utils {
         return duplicateFunction;
     }
 
-    std::vector<ContWrapper*> contexts;
-
   private:
-    bool active;
-    Utils() : active(false) {}
 };
 } // namespace osr
 

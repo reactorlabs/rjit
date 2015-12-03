@@ -18,8 +18,6 @@
 #include "R.h"
 
 #include "FunctionCall.h"
-#include "FunctionCloner.h"
-#include "OSRInliner.h"
 #include "ABInliner.h"
 
 using namespace rjit;

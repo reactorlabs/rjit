@@ -17,8 +17,6 @@
 
 #include "R.h"
 
-#include "FunctionCloner.h"
-#include "OSRInliner.h"
 #include "ABInliner.h"
 
 namespace osr {
