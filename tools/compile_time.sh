@@ -41,14 +41,15 @@ PACKAGE='base'
 
 COMPILE_TIME_FUNCTION="
 compile_times <- list();
+timestamp <- Sys.time();
 benv <- getNamespace('$PACKAGE');
 for (name in names(benv)) {
   x <- benv[[name]];
-  print(name);
   if (typeof(x) == 'closure') {
+    compile_times[[name]] <- list();
     start <- Sys.time();
     comp_res <- jit.compile(x);
-    compile_times[[name]] <- Sys.time() - start;
+    compile_times[[name]][['$COMMIT_ID']] <- list(timestamp, Sys.time() - start);
   }
 };
 filename <- paste('$PACKAGE', '_functions_', '$COMMIT_ID', '.Rds', sep = '');
@@ -56,6 +57,7 @@ saveRDS(compile_times, filename);
 "
 
 COMPILE_TIME_PACKAGE="
+timestamp <- Sys.time();
 benv <- getNamespace('$PACKAGE');
 start <- Sys.time();
 for (name in names(benv)) {
@@ -64,7 +66,7 @@ for (name in names(benv)) {
     res <- jit.compile(x);
   }
 };
-compile_time <- Sys.time() - start;
+compile_time <- list('$COMMIT_ID'=list(timestamp, Sys.time() - start));
 filename <- paste('$PACKAGE', '_package_', '$COMMIT_ID', '.Rds', sep = '');
 saveRDS(compile_time, filename);
 "
