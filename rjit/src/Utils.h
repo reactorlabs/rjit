@@ -5,7 +5,7 @@
 #include <Rinternals.h>
 #include <algorithm>
 #include <llvm/IR/InstIterator.h>
-
+#include <llvm/Transforms/Utils/Cloning.h>
 #include <string>
 #include <sstream>
 
@@ -63,6 +63,13 @@ class Utils {
             res->push_back(it);
         }
         return res;
+    }
+
+    static llvm::Function* cloneFunction(llvm::Function* f) {
+        llvm::ValueToValueMapTy VMap;
+        llvm::Function* duplicateFunction = llvm::CloneFunction(f, VMap, false);
+        f->getParent()->getFunctionList().push_back(duplicateFunction);
+        return duplicateFunction;
     }
 
     std::vector<ContWrapper*> contexts;

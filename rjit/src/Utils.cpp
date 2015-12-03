@@ -20,6 +20,7 @@
 #include "FunctionCall.h"
 #include "FunctionCloner.h"
 #include "OSRInliner.h"
+#include "ABInliner.h"
 
 using namespace rjit;
 namespace osr {
@@ -74,13 +75,13 @@ REXPORT SEXP extractFunctionCalls(SEXP expr) {
 
 REXPORT SEXP testInline(SEXP outter, SEXP inner) {
     Compiler c("module");
-    Utils::getInstance().activate();
+    ABInliner::getInstance().activate();
     SEXP rO = c.compile("outter", outter);
     SEXP rI = c.compile("inner", inner);
     llvm::Function* llvmO = reinterpret_cast<llvm::Function*>(TAG(rO));
     llvm::Function* llvmI = reinterpret_cast<llvm::Function*>(TAG(rI));
-    OSRInliner::inlineThisInThat(llvmO, llvmI);
-    Utils u = Utils::getInstance();
+    ABInliner::inlineThisInThat(llvmO, llvmI);
+    ABInliner u = ABInliner::getInstance();
     std::vector<SEXP> v1 = u.contexts.at(0)->cp;
     std::vector<SEXP> v2 = u.contexts.at(1)->cp;
     v1.insert(v1.end(), v2.begin(), v2.end());
@@ -88,7 +89,7 @@ REXPORT SEXP testInline(SEXP outter, SEXP inner) {
     for (size_t i = 0; i < v1.size(); ++i)
         SET_VECTOR_ELT(objs, i, v1[i]);
     SETCDR(rO, objs);
-    Utils::getInstance().deactivate();
+    ABInliner::getInstance().deactivate();
     c.jitAll();
     return rO;
 }
