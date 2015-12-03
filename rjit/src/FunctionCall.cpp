@@ -5,7 +5,6 @@
 
 namespace osr {
 
-// TODO modify to use the use of getFunction instead.
 Inst_Vector* FunctionCall::extractArguments(llvm::Function* f,
                                             llvm::inst_iterator it,
                                             llvm::Instruction* ic) {
@@ -13,12 +12,12 @@ Inst_Vector* FunctionCall::extractArguments(llvm::Function* f,
     llvm::inst_iterator end = inst_end(f);
     ++it; // skip the getFunction
     for (; it != end && (&(*it) != ic); ++it) {
-        args->push_back(&(*it));
+        if (it->user_back() == ic) // TODO not sure that's correct
+            args->push_back(&(*it));
     }
     return args;
 }
 
-// TODO this is bad and I should feel bad
 FunctionCalls* FunctionCall::getFunctionCalls(llvm::Function* f) {
 
     FunctionCalls* result = new FunctionCalls();
