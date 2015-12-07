@@ -28,6 +28,9 @@ typedef struct ContextWrapper {
     }
 } ContextWrapper;
 
+/**
+ * @brief      THE API IS NOT FIXED; JUST PROTOTYPING FOR THE MOMENT
+ */
 class ABInliner {
   public:
     static ABInliner& getInstance() {
@@ -79,11 +82,13 @@ class ABInliner {
                                             llvm::Function* inner);
 
     /**
-     * @brief      Inlines fc call to inner into outter
+     * @brief      Inlines fc call to inner into outter and requires the return
+     *             instruction of the inner function.
      *
      * @param      fc        FunctionCall*
      * @param      outter    llvm::Function*
      * @param      inner     llvm::Function*
+     * @param      iRet      llvm::ReturnInst*
      *
      * @return     outter with the inlined call to inner
      */
