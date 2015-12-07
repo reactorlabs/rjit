@@ -38,33 +38,34 @@ class ABInliner {
     // Inlining functions
 
     /**
-     * @brief      { function_description }
+     * @brief      Replaces the argument accesses by their values
      *
-     * @param      args     { parameter_description }
-     * @param      getVars  { parameter_description }
-     * @param[in]  n        { parameter_description }
+     * @param      args     contains the arguments in order of appearance
+     * @param      getVars  contains the corresponding getVar calls
+     * @param[in]  n        how many of them we want to replace
      */
     static void replaceArgs(Inst_Vector* args, Inst_Vector* getVars, int n);
 
     /**
-     * @brief      { function_description }
+     * @brief      Updates the indexes used to access the constant pool
      *
-     * @param      call    { parameter_description }
-     * @param[in]  offset  { parameter_description }
+     * @param      call    The instruction that accesses the constant pool
+     * @param[in]  offset  The new start of the constant pool
      */
     static void updateCPAccess(llvm::CallInst* call, int offset);
 
     /**
-     * @brief      { function_description }
+     * @brief      Create a clone of inner ready to be inlined at fc.
      *
-     * @param      inner   { parameter_description }
-     * @param      fc      { parameter_description }
-     * @param[in]  offset  { parameter_description }
+     * @param      inner   The callee function
+     * @param      fc      The caller call to inner
+     * @param[in]  offset  Size of the caller's constant pool
      *
-     * @return     { description_of_the_return_value }
+     * @return     The clone of inner with the correct access to the CP and
+     *             the values for the arguments.
      */
-    static Function_N_RInsts getBody2Inline(llvm::Function* inner,
-                                            FunctionCall* fc, int offset);
+    static Function_N_RInsts getBodyToInline(llvm::Function* inner,
+                                             FunctionCall* fc, int offset);
 
     /**
      * @brief      Inlines inner calls into outter
@@ -98,6 +99,7 @@ class ABInliner {
     }
     bool isActive() { return active; }
 
+    /* Saves the constant pools of the functions we want to inline */
     std::vector<ContextWrapper*> contexts;
 
   private:

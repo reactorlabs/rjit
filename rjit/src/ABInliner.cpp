@@ -43,8 +43,8 @@ void ABInliner::updateCPAccess(llvm::CallInst* call, int offset) {
     }
 }
 // TODO the functions is highly inefficient!
-Function_N_RInsts ABInliner::getBody2Inline(llvm::Function* f, FunctionCall* fc,
-                                            int offset) {
+Function_N_RInsts ABInliner::getBodyToInline(llvm::Function* f,
+                                             FunctionCall* fc, int offset) {
 
     llvm::Function* clone = Utils::cloneFunction(f);
     llvm::Function* outter = fc->getFunction();
@@ -136,8 +136,9 @@ llvm::Function* ABInliner::inlineFunctionCall(FunctionCall* fc,
     return outter;
 }
 
-llvm::Function* ABInliner::inlineThisInThat(llvm::Function* outter,
-                                            llvm::Function* inner) {
+llvm::Function*
+ABInliner::inlineThisInThat(llvm::Function* outter, // TODO outer
+                            llvm::Function* inner) {
     ABInliner u = ABInliner::getInstance();
     if (outter == nullptr || inner == nullptr || u.contexts.empty()) {
         return outter;
@@ -150,7 +151,7 @@ llvm::Function* ABInliner::inlineThisInThat(llvm::Function* outter,
     for (FunctionCalls::iterator it = calls->begin(); it != calls->end();
          ++it) {
         bodyNRet =
-            ABInliner::getBody2Inline(inner, *it, u.contexts.at(0)->cp.size());
+            ABInliner::getBodyToInline(inner, *it, u.contexts.at(0)->cp.size());
         ABInliner::inlineFunctionCall(*it, outter, bodyNRet.f, bodyNRet.rInsts);
     }
     return nullptr;

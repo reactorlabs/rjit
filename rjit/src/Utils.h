@@ -21,11 +21,11 @@ class Utils {
     }
 
     /**
-     * @brief      { function_description }
+     * @brief      Put the f's basic blocks into a vector
      *
-     * @param      f     { parameter_description }
+     * @param      f     llvm::Function*
      *
-     * @return     { description_of_the_return_value }
+     * @return     an std::vector of f's basic blocks
      */
     static BB_Vector* getBBs(llvm::Function* f) {
         BB_Vector* res = new BB_Vector();
@@ -35,6 +35,13 @@ class Utils {
         return res;
     }
 
+    /**
+     * @brief      Creates a deep clone of the function f
+     *
+     * @param      f     llvm::Function*
+     *
+     * @return     A new llvm::Function* cloned from f
+     */
     static llvm::Function* cloneFunction(llvm::Function* f) {
         llvm::ValueToValueMapTy VMap;
         llvm::Function* duplicateFunction = llvm::CloneFunction(f, VMap, false);

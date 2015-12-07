@@ -37,6 +37,8 @@ FunctionCalls* FunctionCall::getFunctionCalls(llvm::Function* f) {
                 result->push_back(new FunctionCall(gf, *args, ics));
             } else {
                 // TODO error malformed IR or wrong assumptions on my side
+                printf("Malformed call in getFunctionCalls\n");
+                return result;
             }
         }
     }
