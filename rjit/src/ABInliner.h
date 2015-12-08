@@ -9,6 +9,7 @@
 #include <string>
 #include <sstream>
 #include "FunctionCall.h"
+#include "Liveness.hpp"
 
 namespace osr {
 typedef std::vector<llvm::Instruction*> Inst_Vector;
@@ -71,31 +72,37 @@ class ABInliner {
                                              FunctionCall* fc, int offset);
 
     /**
-     * @brief      Inlines inner calls into outter
+     * @brief      Inlines inner calls into outer
      *
-     * @param      outter  llvm::Function*
+     * @param      outer  llvm::Function*
      * @param      inner   llvm::Function*
      *
-     * @return     outter with the inlined calls
+     * @return     outer with the inlined calls
      */
-    static llvm::Function* inlineThisInThat(llvm::Function* outter,
+    static llvm::Function* inlineThisInThat(llvm::Function* outer,
                                             llvm::Function* inner);
 
     /**
-     * @brief      Inlines fc call to inner into outter and requires the return
+     * @brief      Inlines fc call to inner into outer and requires the return
      *             instruction of the inner function.
      *
      * @param      fc        FunctionCall*
-     * @param      outter    llvm::Function*
+     * @param      outer    llvm::Function*
      * @param      inner     llvm::Function*
      * @param      iRet      llvm::ReturnInst*
      *
-     * @return     outter with the inlined call to inner
+     * @return     outer with the inlined call to inner
      */
     static llvm::Function* inlineFunctionCall(FunctionCall* fc,
-                                              llvm::Function* outter,
+                                              llvm::Function* outer,
                                               llvm::Function* inner,
                                               llvm::ReturnInst* iRet);
+
+    static llvm::Function* OSRInline(llvm::Function* outer,
+                                     llvm::Function* inner);
+
+    // TODO for testing
+    static Inst_Vector* getOSRCondition();
     // TODO this is useful only for now.
     void activate() { active = true; }
     void deactivate() {

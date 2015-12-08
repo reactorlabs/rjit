@@ -19,6 +19,8 @@
 
 #include "ABInliner.h"
 
+#include "OSRLibrary.hpp"
+
 namespace osr {
 
 void ABInliner::replaceArgs(Inst_Vector* args, Inst_Vector* getVars, int n) {
@@ -47,17 +49,17 @@ Function_N_RInsts ABInliner::getBodyToInline(llvm::Function* f,
                                              FunctionCall* fc, int offset) {
 
     llvm::Function* clone = Utils::cloneFunction(f);
-    llvm::Function* outter = fc->getFunction();
+    llvm::Function* outer = fc->getFunction();
     Inst_Vector getVars;
     llvm::ReturnInst* returnInst = nullptr;
 
-    if (!outter)
+    if (!outer)
         printf("Error: getBody2Inline failure.\n"); // TODO fail or stop
 
     // Replace the rho, consts and useCache
-    llvm::Function::arg_iterator OAI = outter->arg_begin();
+    llvm::Function::arg_iterator OAI = outer->arg_begin();
     llvm::Function::arg_iterator AI = clone->arg_begin();
-    for (; AI != clone->arg_end() && OAI != outter->arg_end(); ++AI, ++OAI) {
+    for (; AI != clone->arg_end() && OAI != outer->arg_end(); ++AI, ++OAI) {
         (*AI).replaceAllUsesWith(&(*OAI));
     }
 
@@ -83,7 +85,7 @@ Function_N_RInsts ABInliner::getBodyToInline(llvm::Function* f,
 }
 
 llvm::Function* ABInliner::inlineFunctionCall(FunctionCall* fc,
-                                              llvm::Function* outter,
+                                              llvm::Function* outer,
                                               llvm::Function* toInline,
                                               llvm::ReturnInst* iRet) {
     llvm::BasicBlock* callBlock =
@@ -103,7 +105,7 @@ llvm::Function* ABInliner::inlineFunctionCall(FunctionCall* fc,
     BB_Vector* blocks = Utils::getBBs(toInline);
     for (BB_Vector::iterator it = blocks->begin(); it != blocks->end(); ++it) {
         (*it)->removeFromParent();
-        (*it)->insertInto(outter, deadBlock);
+        (*it)->insertInto(outer, deadBlock);
     }
 
     // TODO Handles only one return
@@ -132,29 +134,55 @@ llvm::Function* ABInliner::inlineFunctionCall(FunctionCall* fc,
     delete deadBlock;
     toInline->removeFromParent();
     delete toInline;
-    outter->dump();
-    return outter;
+    outer->dump();
+    return outer;
 }
 
-llvm::Function*
-ABInliner::inlineThisInThat(llvm::Function* outter, // TODO outer
-                            llvm::Function* inner) {
+llvm::Function* ABInliner::inlineThisInThat(llvm::Function* outer, // TODO outer
+                                            llvm::Function* inner) {
     ABInliner u = ABInliner::getInstance();
-    if (outter == nullptr || inner == nullptr || u.contexts.empty()) {
-        return outter;
+    if (outer == nullptr || inner == nullptr || u.contexts.empty()) {
+        return outer;
     }
 
     // TODO select only the calls that correspond to inner
-    FunctionCalls* calls = FunctionCall::getFunctionCalls(outter);
+    FunctionCalls* calls = FunctionCall::getFunctionCalls(outer);
 
     Function_N_RInsts bodyNRet;
     for (FunctionCalls::iterator it = calls->begin(); it != calls->end();
          ++it) {
         bodyNRet =
             ABInliner::getBodyToInline(inner, *it, u.contexts.at(0)->cp.size());
-        ABInliner::inlineFunctionCall(*it, outter, bodyNRet.f, bodyNRet.rInsts);
+        ABInliner::inlineFunctionCall(*it, outer, bodyNRet.f, bodyNRet.rInsts);
     }
     return nullptr;
+}
+
+llvm::Function* ABInliner::OSRInline(llvm::Function* outer,
+                                     llvm::Function* inner) {
+    // TODO use getGlobalContext()
+    llvm::LLVMContext& context =
+        (dynamic_cast<llvm::Module*>(outer->getParent()))->getContext();
+    LivenessAnalysis* ls = new LivenessAnalysis(outer);
+    FunctionCalls* calls = FunctionCall::getFunctionCalls(outer);
+    OSRLibrary::OSRPointConfig bim;
+    for (FunctionCalls::iterator it = calls->begin(); it != calls->end();
+         ++it) {
+        OSRLibrary::insertOpenOSR(context, *outer, *((*it)->getIcStub()),
+                                  nullptr, *(ABInliner::getOSRCondition()),
+                                  nullptr, nullptr, nullptr, ls, bim);
+    }
+
+    outer->dump();
+    return nullptr;
+}
+
+Inst_Vector* ABInliner::getOSRCondition() {
+    Inst_Vector* res = new Inst_Vector();
+    llvm::ConstantInt* ci = ConstantInt::get(getGlobalContext(), APInt(32, 1));
+    llvm::ICmpInst* cond = new llvm::ICmpInst(llvm::ICmpInst::ICMP_EQ, ci, ci);
+    res->push_back(cond);
+    return res;
 }
 
 } // namespace osr

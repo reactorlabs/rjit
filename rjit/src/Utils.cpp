@@ -58,17 +58,15 @@ REXPORT SEXP printWithoutSP(SEXP expr) {
     return result;
 }
 
-REXPORT SEXP extractFunctionCalls(SEXP expr) {
+REXPORT SEXP testOSR(SEXP expr) {
     Compiler c("module");
     SEXP result = c.compile("rfunction", expr);
     llvm::Function* rfunction = reinterpret_cast<llvm::Function*>(TAG(result));
+    printf("Before doing anything rash\n");
     rfunction->dump();
-    FunctionCalls* calls = FunctionCall::getFunctionCalls(rfunction);
-    for (FunctionCalls::iterator it = calls->begin(); it != calls->end();
-         ++it) {
-        (*it)->printFunctionCall();
-    }
-    return R_NilValue;
+    ABInliner::OSRInline(rfunction, rfunction);
+    printf("Afterwards\n");
+    return result;
 }
 
 REXPORT SEXP testInline(SEXP outter, SEXP inner) {
