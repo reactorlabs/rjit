@@ -7,12 +7,16 @@ build:
         name: setup (without llvm) and run tests
         code: |
             ${WERCKER_SOURCE_DIR}/tools/setup.sh -l -d . 
-    - script:
-        name: integration tests
-        code: |
-            ${WERCKER_SOURCE_DIR}/tools/integration_tests.sh
+#    - script:
+#        name: integration tests
+#        code: |
+#            ${WERCKER_SOURCE_DIR}/tools/integration_tests.sh
   after-steps:
     - script:
         name: Slack Notifications
         code: |
             ${WERCKER_SOURCE_DIR}/tools/ci.sh
+    - script:
+        name: Benchmarks
+        code: |
+            ${WERCKER_SOURCE_DIR}/tools/compile_time.sh
