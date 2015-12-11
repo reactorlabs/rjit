@@ -58,35 +58,31 @@ REXPORT SEXP printWithoutSP(SEXP expr) {
     return result;
 }
 
-REXPORT SEXP testOSR(SEXP expr) {
+REXPORT SEXP testOSR(SEXP outer, SEXP inner, SEXP env) {
     Compiler c("module");
-    SEXP result = c.compile("rfunction", expr);
-    llvm::Function* rfunction = reinterpret_cast<llvm::Function*>(TAG(result));
-    printf("Before doing anything rash\n");
-    rfunction->dump();
-    ABInliner::OSRInline(rfunction, rfunction);
-    printf("Afterwards\n");
-    return result;
-}
-
-REXPORT SEXP testInline(SEXP outter, SEXP inner) {
-    Compiler c("module");
-    ABInliner::getInstance().activate();
-    SEXP rO = c.compile("outter", outter);
+    SEXP rO = c.compile("outer", outer);
     SEXP rI = c.compile("inner", inner);
-    llvm::Function* llvmO = reinterpret_cast<llvm::Function*>(TAG(rO));
-    llvm::Function* llvmI = reinterpret_cast<llvm::Function*>(TAG(rI));
-    ABInliner::inlineThisInThat(llvmO, llvmI);
-    ABInliner u = ABInliner::getInstance();
-    std::vector<SEXP> v1 = u.contexts.at(0)->cp;
-    std::vector<SEXP> v2 = u.contexts.at(1)->cp;
-    v1.insert(v1.end(), v2.begin(), v2.end());
-    SEXP objs = allocVector(VECSXP, v1.size());
-    for (size_t i = 0; i < v1.size(); ++i)
-        SET_VECTOR_ELT(objs, i, v1[i]);
+    SEXP poolO = CDR(rO);
+    SEXP poolI = CDR(rI);
+    int sizeO = LENGTH(poolO);
+    int sizeI = LENGTH(poolI);
+    SEXP objs = allocVector(VECSXP, sizeO + sizeI);
+    for (int i = 0; i < sizeO; ++i)
+        SET_VECTOR_ELT(objs, i, VECTOR_ELT(poolO, i));
+    for (int i = 0; i < sizeI; ++i)
+        SET_VECTOR_ELT(objs, i + sizeO, VECTOR_ELT(poolI, i));
+
     SETCDR(rO, objs);
-    ABInliner::getInstance().deactivate();
     c.jitAll();
     return rO;
+}
+
+REXPORT SEXP testInline(SEXP outer, SEXP inner, SEXP env) {
+    /* Compiler c("module");
+     SEXP rO = c.compile("outer", outer);
+     SEXP rI = c.compile("inner", inner);*/
+    SEXP res = ABInliner::inlineThisInThat(outer, inner, env);
+    // c.jitAll();
+    return res;
 }
 }

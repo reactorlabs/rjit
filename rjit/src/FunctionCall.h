@@ -67,6 +67,8 @@ class FunctionCall {
         return nullptr;
     }
 
+    int getFunctionSymbol();
+
   private:
     llvm::CallInst* getFunc;
     Inst_Vector args;

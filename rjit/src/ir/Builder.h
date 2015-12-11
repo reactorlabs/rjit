@@ -13,8 +13,6 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Host.h"
 
-#include "ABInliner.h"
-
 namespace rjit {
 
 namespace ir {
@@ -151,12 +149,8 @@ class Builder {
         SEXP result = createNativeSXP(nullptr, c_->cp[0], c_->cp, c_->f);
         relocations_.push_back(result);
         // c_->f->dump();
-        if (osr::ABInliner::getInstance().isActive()) {
-            osr::ABInliner::getInstance().contexts.push_back(
-                new osr::ContextWrapper(c_->cp, c_->f));
-        } else {
-            delete c_;
-        }
+        delete c_;
+
         if (contextStack_.empty()) {
             c_ = nullptr;
         } else {

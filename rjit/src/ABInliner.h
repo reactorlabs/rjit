@@ -10,10 +10,12 @@
 #include <sstream>
 #include "FunctionCall.h"
 #include "Liveness.hpp"
+#include "OSRLibrary.hpp"
 
 namespace osr {
 typedef std::vector<llvm::Instruction*> Inst_Vector;
 typedef std::vector<llvm::ReturnInst*> RInst_Vector;
+typedef std::map<std::string, SEXP> FunctionPool;
 
 typedef struct {
     llvm::Function* f;
@@ -79,8 +81,7 @@ class ABInliner {
      *
      * @return     outer with the inlined calls
      */
-    static llvm::Function* inlineThisInThat(llvm::Function* outer,
-                                            llvm::Function* inner);
+    static SEXP inlineThisInThat(SEXP sOuter, SEXP sInner, SEXP env);
 
     /**
      * @brief      Inlines fc call to inner into outer and requires the return
@@ -98,25 +99,18 @@ class ABInliner {
                                               llvm::Function* inner,
                                               llvm::ReturnInst* iRet);
 
-    static llvm::Function* OSRInline(llvm::Function* outer,
-                                     llvm::Function* inner);
+    static void OSRInstrument(llvm::Function* base,
+                              llvm::Function* instrumented, StateMap* map);
+
+    llvm::Function* inlineCalls(llvm::Function* outer, SEXP env);
 
     // TODO for testing
     static Inst_Vector* getOSRCondition();
-    // TODO this is useful only for now.
-    void activate() { active = true; }
-    void deactivate() {
-        active = false;
-        contexts.clear();
-    }
-    bool isActive() { return active; }
 
-    /* Saves the constant pools of the functions we want to inline */
-    std::vector<ContextWrapper*> contexts;
+    FunctionPool pool;
 
   private:
-    ABInliner() : active(false) {}
-    bool active;
+    ABInliner() {}
 };
 } // namespace osr
 

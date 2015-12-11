@@ -64,10 +64,11 @@ jit.printWithoutSP <- function(what) {
     }
 }
 
-jit.testOSR <- function(what) {
+jit.testOSR <- function(what, whut, env=environment(what)) {
     if (typeof(what) == "closure") {
         bc = .Internal(bodyCode(what))
-        native = .Call("testOSR", bc)
+        bc1 = .Internal(bodyCode(whut))
+        native = .Call("testOSR", bc, bc1, env)
         f = .Internal(bcClose(formals(what), native, env))
         attrs = attributes(what)
         if (!is.null(attrs))
@@ -76,17 +77,17 @@ jit.testOSR <- function(what) {
             f = asS4(f)
         f
     } else if (any(c("language", "symbol", "logical", "integer", "double", "complex", "character") == typeof(what))) {
-        .Call("testOSR", what)
+        .Call("testOSR", what, whut)
     } else {
        stop("Only bytecode expressions and asts can be jitted.")
     }
 }
 
-jit.testInline <- function(what, whut, fake) {
+jit.testInline <- function(what, whut, env =environment(whut)) {
     if(typeof(what) == "closure") {
         bc = .Internal(bodyCode(what))
         bc1 = .Internal(bodyCode(whut))
-        native = .Call("testInline", bc, bc1)
+        native = .Call("testInline", bc, bc1, env)
         f = .Internal(bcClose(formals(what), native, env))
         attrs = attributes(what)
         if (!is.null(attrs))

@@ -19,8 +19,6 @@
 
 #include "ABInliner.h"
 
-#include "OSRLibrary.hpp"
-
 namespace osr {
 
 void ABInliner::replaceArgs(Inst_Vector* args, Inst_Vector* getVars, int n) {
@@ -84,10 +82,12 @@ Function_N_RInsts ABInliner::getBodyToInline(llvm::Function* f,
     return result;
 }
 
+// TODO instrument here!
 llvm::Function* ABInliner::inlineFunctionCall(FunctionCall* fc,
                                               llvm::Function* outer,
                                               llvm::Function* toInline,
                                               llvm::ReturnInst* iRet) {
+    auto base = StateMap::generateIdentityMapping(outer);
     llvm::BasicBlock* callBlock =
         dynamic_cast<llvm::BasicBlock*>(fc->getGetFunc()->getParent());
     if (callBlock == NULL) {
@@ -118,7 +118,7 @@ llvm::Function* ABInliner::inlineFunctionCall(FunctionCall* fc,
         llvm::BasicBlock* parentReturn =
             dynamic_cast<llvm::BasicBlock*>(iRet->getParent());
         if (parentReturn == NULL) {
-            printf("ERROR parent of return is null\n"); // TODO
+            printf("ERROR  of return is null\n"); // TODO
             return nullptr;
         }
         llvm::BasicBlock* split =
@@ -134,16 +134,22 @@ llvm::Function* ABInliner::inlineFunctionCall(FunctionCall* fc,
     delete deadBlock;
     toInline->removeFromParent();
     delete toInline;
+    ABInliner::OSRInstrument(base.first, outer, base.second);
     outer->dump();
     return outer;
 }
 
-llvm::Function* ABInliner::inlineThisInThat(llvm::Function* outer, // TODO outer
-                                            llvm::Function* inner) {
-    ABInliner u = ABInliner::getInstance();
-    if (outer == nullptr || inner == nullptr || u.contexts.empty()) {
-        return outer;
-    }
+SEXP ABInliner::inlineThisInThat(SEXP sOuter, SEXP sInner, SEXP env) {
+
+    rjit::Compiler c("module");
+    SEXP cOuter = c.compile("outer", sOuter);
+    SEXP cInner = c.compile("inner", sInner);
+
+    llvm::Function* outer = reinterpret_cast<llvm::Function*>(TAG(cOuter));
+    llvm::Function* inner = reinterpret_cast<llvm::Function*>(TAG(cInner));
+
+    if (!(outer && inner))
+        return R_NilValue; // TODO fix me
 
     // TODO select only the calls that correspond to inner
     FunctionCalls* calls = FunctionCall::getFunctionCalls(outer);
@@ -151,30 +157,49 @@ llvm::Function* ABInliner::inlineThisInThat(llvm::Function* outer, // TODO outer
     Function_N_RInsts bodyNRet;
     for (FunctionCalls::iterator it = calls->begin(); it != calls->end();
          ++it) {
-        bodyNRet =
-            ABInliner::getBodyToInline(inner, *it, u.contexts.at(0)->cp.size());
+
+        // TODO aghosn still not working
+        SEXP symbol = VECTOR_ELT(CDR(cOuter), (*it)->getFunctionSymbol());
+        SEXP fun = findFun(symbol, env);
+        if (TYPEOF(fun) == CLOSXP) {
+            SEXP cfun = c.compile("inner2", BODY(fun));
+            llvm::Function* llvmf =
+                reinterpret_cast<llvm::Function*>(TAG(cfun));
+            llvmf->dump();
+        }
+
+        bodyNRet = ABInliner::getBodyToInline(inner, *it, LENGTH(CDR(cOuter)));
         ABInliner::inlineFunctionCall(*it, outer, bodyNRet.f, bodyNRet.rInsts);
+
+        // Set the constant pool
+        int sizeO = LENGTH(CDR(cOuter));
+        int sizeI = LENGTH(CDR(cInner));
+        SEXP objs = allocVector(VECSXP, sizeO + sizeI);
+        for (int i = 0; i < sizeO; ++i)
+            SET_VECTOR_ELT(objs, i, VECTOR_ELT(CDR(cOuter), i));
+        for (int i = 0; i < sizeI; ++i)
+            SET_VECTOR_ELT(objs, i + sizeO, VECTOR_ELT(CDR(cInner), i));
+        SETCDR(cOuter, objs);
     }
-    return nullptr;
+    c.jitAll();
+    return cOuter;
 }
 
-llvm::Function* ABInliner::OSRInline(llvm::Function* outer,
-                                     llvm::Function* inner) {
-    // TODO use getGlobalContext()
-    llvm::LLVMContext& context =
-        (dynamic_cast<llvm::Module*>(outer->getParent()))->getContext();
-    LivenessAnalysis* ls = new LivenessAnalysis(outer);
-    FunctionCalls* calls = FunctionCall::getFunctionCalls(outer);
-    OSRLibrary::OSRPointConfig bim;
-    for (FunctionCalls::iterator it = calls->begin(); it != calls->end();
-         ++it) {
-        OSRLibrary::insertOpenOSR(context, *outer, *((*it)->getIcStub()),
-                                  nullptr, *(ABInliner::getOSRCondition()),
-                                  nullptr, nullptr, nullptr, ls, bim);
-    }
-
-    outer->dump();
-    return nullptr;
+void ABInliner::OSRInstrument(llvm::Function* base,
+                              llvm::Function* instrumented, StateMap* map) {
+    llvm::Instruction* term = instrumented->getEntryBlock().getTerminator();
+    llvm::Instruction* pad = &(*inst_begin(base));
+    OSRLibrary::OSRPointConfig bim(true, true, -1, nullptr,
+                                   instrumented->getParent(), nullptr, nullptr,
+                                   instrumented->getParent(), nullptr);
+    instrumented->getParent()->getFunctionList().push_back(base);
+    if (!term)
+        return;
+    auto res = OSRLibrary::insertResolvedOSR(
+        getGlobalContext(), *instrumented, *term, *base, *pad,
+        *(ABInliner::getOSRCondition()), *map, bim);
+    printf("The continuation\n");
+    res.second->dump();
 }
 
 Inst_Vector* ABInliner::getOSRCondition() {
@@ -183,6 +208,33 @@ Inst_Vector* ABInliner::getOSRCondition() {
     llvm::ICmpInst* cond = new llvm::ICmpInst(llvm::ICmpInst::ICMP_EQ, ci, ci);
     res->push_back(cond);
     return res;
+}
+
+llvm::Function* ABInliner::inlineCalls(llvm::Function* outer, SEXP env) {
+
+    /*ABInliner u = ABInliner::getInstance();
+    FunctionCalls* calls = FunctionCall::getFunctionCalls(outer);
+    Function_N_RInsts bodyNRet;
+    for (FunctionCalls::iterator it = calls->begin(); it != calls->end(); ++it)
+    {
+        std::string name = (*it)->getGetFunc()->getName().str();
+        if (ABInliner::getInstance().pool.find(name) !=
+    ABInliner::getInstance().pool.end()) {
+            SEXP fun = findFun(ABInliner::getInstance().pool[name], env);
+            if (fun && TYPEOF(fun) == NATIVESXP) {
+                llvm::Function* inner =
+    reinterpret_cast<llvm::Function*>(TAG(fun));
+                bodyNRet = ABInliner::getBodyToInline(inner, *it,
+    u.contexts.at(0)->cp.size());
+                ABInliner::inlineFunctionCall(*it, outer, bodyNRet.f,
+    bodyNRet.rInsts);
+            }
+        } else {
+            printf("NOT IN THE POOL!\n");
+        }
+    } */
+
+    return nullptr;
 }
 
 } // namespace osr

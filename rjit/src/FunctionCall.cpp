@@ -64,4 +64,10 @@ int FunctionCall::getNumbArguments() {
     return ((int)name.back() - '0');
 }
 
+int FunctionCall::getFunctionSymbol() {
+    llvm::ConstantInt* cst =
+        dynamic_cast<llvm::ConstantInt*>(this->getFunc->getArgOperand(2));
+    return cst->getSExtValue();
+}
+
 } // namespace osr
