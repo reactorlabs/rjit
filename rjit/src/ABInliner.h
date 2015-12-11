@@ -77,11 +77,10 @@ class ABInliner {
      * @brief      Inlines inner calls into outer
      *
      * @param      outer  llvm::Function*
-     * @param      inner   llvm::Function*
      *
      * @return     outer with the inlined calls
      */
-    static SEXP inlineThisInThat(SEXP sOuter, SEXP sInner, SEXP env);
+    static SEXP inlineThisInThat(SEXP sOuter, SEXP env);
 
     /**
      * @brief      Inlines fc call to inner into outer and requires the return

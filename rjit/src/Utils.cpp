@@ -77,12 +77,8 @@ REXPORT SEXP testOSR(SEXP outer, SEXP inner, SEXP env) {
     return rO;
 }
 
-REXPORT SEXP testInline(SEXP outer, SEXP inner, SEXP env) {
-    /* Compiler c("module");
-     SEXP rO = c.compile("outer", outer);
-     SEXP rI = c.compile("inner", inner);*/
-    SEXP res = ABInliner::inlineThisInThat(outer, inner, env);
-    // c.jitAll();
+REXPORT SEXP testInline(SEXP outer, SEXP env) {
+    SEXP res = ABInliner::inlineThisInThat(outer, env);
     return res;
 }
 }

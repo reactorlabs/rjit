@@ -139,33 +139,35 @@ llvm::Function* ABInliner::inlineFunctionCall(FunctionCall* fc,
     return outer;
 }
 
-SEXP ABInliner::inlineThisInThat(SEXP sOuter, SEXP sInner, SEXP env) {
+SEXP ABInliner::inlineThisInThat(SEXP sOuter, SEXP env) {
 
     rjit::Compiler c("module");
     SEXP cOuter = c.compile("outer", sOuter);
-    SEXP cInner = c.compile("inner", sInner);
 
     llvm::Function* outer = reinterpret_cast<llvm::Function*>(TAG(cOuter));
-    llvm::Function* inner = reinterpret_cast<llvm::Function*>(TAG(cInner));
+    llvm::Function* inner = nullptr;
+    SEXP cInner;
 
-    if (!(outer && inner))
-        return R_NilValue; // TODO fix me
+    if (!outer)
+        return sOuter; // TODO fix me
 
-    // TODO select only the calls that correspond to inner
     FunctionCalls* calls = FunctionCall::getFunctionCalls(outer);
 
     Function_N_RInsts bodyNRet;
     for (FunctionCalls::iterator it = calls->begin(); it != calls->end();
          ++it) {
 
-        // TODO aghosn still not working
+        // Get the function that is called
         SEXP symbol = VECTOR_ELT(CDR(cOuter), (*it)->getFunctionSymbol());
-        SEXP fun = findFun(symbol, env);
-        if (TYPEOF(fun) == CLOSXP) {
-            SEXP cfun = c.compile("inner2", BODY(fun));
-            llvm::Function* llvmf =
-                reinterpret_cast<llvm::Function*>(TAG(cfun));
-            llvmf->dump();
+        SEXP sInner = findFun(symbol, env);
+        if (TYPEOF(sInner) == NATIVESXP) {
+            inner = reinterpret_cast<llvm::Function*>(TAG(sInner));
+            cInner = sInner;
+        } else if (TYPEOF(sInner) == CLOSXP) {
+            cInner = c.compile("inner", BODY(sInner));
+            inner = reinterpret_cast<llvm::Function*>(TAG(cInner));
+        } else {
+            continue;
         }
 
         bodyNRet = ABInliner::getBodyToInline(inner, *it, LENGTH(CDR(cOuter)));
