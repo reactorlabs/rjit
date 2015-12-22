@@ -230,7 +230,7 @@ bool ICCompiler::compileIc(SEXP inCall, SEXP inFun) {
                                        b.convertToPointer(inBody), newrho);
 
             INTRINSIC(endClosureContext, cntxt, res);
-            ir::Return::create(b, res);
+            llvm::ReturnInst::Create(llvm::getGlobalContext(), res, b);
 
             b.setBlock(icMiss);
             callIcMiss();
@@ -248,7 +248,7 @@ void ICCompiler::callIcMiss() {
     // INTRINSIC_NO_SAFEPOINT(d,{});
     auto stub = getStub(size, b);
     auto res = INTRINSIC_NO_SAFEPOINT(stub, b.args());
-    ir::Return::create(b, res);
+    llvm::ReturnInst::Create(llvm::getGlobalContext(), res, b);
 }
 
 std::string ICCompiler::specialName(unsigned size) {
@@ -275,7 +275,7 @@ void ICCompiler::compileSpecialIC() {
 
     Value* res = ir::CallSpecial::Create(
         b, call(), fun(), b.convertToPointer(R_NilValue), b.rho());
-    ir::Return::create(b, res);
+    llvm::ReturnInst::Create(llvm::getGlobalContext(), res, b);
 
     b.setBlock(icMiss);
     callIcMiss();
@@ -307,7 +307,7 @@ bool ICCompiler::compileGenericIc(SEXP inCall, SEXP inFun) {
     default:
         assert(false);
     }
-    ir::Return::create(b, res);
+    llvm::ReturnInst::Create(llvm::getGlobalContext(), res, b);
 
     b.setBlock(icMiss);
     callIcMiss();

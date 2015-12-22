@@ -5,7 +5,9 @@ using namespace llvm;
 namespace rjit {
 namespace ir {
 
-char const* const Instruction::MD_NAME = "r_ir_type";
+char const* const Pattern::MD_NAME = "r_ir_type";
+
+#ifdef HAHA
 
 bool Instruction::isInstruction(llvm::Instruction* ins) {
     return ins->getMetadata(MD_NAME) ? true : false;
@@ -53,6 +55,7 @@ void Cbr::create(Builder& b, Value* cond, BasicBlock* trueCase,
                                   b.integer(0), "condition");
     BranchInst::Create(trueCase, falseCase, test, b);
 }
+#endif
 
 } // namespace ir
 

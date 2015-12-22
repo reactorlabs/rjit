@@ -423,12 +423,12 @@ Value* Compiler::compileCondition(SEXP e) {
     BasicBlock* ifTrue = b.createBasicBlock("ifTrue");
     BasicBlock* ifFalse = b.createBasicBlock("ifFalse");
     BasicBlock* next = b.createBasicBlock("next");
-    ir::Cbr::create(b, cond, ifTrue, ifFalse);
+    ir::Cbr::Create(b, cond, ifTrue, ifFalse);
 
     // true case has to be always present
     b.setBlock(ifTrue);
     Value* trueResult = compileExpression(trueAst);
-    ir::Branch::create(b, next);
+    BranchInst::Create(next, b);
     ifTrue = b.block();
 
     // false case may not be present in which case invisible R_NilValue should
@@ -442,7 +442,7 @@ Value* Compiler::compileCondition(SEXP e) {
         falseResult = compileExpression(falseAst);
     }
     ifFalse = b.block();
-    ir::Branch::create(b, next);
+    BranchInst::Create(next, b);
 
     // add a phi node for the result
     b.setBlock(next);
@@ -460,7 +460,7 @@ Value* Compiler::compileCondition(SEXP e) {
    */
 Value* Compiler::compileBreak(SEXP ast) {
     llvm::BasicBlock* bb = b.breakTarget();
-    ir::Branch::create(b, bb);
+    BranchInst::Create(bb, b);
     // TODO this is really simple, but fine for us - dead code elimination will
     // remove the block if required
     b.setBlock(b.createBasicBlock("deadcode"));
@@ -475,7 +475,7 @@ Value* Compiler::compileBreak(SEXP ast) {
    */
 Value* Compiler::compileNext(SEXP ast) {
     llvm::BasicBlock* bb = b.nextTarget();
-    ir::Branch::create(b, bb);
+    BranchInst::Create(bb, b);
     // TODO this is really simple, but fine for us - dead code elimination will
     // remove the block if required
     b.setBlock(b.createBasicBlock("deadcode"));
@@ -494,11 +494,11 @@ Value* Compiler::compileRepeatLoop(SEXP ast) {
     // create the body and next basic blocks
     b.openLoop();
 
-    ir::Branch::create(b, b.nextTarget());
+    BranchInst::Create(b.nextTarget(), b);
     b.setBlock(b.nextTarget());
 
     compileExpression(bodyAst);
-    ir::Branch::create(b, b.nextTarget());
+    BranchInst::Create(b.nextTarget(), b);
     b.setBlock(b.breakTarget());
     // restore the old loop pointers in the context
     b.closeLoop();
@@ -520,17 +520,17 @@ Value* Compiler::compileWhileLoop(SEXP ast) {
     // create the body and next basic blocks
     b.openLoop();
 
-    ir::Branch::create(b, b.nextTarget());
+    BranchInst::Create(b.nextTarget(), b);
     b.setBlock(b.nextTarget());
     // compile the condition
     Value* cond2 = compileExpression(condAst);
     Value* cond = ir::ConvertToLogicalNoNA::Create(b, cond2, condAst);
     BasicBlock* whileBody = b.createBasicBlock("whileBody");
-    ir::Cbr::create(b, cond, whileBody, b.breakTarget());
+    ir::Cbr::Create(b, cond, whileBody, b.breakTarget());
     // compile the body
     b.setBlock(whileBody);
     compileExpression(bodyAst);
-    ir::Branch::create(b, b.nextTarget());
+    BranchInst::Create(b.nextTarget(), b);
     b.setBlock(b.breakTarget());
     // restore the old loop pointers in the context
     b.closeLoop();
@@ -579,12 +579,12 @@ Value* Compiler::compileForLoop(SEXP ast) {
     Value* seq = ir::StartFor::Create(b, seq2, b.rho());
     Value* seqLength = ir::LoopSequenceLength::Create(b, seq, ast);
     BasicBlock* forStart = b.block();
-    ir::Branch::create(b, forCond);
+    BranchInst::Create(forCond, b);
     b.setBlock(forCond);
     PHINode* control = PHINode::Create(t::Int, 2, "loopControl", b.block());
     control->addIncoming(b.integer(0), forStart);
     // now check if control is smaller than length
-    ICmpInst* test = ir::UnsignedIntegerLessThan::create(b, control, seqLength);
+    ICmpInst* test = new llvm::ICmpInst(*b.block(), llvm::ICmpInst::Predicate::ICMP_ULT, control, seqLength);
     BranchInst::Create(forBody, b.breakTarget(), test, b.block());
 
     // move to the for loop body, where we have to set the control variable
@@ -594,16 +594,16 @@ Value* Compiler::compileForLoop(SEXP ast) {
     ir::GenericSetVar::Create(b, controlValue, b.rho(), controlAst);
     // now compile the body of the loop
     compileExpression(bodyAst);
-    ir::Branch::create(b, b.nextTarget());
+    BranchInst::Create(b.nextTarget(), b);
     // in the next block, increment the internal control variable and jump to
     // forCond
     b.setBlock(b.nextTarget());
 
     // TODO: Need an intrinsic function for BinaryOperator
-    Value* control1 = ir::IntegerAdd::create(b, control, b.integer(1));
+    Value* control1 = llvm::BinaryOperator::Create(llvm::Instruction::Add, control, b.integer(1), "", b);
     control->addIncoming(control1, b.nextTarget());
 
-    ir::Branch::create(b, forCond);
+    BranchInst::Create(forCond, b);
     b.setBlock(b.breakTarget());
     // restore the old loop pointers in the context
     b.closeLoop();
@@ -712,7 +712,7 @@ Value* Compiler::compileSwitch(SEXP call) {
 
     ir::CheckSwitchControl::Create(b, control, call);
     Value* ctype = ir::SexpType::Create(b, control);
-    ICmpInst* cond = ir::IntegerEquals::create(b, ctype, b.integer(STRSXP));
+    ICmpInst* cond = new llvm::ICmpInst(*b.block(), llvm::ICmpInst::Predicate::ICMP_EQ, ctype, b.integer(STRSXP));
     BasicBlock* switchIntegral = b.createBasicBlock("switchIntegral");
     BasicBlock* switchCharacter = b.createBasicBlock("switchCharacter");
     BasicBlock* switchNext = b.createBasicBlock("switchNext");
@@ -725,7 +725,7 @@ Value* Compiler::compileSwitch(SEXP call) {
     Value* caseIntegral =
         ir::SwitchControlInteger::Create(b, control, caseAsts.size());
     auto swInt =
-        ir::Switch::create(b, caseIntegral, switchNext, caseAsts.size());
+        llvm::SwitchInst::Create(caseIntegral, switchNext, caseAsts.size(), b);
     // for character switch we need to construct the vector,
     b.setBlock(switchCharacter);
     SEXP cases;
@@ -742,7 +742,7 @@ Value* Compiler::compileSwitch(SEXP call) {
         ir::SwitchControlCharacter::Create(b, control, call, cases);
 
     auto swChar =
-        ir::Switch::create(b, caseCharacter, switchNext, caseAsts.size());
+        llvm::SwitchInst::Create(caseCharacter, switchNext, caseAsts.size(), b);
     // create the phi node at the end
     b.setBlock(switchNext);
     PHINode* result = PHINode::Create(t::SEXP, caseAsts.size(), "", b.block());
@@ -754,34 +754,34 @@ Value* Compiler::compileSwitch(SEXP call) {
     for (unsigned i = 0; i < caseAsts.size(); ++i) {
         last = b.createBasicBlock("switchCase");
         if (fallThrough != nullptr) {
-            ir::Branch::create(b, last);
+            BranchInst::Create(last, b);
             fallThrough = nullptr;
         }
         b.setBlock(last);
-        swInt.addCase(i, last);
+        swInt->addCase(b.integer(i), last);
         if (defaultIdx == -1 or defaultIdx > static_cast<int>(i)) {
-            swChar.addCase(i, last);
+            swChar->addCase(b.integer(i), last);
         } else if (defaultIdx < static_cast<int>(i)) {
-            swChar.addCase(i - 1, last);
+            swChar->addCase(b.integer(i - 1), last);
         } else {
-            swChar.addCase(caseAsts.size() - 1, last);
-            swChar.setDefaultDest(last);
+            swChar->addCase(b.integer(caseAsts.size() - 1), last);
+            swChar->setDefaultDest(last);
         }
         SEXP value = caseAsts[i];
         if (TYPEOF(value) == SYMSXP && !strlen(CHAR(PRINTNAME(value)))) {
             fallThrough = b.block();
         } else {
             Value* caseResult = compileExpression(caseAsts[i]);
-            ir::Branch::create(b, switchNext);
+            BranchInst::Create(switchNext, b);
             result->addIncoming(caseResult, b.block());
         }
     }
-    if (swChar.getDefaultDest() == switchNext)
-        swChar.setDefaultDest(last);
-    swInt.setDefaultDest(last);
+    if (swChar->getDefaultDest() == switchNext)
+        swChar->setDefaultDest(last);
+    swInt->setDefaultDest(last);
     if (fallThrough != nullptr) {
         result->addIncoming(ir::Constant::Create(b, R_NilValue), b.block());
-        ir::Branch::create(b, switchNext);
+        BranchInst::Create(switchNext, b);
     }
     b.setBlock(switchNext);
     return result;

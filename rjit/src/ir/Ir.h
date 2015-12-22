@@ -79,6 +79,7 @@ enum class PatternKind {
     ClosureQuickArgumentAdaptor,
     ClosureNativeCallTrampoline,
     CallNative,
+    Cbr,
 };
 
 /** Pattern of llvm instructions that is recognized as high level function and can be matched on.
@@ -245,20 +246,43 @@ protected:
 
 };
 
+class Cbr : public Pattern {
+public:
+    static Cbr & Create(Builder & b, llvm::Value * cond, llvm::BasicBlock * trueCase, llvm::BasicBlock * falseCase) {
+        ICmpInst* test = new ICmpInst(*b.block(), ICmpInst::ICMP_NE, cond, b.integer(0), "condition");
+
+        llvm::Instruction * branch = BranchInst::Create(trueCase, falseCase, test, b);
+        Cbr * result = new Cbr(branch);
+        result->attachTo(test);
+        result->attachTo(branch);
+        return * result;
+    }
+
+protected:
+    Cbr(llvm::Instruction * ins):
+        Pattern(PatternKind::Cbr, ins) {
+    }
+
+    /** Detaches from the comparison and the branch.
+     */
+    void detachAll() override {
+        detachFrom(result->getPrevNode());
+        detachFrom(result);
+    }
+
+    /** Advances by two instructions - the ICmpInst and the branch
+     */
+    void advance(llvm::BasicBlock::iterator & i) override {
+        ++i;
+        ++i;
+    }
+};
 
 
 
 
 
-
-
-
-
-
-
-
-
-
+#ifdef HAHA
 
 
 class Matcher {};
@@ -643,6 +667,8 @@ class Intrinsic : public Instruction {
         return Builder::integer(ins()->getArgOperand(argIndex));
     }
 };
+
+#endif
 
 } // namespace ir
 
