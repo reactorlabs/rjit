@@ -159,14 +159,14 @@ class Builder {
 
       NOTE that this function assumes that the intrinsic does not use varargs.
      */
-    template <typename INTRINSIC>
+    template <typename PRIMITIVE>
     llvm::Function* intrinsic() {
-        llvm::Function* result = m_->getFunction(INTRINSIC::intrinsicName());
+        llvm::Function* result = m_->getFunction(PRIMITIVE::primitiveName());
         // if the intrinsic has not been declared, declare it
         if (result == nullptr)
-            result = llvm::Function::Create(INTRINSIC::intrinsicType(),
+            result = llvm::Function::Create(PRIMITIVE::primitiveType(),
                                             llvm::GlobalValue::ExternalLinkage,
-                                            INTRINSIC::intrinsicName(), m_);
+                                            PRIMITIVE::primitiveName(), m_);
         return result;
     }
 

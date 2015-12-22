@@ -17,8 +17,68 @@ namespace ir {
 
 /** LLVM RTTI kinds of recognized patterns. Also used for fast matching.
  */
-enum PatternKind {
-
+enum class PatternKind {
+    ExtractConstantPool,
+    UserLiteral,
+    Constant,
+    ConvertToLogicalNoNA,
+    PrintValue,
+    StartFor,
+    LoopSequenceLength,
+    GetForLoopValue,
+    MarkVisible,
+    MarkInvisible,
+    UserConstant,
+    GenericGetVar,
+    GenericGetEllipsisArg,
+    GenericSetVar,
+    GenericSetVarParent,
+    GetFunction,
+    GetGlobalFunction,
+    GetSymFunction,
+    GetBuiltinFunction,
+    GetInternalBuiltinFunction,
+    CheckFunction,
+    CreatePromise,
+    SexpType,
+    AddArgument,
+    AddKeywordArgument,
+    AddEllipsisArgument,
+    AddEllipsisArgumentHead,
+    AddEllipsisArgumentTail,
+    CallBuiltin,
+    CallSpecial,
+    CallClosure,
+    CreateClosure,
+    GenericUnaryMinus,
+    GenericUnaryPlus,
+    GenericAdd,
+    GenericSub,
+    GenericMul,
+    GenericDiv,
+    GenericPow,
+    GenericSqrt,
+    GenericExp,
+    GenericEq,
+    GenericNe,
+    GenericLt,
+    GenericLe,
+    GenericGe,
+    GenericGt,
+    GenericBitAnd,
+    GenericBitOr,
+    GenericNot,
+    GenericGetVarMissOK,
+    GenericGetEllipsisValueMissOK,
+    CheckSwitchControl,
+    SwitchControlCharacter,
+    SwitchControlInteger,
+    ReturnJump,
+    InitClosureContext,
+    EndClosureContext,
+    ClosureQuickArgumentAdaptor,
+    ClosureNativeCallTrampoline,
+    CallNative,
 };
 
 /** Pattern of llvm instructions that is recognized as high level function and can be matched on.
@@ -151,17 +211,36 @@ private:
  */
 class PrimitiveCall : public SingleInstructionPattern {
 public:
-    /** Primitive calls can typecast to llvm::CallInst where appropriate.
+
+    /** Returns the call instruction of the primitive call.
      */
-    operator llvm::CallInst * () {
+    llvm::CallInst * callInst() const {
         // reinterpret is faster and we know it must be call inst so all is fine
         assert(llvm::isa<llvm::CallInst>(result) and "PrimitiveCall result must be llvm::CallInst");
         return reinterpret_cast<llvm::CallInst *>(result);
     }
 
+    /** Primitive calls can typecast to llvm::CallInst where appropriate.
+     */
+    operator llvm::CallInst * () {
+        return callInst();
+    }
+
 protected:
     PrimitiveCall(PatternKind kind, llvm::CallInst * result):
         SingleInstructionPattern(kind, result) {
+    }
+
+    llvm::Value* getArgument(unsigned argIndex) {
+        return callInst()->getArgOperand(argIndex);
+    }
+
+    SEXP getArgumentSEXP(unsigned argIndex) {
+        assert(false and "NOT IMPLEMENTED");
+    }
+
+    int getArgumentInt(unsigned argIndex) {
+        return Builder::integer(callInst()->getArgOperand(argIndex));
     }
 
 };

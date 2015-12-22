@@ -3,7 +3,7 @@
 
 #include "llvm.h"
 #include "RIntlns.h"
-#include "Intrinsics.h"
+#include "primitive_calls.h"
 #include "JITModule.h"
 
 namespace rjit {
@@ -84,14 +84,22 @@ class Or {
 };
 }
 
+class Handler2 {
+public:
+    typedef void match;
+    virtual bool dispatch(llvm::BasicBlock::iterator & i) = 0;
+    virtual void defaultHandler(Instruction* ins) {
+    }
+};
+
 // Dummy Handler with empty implementation as a test case
-class DummyHandler : public Handler {
+class DummyHandler : public Handler2 {
   public:
-    DummyHandler() : Handler() {}
+    DummyHandler() : Handler2() {}
 
-    handler gv(GenericGetVar* ins) { getVar = true; }
+    match gv(GenericGetVar* ins) { getVar = true; }
 
-    handler defaultHandler(Instruction* ins) override {}
+    match defaultHandler(Instruction* ins) override {}
 
   public:
     bool getVar = false;
@@ -99,36 +107,36 @@ class DummyHandler : public Handler {
     bool dispatch(llvm::BasicBlock::iterator& i) override;
 };
 
-class MyHandler : public Handler {
+class MyHandler : public Handler2 {
   public:
-    MyHandler() : Handler() {}
+    MyHandler() : Handler2() {}
 
     /** Handlers are identified by their return type handler - this is void
      * typedef that allows the codegen easily spot handlers.
      */
-    handler genericGetVar(GenericGetVar* ins, MockupPredicateA p) {
+    match genericGetVar(GenericGetVar* ins, MockupPredicateA p) {
         std::cout << "GenericGetVar of A" << std::endl;
     }
 
-    handler genericGetVar2x(GenericGetVar* i1, GenericGetVar* i2) {
+    match genericGetVar2x(GenericGetVar* i1, GenericGetVar* i2) {
         std::cout << "Two getvars!!!!" << std::endl;
     }
 
-    handler genericGetVar(GenericGetVar* ins, MockupPredicateB p) {
+    match genericGetVar(GenericGetVar* ins, MockupPredicateB p) {
         std::cout << "GenericGetVar of B" << std::endl;
     }
 
-    handler genericGetVar(GenericGetVar* ins) {
+    match genericGetVar(GenericGetVar* ins) {
         std::cout << "GenericGetVar" << std::endl;
     }
 
-    handler genericAdd(GenericAdd* ins) {
+    match genericAdd(GenericAdd* ins) {
         std::cout << "GenericAdd" << std::endl;
     }
 
-    handler ret(Return* ins) { std::cout << "Return" << std::endl; }
+    match ret(Return* ins) { std::cout << "Return" << std::endl; }
 
-    handler defaultHandler(Instruction* ins) override {
+    match defaultHandler(Instruction* ins) override {
         std::cout << "HahaBaba" << std::endl;
     }
 

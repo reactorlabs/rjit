@@ -27,20 +27,20 @@ $content
 
 CLASS_TEMPLATE = Template("""
 $comment
-class $class_name : public Intrinsic {
+class $class_name : public PrimitiveCall {
   public:
 
 $getters
-    $class_name (llvm::Instruction* ins) :
-        Intrinsic(ins, InstructionKind::$class_name) { }
+    $class_name (llvm::CallInst* ins) :
+        PrimitiveCall(PatternKind::$class_name, ins) { }
 
 $static_ctr
 
-    static char const* intrinsicName() {
+    static char const* primitiveName() {
         return "$intrinsic_name";
     }
 
-    static llvm::FunctionType* intrinsicType() {
+    static llvm::FunctionType* primitiveType() {
         return llvm::FunctionType::get(
             $return_type,
             {
@@ -49,12 +49,12 @@ $static_ctr
             false);
     }
 
-    static bool classof(Instruction const * s) {
-        return s->getKind() == InstructionKind::$class_name;
+    static bool classof(Pattern const * s) {
+        return s->kind == PatternKind::$class_name;
     }
 };""")
 
-STATIC_CTR_TEMPLATE = Template("""    static $class_name & create(
+STATIC_CTR_TEMPLATE = Template("""    static $class_name & Create(
             Builder & b$args) {
 
         std::vector<llvm::Value*> args_;
@@ -67,8 +67,7 @@ $args_load
 
         b.insertCall(ins);
         $class_name * result = new $class_name(ins);
-        setIR(ins, result);
-        //setIRType(ins, InstructionKind::$class_name);
+        result->attachTo(ins);
         return *result;
     }""")
 
@@ -164,11 +163,11 @@ class Intrinsic:
     def argGetterFunction(self, index):
         x = self.argTypes[index]
         if (x == "cp SEXP"):
-            return "getValueSEXP"
+            return "getArgumentSEXP"
         elif (x == "constint"):
-            return "getValueInt"
+            return "getArgumentInt"
         else:
-            return "getValue"
+            return "getArgument"
 
     def typeToIr(self, type):
         if (type in ("SEXP", "cp")):
@@ -276,16 +275,16 @@ class Intrinsic:
     def argumentGetterCode(self, index):
         t = self.argTypes[index]
         if (t in ("SEXP", "int")):
-            return "llvm::Value* {name}() {{ return getValue({index}); }}".format(name=self.argNames[index], index=index)
+            return "llvm::Value* {name}() {{ return getArgument({index}); }}".format(name=self.argNames[index], index=index)
         elif (t == "cp"):
-            return "llvm::Value* constantPool() {{ return getValue({index}); }}".format(index=index)
+            return "llvm::Value* constantPool() {{ return getArgument({index}); }}".format(index=index)
         elif (t == "constint"):
-            return "int {name}() {{ return getValueInt({index}); }}".format(name=self.argNames[index], index=index)
+            return "int {name}() {{ return getArgumentInt({index}); }}".format(name=self.argNames[index], index=index)
         elif (t == "ci"):
             return """
-    int {name}() {{ return getValueInt({index}); }}
+    int {name}() {{ return getArgumentInt({index}); }}
     SEXP {name}Value() {{
-        llvm::Function * f = ins()->getParent()->getParent();
+        llvm::Function * f = callInst()->getParent()->getParent();
         JITModule * m = static_cast<JITModule*>(f->getParent());
         return VECTOR_ELT(m->constPool(f), {name}());
     }}
@@ -296,7 +295,7 @@ class Intrinsic:
 
 def emit(intrinsics, targetDir):
     """ Extracts all intrinsics that we have into specified header and cpp files. """
-    targetName = os.path.join(targetDir, "Intrinsics.h")
+    targetName = os.path.join(targetDir, "primitive_calls.h")
 
     # irt = open(os.path.join(targetDir, "irTypes.h"), "w")
 

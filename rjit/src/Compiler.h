@@ -212,9 +212,9 @@ class Compiler {
         llvm::Value* lhs = compileExpression(CAR(CDR(call)));
         if (CDR(CDR(call)) != R_NilValue) {
             llvm::Value* rhs = compileExpression(CAR(CDR(CDR(call))));
-            return B::create(b, lhs, rhs, b.rho(), call);
+            return B::Create(b, lhs, rhs, b.rho(), call);
         } else {
-            return U::create(b, lhs, b.rho(), call);
+            return U::Create(b, lhs, b.rho(), call);
         }
     }
 
@@ -222,13 +222,13 @@ class Compiler {
     llvm::Value* compileBinary(SEXP call) {
         llvm::Value* lhs = compileExpression(CAR(CDR(call)));
         llvm::Value* rhs = compileExpression(CAR(CDR(CDR(call))));
-        return B::create(b, lhs, rhs, b.rho(), call);
+        return B::Create(b, lhs, rhs, b.rho(), call);
     }
 
     template <typename U>
     llvm::Value* compileUnary(SEXP call) {
         llvm::Value* op = compileExpression(CAR(CDR(call)));
-        return U::create(b, op, b.rho(), call);
+        return U::Create(b, op, b.rho(), call);
     }
 
     ir::Builder b;

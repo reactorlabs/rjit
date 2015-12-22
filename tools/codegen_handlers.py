@@ -735,4 +735,5 @@ def main():
     os.utime(dest, (now, now))
 
 if __name__ == "__main__":
-    main()
+   # main()
+   pass

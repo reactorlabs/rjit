@@ -20,7 +20,7 @@
 #include "Symbols.h"
 #include "Runtime.h"
 #include "ir/Builder.h"
-#include "ir/Intrinsics.h"
+#include "ir/primitive_calls.h"
 #include "ir/Ir.h"
 #include "ir/Handler.h"
 
@@ -90,7 +90,7 @@ Value* Compiler::compileExpression(SEXP value) {
     case STRSXP:
     case NILSXP:
     case CLOSXP:
-        return ir::UserLiteral::create(b, value);
+        return ir::UserLiteral::Create(b, value);
     case BCODESXP:
     // TODO: reuse the compiled fun
     case NATIVESXP:
@@ -108,7 +108,7 @@ Value* Compiler::compileSymbol(SEXP value) {
     assert(TYPEOF(value) == SYMSXP);
     auto name = CHAR(PRINTNAME(value));
     assert(strlen(name));
-    Value* res = ir::GenericGetVar::create(b, b.rho(), value);
+    Value* res = ir::GenericGetVar::Create(b, b.rho(), value);
     res->setName(name);
     return res;
 }
@@ -170,21 +170,21 @@ Value* Compiler::compileCall(SEXP call) {
         // it is a complex function, first get the value of the function and
         // then check it
         f = compileExpression(CAR(call));
-        ir::CheckFunction::create(b, f);
+        ir::CheckFunction::Create(b, f);
     } else {
         // it is simple function - try compiling it with intrinsics
         f = compileIntrinsic(call);
         if (f != nullptr)
             return f;
         // otherwise just do get function
-        f = ir::GetFunction::create(b, b.rho(), CAR(call));
+        f = ir::GetFunction::Create(b, b.rho(), CAR(call));
         f->setName(CHAR(PRINTNAME(CAR(call))));
     }
 
     std::vector<Value*> args;
     compileArguments(CDR(call), args);
 
-    return compileICCallStub(ir::Constant::create(b, call), f, args);
+    return compileICCallStub(ir::Constant::Create(b, call), f, args);
 }
 
 void Compiler::compileArguments(SEXP argAsts, std::vector<Value*>& res) {
@@ -203,13 +203,13 @@ Value* Compiler::compileArgument(SEXP arg, SEXP name) {
     case STRSXP:
     case NILSXP:
         // literals are self-evaluating
-        return ir::UserLiteral::create(b, arg);
+        return ir::UserLiteral::Create(b, arg);
     case SYMSXP:
         if (arg == R_DotsSymbol) {
-            return ir::Constant::create(b, arg);
+            return ir::Constant::Create(b, arg);
         }
         if (arg == R_MissingArg) {
-            return ir::Constant::create(b, arg);
+            return ir::Constant::Create(b, arg);
         }
     default: {
         SEXP code = compilePromise("promise", arg);
@@ -217,7 +217,7 @@ Value* Compiler::compileArgument(SEXP arg, SEXP name) {
         // not needed with new API, compile constant adds automaatically if not
         // present yet
         // b.addConstantPoolObject(code);
-        return ir::UserLiteral::create(b, code);
+        return ir::UserLiteral::Create(b, code);
     }
     }
 }
@@ -244,7 +244,7 @@ Value* Compiler::compileIntrinsic(SEXP call) {
     return compileFunctionDefinition(CDR(call));
     CASE(symbol::Return) {
         return (CDR(call) == R_NilValue)
-                   ? compileReturn(ir::Constant::create(b, R_NilValue))
+                   ? compileReturn(ir::Constant::Create(b, R_NilValue))
                    : compileReturn(compileExpression(CAR(CDR(call))));
     }
     CASE(symbol::Assign)
@@ -315,7 +315,7 @@ Value* Compiler::compileBlock(SEXP block) {
         block = CDR(block);
     }
     if (result == nullptr)
-        result = ir::Constant::create(b, R_NilValue);
+        result = ir::Constant::Create(b, R_NilValue);
     return result;
 }
 
@@ -342,7 +342,7 @@ Value* Compiler::compileParenthesis(SEXP arg) {
 Value* Compiler::compileFunctionDefinition(SEXP fdef) {
     SEXP forms = CAR(fdef);
     SEXP body = compileFunction("function", CAR(CDR(fdef)), forms);
-    return ir::CreateClosure::create(b, b.rho(), forms, body);
+    return ir::CreateClosure::Create(b, b.rho(), forms, body);
 }
 
 /** Simple assignments (that is to a symbol) are compiled using the
@@ -354,7 +354,7 @@ Value* Compiler::compileAssignment(SEXP e) {
     if (TYPEOF(CAR(e)) != SYMSXP)
         return nullptr;
     Value* v = compileExpression(CAR(CDR(e)));
-    ir::GenericSetVar::create(b, v, b.rho(), CAR(e));
+    ir::GenericSetVar::Create(b, v, b.rho(), CAR(e));
     b.setResultVisible(false);
     return v;
 }
@@ -380,7 +380,7 @@ Value* Compiler::compileSuperAssignment(SEXP e) {
     if (TYPEOF(CAR(e)) != SYMSXP)
         return nullptr;
     Value* v = compileExpression(CAR(CDR(e)));
-    ir::GenericSetVarParent::create(b, v, b.rho(), CAR(e));
+    ir::GenericSetVarParent::Create(b, v, b.rho(), CAR(e));
     b.setResultVisible(false);
     return v;
 }
@@ -391,14 +391,14 @@ Value* Compiler::compileSuperAssignment(SEXP e) {
   */
 Value* Compiler::compileReturn(Value* value, bool tail) {
     if (not b.getResultVisible())
-        ir::MarkInvisible::create(b);
+        ir::MarkInvisible::Create(b);
     if (b.getResultJump()) {
-        ir::ReturnJump::create(b, value, b.rho());
+        ir::ReturnJump::Create(b, value, b.rho());
         // we need to have a return instruction as well to fool LLVM into
         // believing the basic block has a terminating instruction
-        ir::Return::create(b, ir::Constant::create(b, R_NilValue));
+        llvm::ReturnInst::Create(llvm::getGlobalContext(), ir::Constant::Create(b, R_NilValue), b);
     } else {
-        ir::Return::create(b, value);
+        llvm::ReturnInst::Create(llvm::getGlobalContext(), value, b);
     }
     // this is here to allow compilation of wrong code where statements are even
     // after return
@@ -419,7 +419,7 @@ Value* Compiler::compileCondition(SEXP e) {
     e = CDR(e);
     SEXP falseAst = (e != R_NilValue) ? CAR(e) : nullptr;
     Value* cond2 = compileExpression(condAst);
-    Value* cond = ir::ConvertToLogicalNoNA::create(b, cond2, condAst);
+    Value* cond = ir::ConvertToLogicalNoNA::Create(b, cond2, condAst);
     BasicBlock* ifTrue = b.createBasicBlock("ifTrue");
     BasicBlock* ifFalse = b.createBasicBlock("ifFalse");
     BasicBlock* next = b.createBasicBlock("next");
@@ -436,7 +436,7 @@ Value* Compiler::compileCondition(SEXP e) {
     b.setBlock(ifFalse);
     Value* falseResult;
     if (falseAst == nullptr) {
-        falseResult = ir::Constant::create(b, R_NilValue);
+        falseResult = ir::Constant::Create(b, R_NilValue);
         b.setResultVisible(false);
     } else {
         falseResult = compileExpression(falseAst);
@@ -464,7 +464,7 @@ Value* Compiler::compileBreak(SEXP ast) {
     // TODO this is really simple, but fine for us - dead code elimination will
     // remove the block if required
     b.setBlock(b.createBasicBlock("deadcode"));
-    return ir::Constant::create(b, R_NilValue);
+    return ir::Constant::Create(b, R_NilValue);
 }
 
 /** Compiles next. Whenever we see next in the compiler, we know it is for a
@@ -479,7 +479,7 @@ Value* Compiler::compileNext(SEXP ast) {
     // TODO this is really simple, but fine for us - dead code elimination will
     // remove the block if required
     b.setBlock(b.createBasicBlock("deadcode"));
-    return ir::Constant::create(b, R_NilValue);
+    return ir::Constant::Create(b, R_NilValue);
 }
 
 /** Compiles repeat loop. This is simple infinite loop. Only break can exit it.
@@ -504,7 +504,7 @@ Value* Compiler::compileRepeatLoop(SEXP ast) {
     b.closeLoop();
     // return R_NilValue
     b.setResultVisible(false);
-    return ir::Constant::create(b, R_NilValue);
+    return ir::Constant::Create(b, R_NilValue);
 }
 
 /** Compiles while loop.
@@ -524,7 +524,7 @@ Value* Compiler::compileWhileLoop(SEXP ast) {
     b.setBlock(b.nextTarget());
     // compile the condition
     Value* cond2 = compileExpression(condAst);
-    Value* cond = ir::ConvertToLogicalNoNA::create(b, cond2, condAst);
+    Value* cond = ir::ConvertToLogicalNoNA::Create(b, cond2, condAst);
     BasicBlock* whileBody = b.createBasicBlock("whileBody");
     ir::Cbr::create(b, cond, whileBody, b.breakTarget());
     // compile the body
@@ -536,7 +536,7 @@ Value* Compiler::compileWhileLoop(SEXP ast) {
     b.closeLoop();
     // return R_NilValue
     b.setResultVisible(false);
-    return ir::Constant::create(b, R_NilValue);
+    return ir::Constant::Create(b, R_NilValue);
 }
 
 /** For loop is compiled into the following structure:
@@ -576,8 +576,8 @@ Value* Compiler::compileForLoop(SEXP ast) {
     BasicBlock* forBody = b.createBasicBlock("forBody");
     // now initialize the loop control structures
     Value* seq2 = compileExpression(seqAst);
-    Value* seq = ir::StartFor::create(b, seq2, b.rho());
-    Value* seqLength = ir::LoopSequenceLength::create(b, seq, ast);
+    Value* seq = ir::StartFor::Create(b, seq2, b.rho());
+    Value* seqLength = ir::LoopSequenceLength::Create(b, seq, ast);
     BasicBlock* forStart = b.block();
     ir::Branch::create(b, forCond);
     b.setBlock(forCond);
@@ -590,8 +590,8 @@ Value* Compiler::compileForLoop(SEXP ast) {
     // move to the for loop body, where we have to set the control variable
     // properly
     b.setBlock(forBody);
-    Value* controlValue = ir::GetForLoopValue::create(b, seq, control);
-    ir::GenericSetVar::create(b, controlValue, b.rho(), controlAst);
+    Value* controlValue = ir::GetForLoopValue::Create(b, seq, control);
+    ir::GenericSetVar::Create(b, controlValue, b.rho(), controlAst);
     // now compile the body of the loop
     compileExpression(bodyAst);
     ir::Branch::create(b, b.nextTarget());
@@ -609,7 +609,7 @@ Value* Compiler::compileForLoop(SEXP ast) {
     b.closeLoop();
     // return R_NilValue
     b.setResultVisible(false);
-    return ir::Constant::create(b, R_NilValue);
+    return ir::Constant::Create(b, R_NilValue);
 }
 
 /** Determines whether we can skip creation of the loop context or not. The code
@@ -710,8 +710,8 @@ Value* Compiler::compileSwitch(SEXP call) {
         return compileExpression(R_NilValue);
     }
 
-    ir::CheckSwitchControl::create(b, control, call);
-    Value* ctype = ir::SexpType::create(b, control);
+    ir::CheckSwitchControl::Create(b, control, call);
+    Value* ctype = ir::SexpType::Create(b, control);
     ICmpInst* cond = ir::IntegerEquals::create(b, ctype, b.integer(STRSXP));
     BasicBlock* switchIntegral = b.createBasicBlock("switchIntegral");
     BasicBlock* switchCharacter = b.createBasicBlock("switchCharacter");
@@ -723,7 +723,7 @@ Value* Compiler::compileSwitch(SEXP call) {
     b.setBlock(switchIntegral);
 
     Value* caseIntegral =
-        ir::SwitchControlInteger::create(b, control, caseAsts.size());
+        ir::SwitchControlInteger::Create(b, control, caseAsts.size());
     auto swInt =
         ir::Switch::create(b, caseIntegral, switchNext, caseAsts.size());
     // for character switch we need to construct the vector,
@@ -739,7 +739,7 @@ Value* Compiler::compileSwitch(SEXP call) {
     //
     b.addConstantPoolObject(cases);
     Value* caseCharacter =
-        ir::SwitchControlCharacter::create(b, control, call, cases);
+        ir::SwitchControlCharacter::Create(b, control, call, cases);
 
     auto swChar =
         ir::Switch::create(b, caseCharacter, switchNext, caseAsts.size());
@@ -780,7 +780,7 @@ Value* Compiler::compileSwitch(SEXP call) {
         swChar.setDefaultDest(last);
     swInt.setDefaultDest(last);
     if (fallThrough != nullptr) {
-        result->addIncoming(ir::Constant::create(b, R_NilValue), b.block());
+        result->addIncoming(ir::Constant::Create(b, R_NilValue), b.block());
         ir::Branch::create(b, switchNext);
     }
     b.setBlock(switchNext);
