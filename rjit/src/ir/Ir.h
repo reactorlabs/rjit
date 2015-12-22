@@ -15,6 +15,173 @@
 namespace rjit {
 namespace ir {
 
+/** LLVM RTTI kinds of recognized patterns. Also used for fast matching.
+ */
+enum PatternKind {
+
+};
+
+/** Pattern of llvm instructions that is recognized as high level function and can be matched on.
+ */
+class Pattern {
+public:
+    static char const * const MD_NAME;
+
+
+    /** Pattern kind used for RTTI and matching.
+     */
+    PatternKind const kind;
+
+    /** Result instruction for the pattern. This value should be used as the value for the whole pattern.
+     */
+    llvm::Instruction * const result;
+
+    /** A pattern can always typecast to its result instruction.
+     */
+    operator llvm::Instruction * () {
+        return result;
+    }
+
+protected:
+
+    /** Creates a pattern with given kind and result instruction.
+     */
+    Pattern(PatternKind kind, llvm::Instruction * result):
+        kind(kind),
+        result(result) {
+    }
+
+    /** When a pattern is destroyed, it detaches itself from all its instructions.
+     */
+    virtual ~Pattern() {
+        detachAll();
+    }
+
+    /** Returns pattern the given llvm instruction belongs to. Returns nullptr if the instruction is not part of any pattern. */
+    static Pattern * getPattern(llvm::Instruction * ins) {
+        llvm::MDNode* m = ins->getMetadata(MD_NAME);
+        if (m == nullptr)
+            return nullptr;
+        llvm::Metadata* mx = m->getOperand(0);
+        llvm::APInt const& ap =
+            llvm::cast<llvm::ConstantInt>(
+                llvm::cast<llvm::ValueAsMetadata>(mx)->getValue())
+                ->getUniqueInteger();
+        assert(ap.isIntN(64) and "Expected 64bit integer");
+        Pattern * res = reinterpret_cast<Pattern *>(ap.getZExtValue());
+        assert(res);
+        return res;
+    }
+
+    /** Attaches the pattern to specified llvm instruction. All llvm instructions that are part of a pattern must be attached to it.
+     */
+    void attachTo(llvm::Instruction * ins) {
+        std::vector<llvm::Metadata*> v = {
+            llvm::ValueAsMetadata::get(llvm::ConstantInt::get(
+                ins->getContext(),
+                llvm::APInt(64, reinterpret_cast<std::uintptr_t>(this))
+            ))
+        };
+        llvm::MDNode* m = llvm::MDNode::get(ins->getContext(), v);
+        ins->setMetadata(MD_NAME, m);
+    }
+
+    /** Detaches the pattern from the specified llvm instruction.
+     */
+    void detachFrom(llvm::Instruction * ins) {
+        assert(getPattern(ins) == this and "Cannot detach from instruction that is not a member");
+        // TODO remove the metadata here
+    }
+
+
+private:
+
+    /** Detaches the pattern from all its instructions calling detachFrom on them.
+
+      This method is called by the destructor to detach the pattern from its instructions. The general way of doing this is to scan instructions before and after if they are part of the pattern and detach from them. Subclasses of Pattern may choose to override this to deal with the specific cases faster.
+      */
+    virtual void detachAll() {
+        // TODO implement
+    }
+
+    /** Advances given iterator past the pattern.
+
+      This generic method searches the instructions to find first one that does not belong to the pattern. Subclasses may override this to deal with the specific cases faster.
+     */
+    virtual void advance(llvm::BasicBlock::iterator & i) {
+        while (true) {
+            llvm::Instruction * ii = i;
+            // advance the iterator
+            ++i;
+            // if the last instruction was terminating instruction, return - we are at the end of bb
+            if (llvm::isa<llvm::TerminatorInst>(ii))
+                return;
+            // check if the current instruction still belongs to the pattern and terminate if not
+            ii = i;
+            if (getPattern(ii) != this)
+                return;
+        }
+    }
+};
+
+/** A pattern that consists of a single llvm instruction.
+
+  Provides fast detachAll and advance methods utilizing the single instruction length.
+ */
+class SingleInstructionPattern : public Pattern {
+protected:
+    SingleInstructionPattern(PatternKind kind, llvm::Instruction * ins):
+        Pattern(kind, ins) {
+    }
+private:
+    /** Single instruction just detaches from its result.
+     */
+    void detachAll() override {
+        detachFrom(result);
+    }
+
+    /** Advances by single instruction.
+     */
+    void advance(llvm::BasicBlock::iterator & i) override {
+        ++i;
+    }
+};
+
+/** Primitive call pattern base class.
+ */
+class PrimitiveCall : public SingleInstructionPattern {
+public:
+    /** Primitive calls can typecast to llvm::CallInst where appropriate.
+     */
+    operator llvm::CallInst * () {
+        // reinterpret is faster and we know it must be call inst so all is fine
+        assert(llvm::isa<llvm::CallInst>(result) and "PrimitiveCall result must be llvm::CallInst");
+        return reinterpret_cast<llvm::CallInst *>(result);
+    }
+
+protected:
+    PrimitiveCall(PatternKind kind, llvm::CallInst * result):
+        SingleInstructionPattern(kind, result) {
+    }
+
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class Matcher {};
 
 /** Type of the IR.
