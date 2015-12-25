@@ -74,15 +74,6 @@ class ABInliner {
                                              FunctionCall* fc, int offset);
 
     /**
-     * @brief      Inlines inner calls into outer
-     *
-     * @param      outer  llvm::Function*
-     *
-     * @return     outer with the inlined calls
-     */
-    static SEXP inlineThisInThat(SEXP sOuter, SEXP env);
-
-    /**
      * @brief      Inlines fc call to inner into outer and requires the return
      *             instruction of the inner function.
      *
@@ -99,9 +90,10 @@ class ABInliner {
                                               llvm::ReturnInst* iRet);
 
     static void OSRInstrument(llvm::Function* base,
-                              llvm::Function* instrumented, StateMap* map);
+                              llvm::Function* instrumented,
+                              llvm::Instruction* src, StateMap* map);
 
-    llvm::Function* inlineCalls(llvm::Function* outer, SEXP env);
+    static SEXP inlineCalls(SEXP outer, SEXP env);
 
     // TODO for testing
     static Inst_Vector* getOSRCondition();

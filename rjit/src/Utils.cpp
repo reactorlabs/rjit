@@ -78,7 +78,7 @@ REXPORT SEXP testOSR(SEXP outer, SEXP inner, SEXP env) {
 }
 
 REXPORT SEXP testInline(SEXP outer, SEXP env) {
-    SEXP res = ABInliner::inlineThisInThat(outer, env);
+    SEXP res = ABInliner::inlineCalls(outer, env);
     return res;
 }
 }
