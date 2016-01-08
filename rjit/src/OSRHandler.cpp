@@ -60,7 +60,17 @@ std::pair<Function*, Function*> OSRHandler::setup(Function* base) {
 }
 
 void OSRHandler::insertOSR(Function* opt, Function* instrument,
-                           Instruction* src) {}
+                           Instruction* src) {
+    StateMap* F2NewToF2Map = nullptr;
+    OSRLibrary::OSRPointConfig configuration(
+        true /*verbose*/, true /*updateF1*/, -1 /*branch taken prob*/,
+        nullptr /*keep F1 name*/, nullptr /*keep mod for F1*/,
+        nullptr /*keep stateMap*/, nullptr /*default name generation*/,
+        opt->getParent() /*mod for F2*/,
+        &F2NewToF2Map /*statemap cont to target*/);
+    if (configuration.branchTakenProb)
+        printf("Hello\n");
+}
 
 /******************************************************************************/
 /*                        Private functions                                   */

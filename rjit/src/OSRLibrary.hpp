@@ -265,14 +265,16 @@ class OSRLibrary {
     /// otherwise.
     static bool removeOSRPoint(llvm::Instruction& OSRSrc);
 
+    static void duplicateBodyIntoNewFunction(llvm::Function* F,
+                                             llvm::Function* NF,
+                                             llvm::ValueToValueMapTy& VMap);
+
   private:
     static void
     applyAttributesToArguments(llvm::Function* NF, llvm::Function* F,
                                std::vector<llvm::Value*>& valuesToPass,
                                bool skipFirst = false);
-    static void duplicateBodyIntoNewFunction(llvm::Function* F,
-                                             llvm::Function* NF,
-                                             llvm::ValueToValueMapTy& VMap);
+
     static void fixOperandReferencesFromVMap(llvm::Function* NF,
                                              llvm::Function* F,
                                              llvm::ValueToValueMapTy& VMap);

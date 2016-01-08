@@ -27,6 +27,9 @@ class Compiler {
 
     ir::Builder* getBuilder() { return &b; }
 
+    // TODO aghosn
+    llvm::ExecutionEngine* getEngine();
+
   private:
     /** Compiles an expression.
 

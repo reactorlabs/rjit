@@ -20,6 +20,9 @@
 #include "FunctionCall.h"
 #include "ABInliner.h"
 
+#include "OSRHandler.h"
+#include "OSRInliner.h"
+
 using namespace rjit;
 namespace osr {
 
@@ -58,27 +61,13 @@ REXPORT SEXP printWithoutSP(SEXP expr) {
     return result;
 }
 
-REXPORT SEXP testOSR(SEXP outer, SEXP inner, SEXP env) {
-    Compiler c("module");
-    SEXP rO = c.compile("outer", outer);
-    SEXP rI = c.compile("inner", inner);
-    SEXP poolO = CDR(rO);
-    SEXP poolI = CDR(rI);
-    int sizeO = LENGTH(poolO);
-    int sizeI = LENGTH(poolI);
-    SEXP objs = allocVector(VECSXP, sizeO + sizeI);
-    for (int i = 0; i < sizeO; ++i)
-        SET_VECTOR_ELT(objs, i, VECTOR_ELT(poolO, i));
-    for (int i = 0; i < sizeI; ++i)
-        SET_VECTOR_ELT(objs, i + sizeO, VECTOR_ELT(poolI, i));
-
-    SETCDR(rO, objs);
-    c.jitAll();
-    return rO;
-}
-
 REXPORT SEXP testInline(SEXP outer, SEXP env) {
     SEXP res = ABInliner::inlineCalls(outer, env);
+    return res;
+}
+
+REXPORT SEXP testOSR(SEXP outer, SEXP env) {
+    SEXP res = OSRInliner::inlineCalls(outer, env);
     return res;
 }
 }

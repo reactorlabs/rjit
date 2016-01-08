@@ -15,21 +15,11 @@
 namespace osr {
 typedef std::vector<llvm::Instruction*> Inst_Vector;
 typedef std::vector<llvm::ReturnInst*> RInst_Vector;
-typedef std::map<std::string, SEXP> FunctionPool;
 
 typedef struct {
     llvm::Function* f;
     llvm::ReturnInst* rInsts;
 } Function_N_RInsts;
-
-typedef struct ContextWrapper {
-    std::vector<SEXP> cp;
-    llvm::Function* f;
-    ContextWrapper(std::vector<SEXP> CP, llvm::Function* F) {
-        cp = CP;
-        f = F;
-    }
-} ContextWrapper;
 
 /**
  * @brief      THE API IS NOT FIXED; JUST PROTOTYPING FOR THE MOMENT
@@ -61,6 +51,16 @@ class ABInliner {
     static void updateCPAccess(llvm::CallInst* call, int offset);
 
     /**
+     * @brief      Concatenates two function pools into one
+     *
+     * @param[in]  first   first function
+     * @param[in]  second  second function
+     *
+     * @return     a new constant pool first::second
+     */
+    static SEXP concatenateCP(SEXP first, SEXP second);
+
+    /**
      * @brief      Create a clone of inner ready to be inlined at fc.
      *
      * @param      inner   The callee function
@@ -89,16 +89,10 @@ class ABInliner {
                                               llvm::Function* inner,
                                               llvm::ReturnInst* iRet);
 
-    static void OSRInstrument(llvm::Function* base,
-                              llvm::Function* instrumented,
-                              llvm::Instruction* src, StateMap* map);
-
     static SEXP inlineCalls(SEXP outer, SEXP env);
 
     // TODO for testing
     static Inst_Vector* getOSRCondition();
-
-    FunctionPool pool;
 
   private:
     ABInliner() {}

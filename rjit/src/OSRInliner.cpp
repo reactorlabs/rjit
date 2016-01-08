@@ -8,9 +8,7 @@ using namespace llvm;
 namespace osr {
 
 /******************************************************************************/
-/*												Public
- * functions
- */
+/*					Public functions */
 /******************************************************************************/
 
 SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
@@ -52,9 +50,7 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
 }
 
 /******************************************************************************/
-/*												Private
- * functions
- */
+/*					Private functions */
 /******************************************************************************/
 
 void OSRInliner::setCP(SEXP first, SEXP second) {
