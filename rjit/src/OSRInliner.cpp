@@ -170,8 +170,8 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     delete deadBlock;
     delete toInline;
 
-    toOpt->dump();
-    toInstrument->dump();
+    /*toOpt->dump();
+    toInstrument->dump();*/
 }
 
 Inst_Vector* OSRInliner::getTrueCondition() {

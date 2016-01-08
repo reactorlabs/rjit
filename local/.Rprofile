@@ -23,7 +23,7 @@ packageTests <- function() {
     cat("IM IN UR DLLZ\n")
     source("../rjit/R/rjit.R")
     cat("IM IN UR PACKAGE\n")
-    packageTests()
+    #packageTests()
     #f <<- function(a, b)  a + b
     #fc <<- jit.compile(f)
     cat("AWSHUM\n")

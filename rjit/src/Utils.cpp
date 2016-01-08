@@ -18,7 +18,6 @@
 #include "R.h"
 
 #include "FunctionCall.h"
-#include "ABInliner.h"
 
 #include "OSRHandler.h"
 #include "OSRInliner.h"
@@ -59,11 +58,6 @@ REXPORT SEXP printWithoutSP(SEXP expr) {
     llvm::Function* rfunction = reinterpret_cast<llvm::Function*>(TAG(result));
     rfunction->dump();
     return result;
-}
-
-REXPORT SEXP testInline(SEXP outer, SEXP env) {
-    SEXP res = ABInliner::inlineCalls(outer, env);
-    return res;
 }
 
 REXPORT SEXP testOSR(SEXP outer, SEXP env) {

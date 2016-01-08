@@ -63,7 +63,7 @@ void OSRHandler::insertOSR(Function* opt, Function* instrument,
                            Instruction* src, Inst_Vector* cond) {
     StateMap* F2NewToF2Map = nullptr;
     OSRLibrary::OSRPointConfig configuration(
-        true /*verbose*/, true /*updateF1*/, -1 /*branch taken prob*/,
+        false /*verbose*/, true /*updateF1*/, -1 /*branch taken prob*/,
         nullptr /*keep F1 name*/, opt->getParent() /*keep mod for F1*/,
         nullptr /*keep stateMap*/, nullptr /*default name generation*/,
         opt->getParent() /*mod for F2*/,
