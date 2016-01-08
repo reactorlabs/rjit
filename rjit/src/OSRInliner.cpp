@@ -18,9 +18,8 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
     Function* fLLVM = GET_LLVM(fSexp);
     assert(fLLVM && "Could not extract the LLVM function.");
 
-    /*Set up the working copies*/
-    auto pair = OSRHandler::setup(fLLVM);
-    Function* toOpt = pair.first, *toInstrument = pair.second;
+    /*Set up the working copy*/
+    Function* toOpt = OSRHandler::setupOpt(fLLVM);
     SET_TAG(fSexp, reinterpret_cast<SEXP>(toOpt));
 
     /*Get the function calls inside f*/
@@ -38,6 +37,7 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
         // Replace constant pool accesses and argument uses.
         ReturnInst* ret = nullptr;
         prepareCodeToInline(toInline, *it, LENGTH(CDR(fSexp)), &ret);
+        Function* toInstrument = OSRHandler::getFreshInstrument(fLLVM, toOpt);
         insertBody(toOpt, toInline, toInstrument, *it, ret);
 
         // Set the constant pool.

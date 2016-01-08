@@ -16,7 +16,7 @@ class OSRHandler : public OSRLibrary {
     /**
      * Map from base function to instrumented
      */
-    static std::map<Function*, Function*> instruments;
+    static std::map<Function*, std::list<Function*>> instruments;
 
     /**
      * Map from function to its statemap to base.
@@ -50,7 +50,27 @@ class OSRHandler : public OSRLibrary {
      *
      * @return     <toModify, toInstrument>.
      */
-    static std::pair<Function*, Function*> setup(Function* base);
+    static std::pair<Function*, Function*> setupOptAndInstr(Function* base);
+
+    /**
+     * @brief      { function_description }
+     *
+     * @param      base  { parameter_description }
+     *
+     * @return     { description_of_the_return_value }
+     */
+    static Function* setupOpt(Function* base);
+
+    /**
+     * @brief      Returns a fresh version of base to instrument.
+     *
+     * @param      base  The original functional.
+     *
+     * param       toOpt The version used to Optimize.
+     *
+     * @return     A copy of base, and registers the statemap.
+     */
+    static Function* getFreshInstrument(Function* base, Function* toOpt);
 
     /**
      * @brief      Inserts a bidirectional (lie, later) osr relation.
@@ -69,7 +89,7 @@ class OSRHandler : public OSRLibrary {
     static GlobalVariable* osrValue;
 
     OSRHandler() {}
-    static bool existInstrument(Function* f);
+    // static bool existInstrument(Function* f);
 };
 
 } // namespace osr
