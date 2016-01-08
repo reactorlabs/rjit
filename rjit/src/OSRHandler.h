@@ -9,6 +9,7 @@ using namespace llvm;
 namespace osr {
 
 #define GET_LLVM(sexp) (reinterpret_cast<llvm::Function*>(TAG(sexp)))
+typedef std::vector<Instruction*> Inst_Vector;
 
 class OSRHandler : public OSRLibrary {
   public:
@@ -59,8 +60,8 @@ class OSRHandler : public OSRLibrary {
      * @param      src         OSRExit
      * @param      lPad        entry in instrument
      */
-    static void insertOSR(Function* opt, Function* instrument,
-                          Instruction* src);
+    static void insertOSR(Function* opt, Function* instrument, Instruction* src,
+                          Inst_Vector* cond);
 
   private:
     static OSRHandler instance;

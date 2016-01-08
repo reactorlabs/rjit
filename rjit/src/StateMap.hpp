@@ -232,12 +232,12 @@ class StateMap {
         assert((default1.size() == default2.size()) &&
                "StateMap: not the same size");
 
-        for (auto i1 = default1.begin(), i2 = default2.begin();
-             i1 != default1.end() && i2 != default2.end(); ++i1, ++i2) {
-            if ((*i1).first != (*i2).first)
+        for (auto i1 = default1.begin(); i1 != default1.end(); ++i1) {
+            auto corresponding = default2.find((*i1).first);
+            if (corresponding == default2.end())
                 continue;
             llvm::Value* src_v = (*i1).second;
-            llvm::Value* dest_v = (*i2).second;
+            llvm::Value* dest_v = (*corresponding).second;
             if (llvm::isa<llvm::Argument>(src_v)) {
                 registerOneToOneValue(src_v, dest_v, true);
             } else if (llvm::Instruction* src_I =

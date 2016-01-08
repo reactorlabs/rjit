@@ -45,6 +45,8 @@ class OSRInliner {
     static void insertBody(Function* toOpt, Function* toInline,
                            Function* toInstrument, FunctionCall* fc,
                            ReturnInst* ret);
+
+    static Inst_Vector* getTrueCondition();
 };
 
 } // namespace osr

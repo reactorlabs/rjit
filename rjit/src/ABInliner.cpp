@@ -87,7 +87,7 @@ llvm::Function* ABInliner::inlineFunctionCall(FunctionCall* fc,
                                               llvm::Function* outer,
                                               llvm::Function* toInline,
                                               llvm::ReturnInst* iRet) {
-    // auto base = StateMap::generateIdentityMapping(outer);
+    auto base = StateMap::generateIdentityMapping(outer);
     // llvm::Function* instru = OSRHandler::getInstrumented(outer);
     // auto base = std::pair<llvm::Function*, StateMap*>(instru,
     // OSRHandler::getInstance()->maps[instru]);
@@ -131,16 +131,16 @@ llvm::Function* ABInliner::inlineFunctionCall(FunctionCall* fc,
     }
 
     blocks->clear();
-    /*auto landPad = dynamic_cast<llvm::Instruction*>(
+    auto landPad = dynamic_cast<llvm::Instruction*>(
         base.second->getCorrespondingOneToOneValue(fc->getGetFunc()));
     OSRLibrary::OSRPointConfig conf(true, true, -1, nullptr, outer->getParent(),
                                     nullptr, nullptr, outer->getParent(),
-                                    nullptr);*/
-    // outer->getParent()->getFunctionList().push_back(base.first);
-    /*auto res = OSRLibrary::insertResolvedOSR(
+                                    nullptr);
+    outer->getParent()->getFunctionList().push_back(base.first);
+    auto res = OSRLibrary::insertResolvedOSR(
         getGlobalContext(), *outer,
         *(dynamic_cast<llvm::Instruction*>(fc->getGetFunc())), *(base.first),
-        *landPad, *(ABInliner::getOSRCondition()), *(base.second), conf);*/
+        *landPad, *(ABInliner::getOSRCondition()), *(base.second), conf);
 
     // clean up
     fc->getGetFunc()->removeFromParent();
@@ -151,7 +151,7 @@ llvm::Function* ABInliner::inlineFunctionCall(FunctionCall* fc,
     outer->dump();
 
     printf("See the instrumentation\n");
-    // res.second->dump();
+    res.second->dump();
     return outer;
 }
 

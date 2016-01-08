@@ -8,7 +8,7 @@ using namespace llvm;
 namespace osr {
 
 /******************************************************************************/
-/*					Public functions */
+/*                  Public functions */
 /******************************************************************************/
 
 SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
@@ -50,7 +50,7 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
 }
 
 /******************************************************************************/
-/*					Private functions */
+/*                  Private functions */
 /******************************************************************************/
 
 void OSRInliner::setCP(SEXP first, SEXP second) {
@@ -159,7 +159,8 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     }
 
     // OSR Instrumentation.
-    OSRHandler::insertOSR(toOpt, toInstrument, fc->getGetFunc());
+    OSRHandler::insertOSR(toOpt, toInstrument, fc->getGetFunc(),
+                          getTrueCondition());
 
     // Clean up.
     blocks->clear();
@@ -171,6 +172,14 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
 
     toOpt->dump();
     toInstrument->dump();
+}
+
+Inst_Vector* OSRInliner::getTrueCondition() {
+    Inst_Vector* res = new Inst_Vector();
+    ConstantInt* one = ConstantInt::get(getGlobalContext(), APInt(32, 1));
+    ICmpInst* cond = new ICmpInst(ICmpInst::ICMP_EQ, one, one);
+    res->push_back(cond);
+    return res;
 }
 
 } // namespace osr
