@@ -1,0 +1,4 @@
+SOURCES = $(wildcard *.cpp ir/*.cpp)
+OBJECTS = $(SOURCES:.cpp=.o)
+PKG_CXXFLAGS = `/home/aghosn/Documents/Programs/Thesis/llvm/llvm-build-370/./bin/llvm-config --cxxflags | sed 's/-Wcovered-switch-default//' | sed 's/-fcolor-diagnostics//'` -UNDEBUG -I.
+PKG_LIBS = `/home/aghosn/Documents/Programs/Thesis/llvm/llvm-build-370/./bin/llvm-config --ldflags --system-libs --libs support core mcjit native irreader linker ipo`
