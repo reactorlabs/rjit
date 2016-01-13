@@ -77,6 +77,7 @@ void Compiler::jitAll() {
 llvm::ExecutionEngine* Compiler::getEngine() {
     return JITCompileLayer::singleton.getEngine(b.module());
 }
+// TODO end aghosn
 
 void Compiler::removeFromRelocations(SEXP f) {
     std::remove(relocations.begin(), relocations.end(), f);

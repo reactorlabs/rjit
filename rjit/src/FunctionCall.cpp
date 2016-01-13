@@ -2,6 +2,7 @@
 
 #include "FunctionCall.h"
 #include "Utils.h"
+#include "ir/intrinsics.h"
 
 namespace osr {
 
@@ -19,7 +20,6 @@ Inst_Vector* FunctionCall::extractArguments(llvm::Function* f,
 }
 
 FunctionCalls* FunctionCall::getFunctionCalls(llvm::Function* f) {
-
     FunctionCalls* result = new FunctionCalls();
     llvm::CallInst* gf = nullptr;
     llvm::CallInst* ics = nullptr;
@@ -68,6 +68,86 @@ int FunctionCall::getFunctionSymbol() {
     llvm::ConstantInt* cst =
         dynamic_cast<llvm::ConstantInt*>(this->getFunc->getArgOperand(2));
     return cst->getSExtValue();
+}
+
+void FunctionCall::getNatives(SEXP cp) {
+    for (auto it = args.begin(); it != args.end(); ++it) {
+        llvm::CallInst* call = dynamic_cast<llvm::CallInst*>(*it);
+        if (call && IS_USERLIT(call)) {
+            // Get the last argument
+            int end = call->getNumArgOperands() - 1;
+            llvm::ConstantInt* index =
+                dynamic_cast<llvm::ConstantInt*>(call->getArgOperand(end));
+            assert(index && "Could not access index");
+            int64_t value = index->getSExtValue();
+            SEXP access = VECTOR_ELT(cp, value);
+            if (TYPEOF(access) == NATIVESXP) {
+                printf("Found a problem!!\n");
+                (*it)->dump();
+            }
+        }
+    }
+}
+
+void FunctionCall::fixNatives(SEXP cp, rjit::Compiler* c) {
+    for (unsigned int i = 0; i < args.size(); ++i) {
+        llvm::CallInst* call = dynamic_cast<llvm::CallInst*>(args.at(i));
+        if (call && IS_USERLIT(call)) {
+            llvm::ConstantInt* idx = dynamic_cast<llvm::ConstantInt*>(
+                call->getArgOperand(call->getNumArgOperands() - 1));
+            assert(idx && "Could not access the index in userLiteral");
+            int64_t value = idx->getSExtValue();
+            SEXP access = VECTOR_ELT(cp, value);
+            if (TYPEOF(access) == NATIVESXP) {
+                // TODO replace by a promise that we insert in the code.
+                // put the userliterral in createPromise and rho.
+                // then introduce and replace all uses -> carefull with that
+                // part.
+                /*llvm::Instruction* promise = (rjit::ir::CreatePromise::create(
+                    *(c->getBuilder()), call, getRho()));*/
+                std::vector<llvm::Value*> args_;
+                args_.push_back(call);
+                args_.push_back(getRho());
+                llvm::CallInst* promise = llvm::CallInst::Create(
+                    c->getBuilder()->intrinsic<rjit::ir::CreatePromise>(),
+                    args_, "");
+
+                promise->insertAfter(args.at(i));
+                llvm::AttributeSet PAL;
+                {
+                    llvm::SmallVector<llvm::AttributeSet, 4> Attrs;
+                    llvm::AttributeSet PAS;
+                    {
+                        llvm::AttrBuilder B;
+                        auto id =
+                            rjit::JITCompileLayer::singleton.getSafepointId(
+                                getFunction());
+                        B.addAttribute("statepoint-id", std::to_string(id));
+                        PAS =
+                            llvm::AttributeSet::get(getGlobalContext(), ~0U, B);
+                    }
+                    Attrs.push_back(PAS);
+                    PAL = llvm::AttributeSet::get(getGlobalContext(), Attrs);
+                }
+                promise->setAttributes(PAL);
+
+                args.at(i)
+                    ->replaceUsesOutsideBlock(promise, args.at(i)->getParent());
+                // promise->insertAfter(args.at(i));
+                args.at(i) = promise;
+            }
+        }
+    }
+}
+
+llvm::Value* FunctionCall::getRho() {
+    llvm::Function* fun = this->getFunction();
+    assert(fun && "The function for this fc is null.");
+    for (auto RI = fun->arg_begin(), EI = fun->arg_end(); RI != EI; ++RI) {
+        if (NAME_CONTAINS(&(*RI), "rho"))
+            return &(*RI);
+    }
+    return nullptr;
 }
 
 } // namespace osr

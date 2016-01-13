@@ -28,6 +28,7 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
     for (auto it = calls->begin(); it != calls->end(); ++it) {
         // Get the callee
         SEXP constantPool = CDR(fSexp);
+        (*it)->fixNatives(constantPool, &c);
         SEXP toInlineSexp =
             getFunction(&c, constantPool, (*it)->getFunctionSymbol(), env);
         if (!toInlineSexp)
@@ -159,8 +160,8 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     }
 
     // OSR Instrumentation.
-    OSRHandler::insertOSR(toOpt, toInstrument, fc->getGetFunc(),
-                          getTrueCondition());
+    /*OSRHandler::insertOSR(toOpt, toInstrument, fc->getGetFunc(),
+                          getTrueCondition());*/
 
     // Clean up.
     blocks->clear();
@@ -170,14 +171,15 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     delete deadBlock;
     delete toInline;
 
-    /*toOpt->dump();
-    toInstrument->dump();*/
+    toOpt->dump();
+    /*toInstrument->dump();*/
 }
 
 Inst_Vector* OSRInliner::getTrueCondition() {
     Inst_Vector* res = new Inst_Vector();
     ConstantInt* one = ConstantInt::get(getGlobalContext(), APInt(32, 1));
-    ICmpInst* cond = new ICmpInst(ICmpInst::ICMP_EQ, one, one);
+    ConstantInt* zero = ConstantInt::get(getGlobalContext(), APInt(32, 0));
+    ICmpInst* cond = new ICmpInst(ICmpInst::ICMP_EQ, one, zero);
     res->push_back(cond);
     return res;
 }

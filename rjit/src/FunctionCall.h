@@ -3,12 +3,16 @@
 
 #include "llvm.h"
 #include <llvm/IR/InstIterator.h>
+#include <Rinternals.h>
+#include "Compiler.h"
+#include "JITCompileLayer.h"
 
 #define GETFUNCTION_NAME "getFunction"
 #define CONSTANT_NAME "constant"
 #define ICSTUB_NAME "icStub"
 #define LITERAL_NAME "userLiteral"
 #define GET_VAR_NAME "genericGetVar"
+#define USR_LIT "userLiteral"
 
 #define IS_NAMED(x, y) ((x)->getName().str().compare((y)) == 0)
 #define NAME_CONTAINS(x, y)                                                    \
@@ -20,18 +24,12 @@
 #define IS_CALL_NAMED(x, y) IS_NAMED((x)->getCalledFunction(), (y))
 #define IS_STUB(x) NAME_CONTAINS((x)->getCalledFunction(), ICSTUB_NAME)
 #define IS_CONSTANT_CALL(x) IS_CALL_NAMED((x), CONSTANT_NAME)
-
+#define IS_USERLIT(x) IS_NAMED((x)->getCalledFunction(), USR_LIT)
 namespace osr {
 
 typedef std::vector<llvm::Instruction*> Inst_Vector;
 class FunctionCall;
 typedef std::vector<FunctionCall*> FunctionCalls;
-typedef std::pair<llvm::inst_iterator, Inst_Vector*> Pos_N_Args;
-typedef struct {
-    llvm::inst_iterator it;
-    Inst_Vector* args;
-    llvm::CallInst* consts;
-} Pos_Args_Consts;
 
 /**
  * @brief      Wrapper for a function call in rjit. Enables to expose
@@ -67,12 +65,17 @@ class FunctionCall {
         return nullptr;
     }
 
+    void getNatives(SEXP cp);
+    void fixNatives(SEXP cp, rjit::Compiler* c);
+
     int getFunctionSymbol();
 
   private:
     llvm::CallInst* getFunc;
     Inst_Vector args;
     llvm::CallInst* icStub;
+
+    llvm::Value* getRho();
 };
 } // namespace osr
 #endif
