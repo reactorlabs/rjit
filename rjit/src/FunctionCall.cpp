@@ -99,18 +99,16 @@ void FunctionCall::fixNatives(SEXP cp, rjit::Compiler* c) {
             int64_t value = idx->getSExtValue();
             SEXP access = VECTOR_ELT(cp, value);
             if (TYPEOF(access) == NATIVESXP) {
-                // TODO replace by a promise that we insert in the code.
-                // put the userliterral in createPromise and rho.
-                // then introduce and replace all uses -> carefull with that
-                // part.
-                /*llvm::Instruction* promise = (rjit::ir::CreatePromise::create(
-                    *(c->getBuilder()), call, getRho()));*/
                 std::vector<llvm::Value*> args_;
                 args_.push_back(call);
                 args_.push_back(getRho());
-                llvm::CallInst* promise = llvm::CallInst::Create(
+
+                /*llvm::CallInst* promise = llvm::CallInst::Create(
                     c->getBuilder()->intrinsic<rjit::ir::CreatePromise>(),
-                    args_, "");
+                    args_, "");*/
+                llvm::CallInst* promise = llvm::CallInst::Create(
+                    c->getBuilder()->intrinsic<rjit::ir::CallNative>(), args_,
+                    "");
 
                 promise->insertAfter(args.at(i));
                 llvm::AttributeSet PAL;

@@ -160,8 +160,8 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     }
 
     // OSR Instrumentation.
-    /*OSRHandler::insertOSR(toOpt, toInstrument, fc->getGetFunc(),
-                          getTrueCondition());*/
+    OSRHandler::insertOSR(toOpt, toInstrument, fc->getGetFunc(),
+                          getTrueCondition());
 
     // Clean up.
     blocks->clear();
