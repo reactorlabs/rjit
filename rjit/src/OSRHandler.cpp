@@ -7,36 +7,19 @@ namespace osr {
 
 /*      Initialize static variables     */
 OSRHandler OSRHandler::instance;
-Module* OSRHandler::lastMod = nullptr;
-GlobalVariable* OSRHandler::osrValue = nullptr;
 std::map<Function*, std::list<Function*>> OSRHandler::instruments;
-std::map<Function*, StateMap*> OSRHandler::statemaps;
 std::map<Function*, Function*> OSRHandler::toBase;
 std::map<std::pair<Function*, Function*>, StateMap*> OSRHandler::transitiveMaps;
 
 /******************************************************************************/
 /*                        Public functions                                    */
 /******************************************************************************/
-
-std::pair<Function*, Function*> OSRHandler::setupOptAndInstr(Function* base) {
-    assert(base && "OSRHandler: setup with nullptr.");
-
-    // Generate a new clone of the function that we can modify.
-    Function* toOpt = setupOpt(base);
-
-    // Generate the version to instrument for the continuation.
-    Function* toInstrument = getFreshInstrument(base, toOpt);
-
-    return std::pair<Function*, Function*>(toOpt, toInstrument);
-}
-
 Function* OSRHandler::setupOpt(Function* base) {
     assert(base && "OSRHandler: setup with nullptr");
 
     // Generate a new clone of the function that we can modify.
     auto toOpt = StateMap::generateIdentityMapping(base);
     toBase[toOpt.first] = base;
-    statemaps[toOpt.first] = toOpt.second;
 
     // Add the function to the module.
     base->getParent()->getFunctionList().push_back(toOpt.first);
@@ -44,30 +27,9 @@ Function* OSRHandler::setupOpt(Function* base) {
     return toOpt.first;
 }
 
-Function* OSRHandler::getFreshInstrument(Function* base, Function* toOpt) {
-    auto toInstrument = StateMap::generateIdentityMapping(base);
-    (instruments[base]).push_back(toInstrument.first);
-    statemaps[toInstrument.first] = toInstrument.second;
-
-    auto toOptMap = statemaps[toOpt];
-
-    // Generate & Register the transitive statemap.
-    StateMap* transitive =
-        new StateMap(toOpt, toOptMap, toInstrument.first, toInstrument.second);
-    auto transitiveKey =
-        std::pair<Function*, Function*>(toOpt, toInstrument.first);
-    transitiveMaps[transitiveKey] = transitive;
-
-    // Add the function to the module.
-    base->getParent()->getFunctionList().push_back(toInstrument.first);
-
-    return toInstrument.first;
-}
-
 Function* OSRHandler::getToInstrument(Function* base) {
     auto toInstrument = StateMap::generateIdentityMapping(base);
     (instruments[base]).push_back(toInstrument.first);
-    statemaps[toInstrument.first] = toInstrument.second;
 
     auto transitiveKey =
         std::pair<Function*, Function*>(base, toInstrument.first);
@@ -104,10 +66,5 @@ void OSRHandler::insertOSR(Function* opt, Function* instrument,
 /******************************************************************************/
 /*                        Private functions                                   */
 /******************************************************************************/
-
-/*bool OSRHandler::existInstrument(Function* f) {
-  std::map<Function*, Function*>::iterator it = instruments.find(f);
-  return (it != instruments.end());
-}*/
 
 } // namespace osr

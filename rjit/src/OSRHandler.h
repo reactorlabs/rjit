@@ -19,11 +19,6 @@ class OSRHandler : public OSRLibrary {
     static std::map<Function*, std::list<Function*>> instruments;
 
     /**
-     * Map from function to its statemap to base.
-     */
-    static std::map<Function*, StateMap*> statemaps;
-
-    /**
      * Map from version to base.
      */
     static std::map<Function*, Function*> toBase;
@@ -40,18 +35,6 @@ class OSRHandler : public OSRLibrary {
      */
     static OSRHandler* getInstance() { return &instance; }
 
-    // static GlobalVariable* getNewGlobal(int ini, Module* mod);
-
-    /**
-     * @brief      Creates two clones for \base and properly inits their
-     *entries.
-     *
-     * @param      base  The base function.
-     *
-     * @return     <toModify, toInstrument>.
-     */
-    static std::pair<Function*, Function*> setupOptAndInstr(Function* base);
-
     /**
      * @brief      { function_description }
      *
@@ -60,17 +43,6 @@ class OSRHandler : public OSRLibrary {
      * @return     { description_of_the_return_value }
      */
     static Function* setupOpt(Function* base);
-
-    /**
-     * @brief      Returns a fresh version of base to instrument.
-     *
-     * @param      base  The original functional.
-     *
-     * param       toOpt The version used to Optimize.
-     *
-     * @return     A copy of base, and registers the statemap.
-     */
-    static Function* getFreshInstrument(Function* base, Function* toOpt);
 
     /**
      * @brief      Returns a copy of base and registers a new mapping.
@@ -94,8 +66,6 @@ class OSRHandler : public OSRLibrary {
 
   private:
     static OSRHandler instance;
-    static Module* lastMod;
-    static GlobalVariable* osrValue;
 
     OSRHandler() {}
     // static bool existInstrument(Function* f);
