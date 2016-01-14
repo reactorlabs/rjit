@@ -35,6 +35,9 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
             continue;
         Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 
+        // For the OSR condition.
+        (*it)->setInPtr(&c, toInlineSexp);
+
         // Replace constant pool accesses and argument uses.
         ReturnInst* ret = nullptr;
         prepareCodeToInline(toInline, *it, LENGTH(CDR(fSexp)), &ret);
@@ -160,18 +163,18 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     }
 
     // OSR Instrumentation.
-    OSRHandler::insertOSR(toOpt, toInstrument, fc->getGetFunc(),
-                          getTrueCondition());
+    OSRHandler::insertOSR(toOpt, toInstrument, fc->getIcStub(),
+                          fc->getGetFunc(), getOSRCondition(fc));
 
     // Clean up.
     blocks->clear();
-    fc->getGetFunc()->removeFromParent();
+    // fc->getGetFunc()->removeFromParent();
     deadBlock->removeFromParent();
     toInline->removeFromParent();
     delete deadBlock;
     delete toInline;
 
-    // toOpt->dump();
+    toOpt->dump();
     /*toInstrument->dump();*/
 }
 
@@ -181,6 +184,16 @@ Inst_Vector* OSRInliner::getTrueCondition() {
     // ConstantInt* zero = ConstantInt::get(getGlobalContext(), APInt(32, 0));
     ICmpInst* cond = new ICmpInst(ICmpInst::ICMP_EQ, one, one /*zero*/);
     res->push_back(cond);
+    return res;
+}
+
+// TODO do the sexp
+Inst_Vector* OSRInliner::getOSRCondition(FunctionCall* fc) {
+    Inst_Vector* res = new Inst_Vector();
+    assert(fc->getInPtr() && "The function address has not been set.");
+    ICmpInst* test =
+        new ICmpInst(ICmpInst::ICMP_EQ, fc->getGetFunc(), fc->getInPtr());
+    res->push_back(test);
     return res;
 }
 

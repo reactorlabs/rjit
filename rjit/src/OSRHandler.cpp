@@ -42,7 +42,8 @@ Function* OSRHandler::getToInstrument(Function* base) {
 }
 
 void OSRHandler::insertOSR(Function* opt, Function* instrument,
-                           Instruction* src, Inst_Vector* cond) {
+                           Instruction* src, Instruction* pad,
+                           Inst_Vector* cond) {
     StateMap* F2NewToF2Map = nullptr;
     OSRLibrary::OSRPointConfig configuration(
         false /*verbose*/, true /*updateF1*/, -1 /*branch taken prob*/,
@@ -56,7 +57,7 @@ void OSRHandler::insertOSR(Function* opt, Function* instrument,
         transitiveMaps[std::pair<Function*, Function*>(opt, instrument)];
     assert(transitive && "No transitive map registered for this pair.");
     Instruction* lPad = dynamic_cast<Instruction*>(
-        transitive->getCorrespondingOneToOneValue(src));
+        transitive->getCorrespondingOneToOneValue(pad));
     assert(lPad && "The landing pad could not be found.");
 
     OSRLibrary::insertResolvedOSR(getGlobalContext(), *opt, *src, *instrument,

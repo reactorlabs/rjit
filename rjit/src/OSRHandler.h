@@ -54,15 +54,17 @@ class OSRHandler : public OSRLibrary {
     static Function* getToInstrument(Function* base);
 
     /**
-     * @brief      Inserts a bidirectional (lie, later) osr relation.
+     * @brief      Inserts an osr exit in opt to instrument.
      *
-     * @param      opt         optimized function
-     * @param      instrument  continuation function
-     * @param      src         OSRExit
-     * @param      lPad        entry in instrument
+     * @param      opt         Optimized function (e.g., source).
+     * @param      instrument  Continuation function.
+     * @param      src         Where to put the exit condition.
+     * @param      pad         Point in opt that corresponds to landing pad in
+     * instrument.
+     * @param      cond        OSR condition.
      */
     static void insertOSR(Function* opt, Function* instrument, Instruction* src,
-                          Inst_Vector* cond);
+                          Instruction* pad, Inst_Vector* cond);
 
   private:
     static OSRHandler instance;

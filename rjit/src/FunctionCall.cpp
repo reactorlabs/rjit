@@ -148,4 +148,10 @@ llvm::Value* FunctionCall::getRho() {
     return nullptr;
 }
 
+void FunctionCall::setInPtr(rjit::Compiler* c, SEXP addr) {
+    inPtr = c->getBuilder()->convertToPointer(addr);
+}
+
+llvm::Value* FunctionCall::getInPtr() { return inPtr; }
+
 } // namespace osr

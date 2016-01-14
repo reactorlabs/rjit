@@ -47,6 +47,7 @@ class OSRInliner {
                            ReturnInst* ret);
 
     static Inst_Vector* getTrueCondition();
+    static Inst_Vector* getOSRCondition(FunctionCall* fc);
 };
 
 } // namespace osr

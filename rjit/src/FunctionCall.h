@@ -40,7 +40,7 @@ class FunctionCall {
   public:
     FunctionCall(llvm::CallInst* getFunc, Inst_Vector args,
                  llvm::CallInst* icStub)
-        : getFunc(getFunc), args(args), icStub(icStub) {}
+        : getFunc(getFunc), args(args), icStub(icStub), inPtr(nullptr) {}
 
     static FunctionCalls* getFunctionCalls(llvm::Function* f);
 
@@ -70,10 +70,14 @@ class FunctionCall {
 
     int getFunctionSymbol();
 
+    void setInPtr(rjit::Compiler* c, SEXP addr);
+    llvm::Value* getInPtr();
+
   private:
     llvm::CallInst* getFunc;
     Inst_Vector args;
     llvm::CallInst* icStub;
+    llvm::Value* inPtr;
 
     llvm::Value* getRho();
 };
