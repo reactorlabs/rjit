@@ -72,6 +72,7 @@ class FunctionCall {
 
     void setInPtr(rjit::Compiler* c, SEXP addr);
     llvm::Value* getInPtr();
+    llvm::Instruction* getArg_back();
 
   private:
     llvm::CallInst* getFunc;

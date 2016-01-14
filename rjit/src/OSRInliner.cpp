@@ -30,13 +30,20 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
         SEXP constantPool = CDR(fSexp);
         (*it)->fixNatives(constantPool, &c);
         SEXP toInlineSexp =
-            getFunction(&c, constantPool, (*it)->getFunctionSymbol(), env);
+            getFunction(constantPool, (*it)->getFunctionSymbol(), env);
         if (!toInlineSexp)
             continue;
-        Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 
         // For the OSR condition.
         (*it)->setInPtr(&c, toInlineSexp);
+
+        // Get the LLVM IR for the function to Inline.
+        if (TYPEOF(BODY(toInlineSexp)) == NATIVESXP)
+            toInlineSexp = BODY(toInlineSexp);
+        else
+            toInlineSexp = c.compile("inner", BODY(toInlineSexp));
+
+        Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 
         // Replace constant pool accesses and argument uses.
         ReturnInst* ret = nullptr;
@@ -89,15 +96,12 @@ void OSRInliner::replaceArgs(Inst_Vector* args, Inst_Vector* vars, int n) {
     }
 }
 
-SEXP OSRInliner::getFunction(rjit::Compiler* c, SEXP cp, int symbol, SEXP env) {
+SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     SEXP symb = VECTOR_ELT(cp, symbol);
     SEXP fSexp = findFun(symb, env);
-    if (TYPEOF(fSexp) == NATIVESXP) {
+    if (TYPEOF(fSexp) == CLOSXP) {
         return fSexp;
-    } else if (TYPEOF(fSexp) == CLOSXP) {
-        return c->compile("inner", BODY(fSexp));
     }
-
     return nullptr;
 }
 
@@ -163,7 +167,7 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     }
 
     // OSR Instrumentation.
-    OSRHandler::insertOSR(toOpt, toInstrument, fc->getIcStub(),
+    OSRHandler::insertOSR(toOpt, toInstrument, fc->getArg_back(),
                           fc->getGetFunc(), getOSRCondition(fc));
 
     // Clean up.
@@ -192,7 +196,7 @@ Inst_Vector* OSRInliner::getOSRCondition(FunctionCall* fc) {
     Inst_Vector* res = new Inst_Vector();
     assert(fc->getInPtr() && "The function address has not been set.");
     ICmpInst* test =
-        new ICmpInst(ICmpInst::ICMP_EQ, fc->getGetFunc(), fc->getInPtr());
+        new ICmpInst(ICmpInst::ICMP_NE, fc->getGetFunc(), fc->getInPtr());
     res->push_back(test);
     return res;
 }

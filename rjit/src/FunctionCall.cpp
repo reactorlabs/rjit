@@ -154,4 +154,6 @@ void FunctionCall::setInPtr(rjit::Compiler* c, SEXP addr) {
 
 llvm::Value* FunctionCall::getInPtr() { return inPtr; }
 
+llvm::Instruction* FunctionCall::getArg_back() { return args.back(); }
+
 } // namespace osr

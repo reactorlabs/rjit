@@ -37,7 +37,7 @@ class OSRInliner {
 
     static void replaceArgs(Inst_Vector* args, Inst_Vector* vars, int n);
 
-    static SEXP getFunction(rjit::Compiler* c, SEXP cp, int symbol, SEXP env);
+    static SEXP getFunction(SEXP cp, int symbol, SEXP env);
 
     static void prepareCodeToInline(Function* toInline, FunctionCall* fc,
                                     int cpOffset, ReturnInst** ret = nullptr);
