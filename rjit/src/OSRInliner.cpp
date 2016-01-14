@@ -38,7 +38,7 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
         // Replace constant pool accesses and argument uses.
         ReturnInst* ret = nullptr;
         prepareCodeToInline(toInline, *it, LENGTH(CDR(fSexp)), &ret);
-        Function* toInstrument = OSRHandler::getFreshInstrument(fLLVM, toOpt);
+        Function* toInstrument = OSRHandler::getToInstrument(toOpt);
         insertBody(toOpt, toInline, toInstrument, *it, ret);
 
         // Set the constant pool.
@@ -171,15 +171,15 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     delete deadBlock;
     delete toInline;
 
-    toOpt->dump();
+    // toOpt->dump();
     /*toInstrument->dump();*/
 }
 
 Inst_Vector* OSRInliner::getTrueCondition() {
     Inst_Vector* res = new Inst_Vector();
     ConstantInt* one = ConstantInt::get(getGlobalContext(), APInt(32, 1));
-    ConstantInt* zero = ConstantInt::get(getGlobalContext(), APInt(32, 0));
-    ICmpInst* cond = new ICmpInst(ICmpInst::ICMP_EQ, one, zero);
+    // ConstantInt* zero = ConstantInt::get(getGlobalContext(), APInt(32, 0));
+    ICmpInst* cond = new ICmpInst(ICmpInst::ICMP_EQ, one, one /*zero*/);
     res->push_back(cond);
     return res;
 }

@@ -73,6 +73,15 @@ class OSRHandler : public OSRLibrary {
     static Function* getFreshInstrument(Function* base, Function* toOpt);
 
     /**
+     * @brief      Returns a copy of base and registers a new mapping.
+     *
+     * @param      base  The base function.
+     *
+     * @return     Function* clone of the base function.
+     */
+    static Function* getToInstrument(Function* base);
+
+    /**
      * @brief      Inserts a bidirectional (lie, later) osr relation.
      *
      * @param      opt         optimized function

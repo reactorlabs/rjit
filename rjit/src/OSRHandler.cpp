@@ -64,6 +64,21 @@ Function* OSRHandler::getFreshInstrument(Function* base, Function* toOpt) {
     return toInstrument.first;
 }
 
+Function* OSRHandler::getToInstrument(Function* base) {
+    auto toInstrument = StateMap::generateIdentityMapping(base);
+    (instruments[base]).push_back(toInstrument.first);
+    statemaps[toInstrument.first] = toInstrument.second;
+
+    auto transitiveKey =
+        std::pair<Function*, Function*>(base, toInstrument.first);
+    transitiveMaps[transitiveKey] = toInstrument.second;
+
+    // add the function to the module.
+    base->getParent()->getFunctionList().push_back(toInstrument.first);
+
+    return toInstrument.first;
+}
+
 void OSRHandler::insertOSR(Function* opt, Function* instrument,
                            Instruction* src, Inst_Vector* cond) {
     StateMap* F2NewToF2Map = nullptr;
