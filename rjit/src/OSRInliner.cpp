@@ -178,7 +178,7 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     delete deadBlock;
     delete toInline;
 
-    toOpt->dump();
+    // toOpt->dump();
     /*toInstrument->dump();*/
 }
 
