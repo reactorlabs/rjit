@@ -64,8 +64,20 @@ void OSRHandler::insertOSR(Function* opt, Function* instrument,
                                   *lPad, *cond, *transitive, configuration);
 }
 
+void OSRHandler::removeEntry(Function* opt, Function* instrument, Value* val) {
+    auto key = std::pair<Function*, Function*>(opt, instrument);
+    assert(transContains(key) && "This key has no statemap registered.");
+    auto map = transitiveMaps[key];
+    auto bidirect = map->getCorrespondingOneToOneValue(val);
+    map->unregisterOneToOneValue(val);
+    map->unregisterOneToOneValue(bidirect);
+}
+
 /******************************************************************************/
 /*                        Private functions                                   */
 /******************************************************************************/
 
+bool OSRHandler::transContains(std::pair<Function*, Function*> key) {
+    return transitiveMaps.find(key) != transitiveMaps.end();
+}
 } // namespace osr

@@ -172,7 +172,9 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
 
     // Clean up.
     blocks->clear();
-    // fc->getGetFunc()->removeFromParent();
+
+    // Remove the icStub from the StateMap.
+    OSRHandler::removeEntry(toOpt, toInstrument, fc->getIcStub());
     deadBlock->removeFromParent();
     toInline->removeFromParent();
     delete deadBlock;

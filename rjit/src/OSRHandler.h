@@ -66,11 +66,25 @@ class OSRHandler : public OSRLibrary {
     static void insertOSR(Function* opt, Function* instrument, Instruction* src,
                           Instruction* pad, Inst_Vector* cond);
 
+    /**
+     * @brief      Removes a bidirectional mapping in the stateMap registered
+     * under the key <otp, instrument>.
+     *
+     * @param      opt         The optimized version.
+     * @param      instrument  The instrumented version.
+     * @param      val         The value to remove.
+     *
+     * @note       This is not required for the code to perform well, it is just
+     * needed to have a clean StateMap.
+     */
+    static void removeEntry(Function* opt, Function* instrument, Value* val);
+
   private:
     static OSRHandler instance;
 
     OSRHandler() {}
     // static bool existInstrument(Function* f);
+    static bool transContains(std::pair<Function*, Function*> key);
 };
 
 } // namespace osr
