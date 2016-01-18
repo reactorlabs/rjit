@@ -64,4 +64,9 @@ REXPORT SEXP testOSR(SEXP outer, SEXP env) {
     SEXP res = OSRInliner::inlineCalls(outer, env);
     return res;
 }
+
+REXPORT SEXP printFormals(SEXP f) {
+    SEXP res = FORMALS(f);
+    return res;
+}
 }

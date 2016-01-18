@@ -82,5 +82,9 @@ jit.testOSR <- function(what, whut, env=environment(what)) {
     }
 }
 
+jit.printFormals <- function(what) {
+    .Call("printFormals", what)
+}
+
 jit.enable <- function() .Call("jitEnable");
 jit.disable <- function() .Call("jitDisable");

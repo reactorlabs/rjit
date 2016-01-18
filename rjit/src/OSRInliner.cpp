@@ -38,10 +38,7 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
         (*it)->setInPtr(&c, toInlineSexp);
 
         // Get the LLVM IR for the function to Inline.
-        if (TYPEOF(BODY(toInlineSexp)) == NATIVESXP)
-            toInlineSexp = BODY(toInlineSexp);
-        else
-            toInlineSexp = c.compile("inner", BODY(toInlineSexp));
+        toInlineSexp = c.compile("inner", BODY(toInlineSexp));
 
         Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 
@@ -159,11 +156,6 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     if (!blocks->empty() && !ret->empty()) {
         // Create the phi node to merge all the return instructions.
         PHINode* node = nullptr;
-
-        /*    PHINode::Create(ret->front()->getReturnValue()->getType(),
-        ret->size());
-        node->insertBefore(continuation->getFirstNonPHI());
-        fc->getIcStub()->replaceAllUsesWith(node);*/
 
         // Set the correct successor for the callBlock.
         callBlock->getTerminator()->setSuccessor(0, *(blocks->begin()));
