@@ -5,10 +5,12 @@
 #include "Compiler.h"
 #include "FunctionCall.h"
 #include <Rinternals.h>
+#include <list>
 using namespace llvm;
 
 namespace osr {
 typedef std::vector<llvm::Instruction*> Inst_Vector;
+typedef std::list<llvm::ReturnInst*> Return_List;
 
 class OSRInliner {
   public:
@@ -40,11 +42,11 @@ class OSRInliner {
     static SEXP getFunction(SEXP cp, int symbol, SEXP env);
 
     static void prepareCodeToInline(Function* toInline, FunctionCall* fc,
-                                    int cpOffset, ReturnInst** ret = nullptr);
+                                    int cpOffset, Return_List* ret);
 
     static void insertBody(Function* toOpt, Function* toInline,
                            Function* toInstrument, FunctionCall* fc,
-                           ReturnInst* ret);
+                           Return_List* ret);
 
     static Inst_Vector* getTrueCondition();
     static Inst_Vector* getOSRCondition(FunctionCall* fc);

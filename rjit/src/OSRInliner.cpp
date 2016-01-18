@@ -46,11 +46,13 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
         Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 
         // Replace constant pool accesses and argument uses.
-        ReturnInst* ret = nullptr;
+        Return_List ret;
         prepareCodeToInline(toInline, *it, LENGTH(CDR(fSexp)), &ret);
         Function* toInstrument = OSRHandler::getToInstrument(toOpt);
-        insertBody(toOpt, toInline, toInstrument, *it, ret);
+        insertBody(toOpt, toInline, toInstrument, *it, &ret);
 
+        // clean up
+        ret.clear();
         // Set the constant pool.
         setCP(fSexp, toInlineSexp);
     }
@@ -106,7 +108,7 @@ SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
 }
 
 void OSRInliner::prepareCodeToInline(Function* toInline, FunctionCall* fc,
-                                     int cpOffset, ReturnInst** ret) {
+                                     int cpOffset, Return_List* ret) {
     Function* caller = fc->getFunction();
     assert((caller && toInline) && "Null pointer.");
 
@@ -123,8 +125,10 @@ void OSRInliner::prepareCodeToInline(Function* toInline, FunctionCall* fc,
             updateCPAccess(call, cpOffset);
         if (call && IS_GET_VAR(call))
             vars.push_back(&(*it));
-        if (!call && ret)
-            *ret = dynamic_cast<ReturnInst*>(&(*it));
+
+        ReturnInst* ri = dynamic_cast<ReturnInst*>(&(*it));
+        if (!call && ri)
+            ret->push_back(ri);
     }
 
     replaceArgs(fc->getArgs(), &vars, fc->getNumbArguments());
@@ -133,7 +137,7 @@ void OSRInliner::prepareCodeToInline(Function* toInline, FunctionCall* fc,
 
 void OSRInliner::insertBody(Function* toOpt, Function* toInline,
                             Function* toInstrument, FunctionCall* fc,
-                            ReturnInst* ret) {
+                            Return_List* ret) {
     BasicBlock* callBlock =
         dynamic_cast<BasicBlock*>(fc->getGetFunc()->getParent());
     assert(callBlock && "Call block is null.");
@@ -151,28 +155,47 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
         (*it)->insertInto(toOpt, deadBlock);
     }
 
-    // Replace the return value.
-    fc->getIcStub()->replaceAllUsesWith(ret->getReturnValue());
-
     // Fix the successors and remove the return from the inlined blocks.
-    if (!blocks->empty()) {
-        callBlock->getTerminator()->setSuccessor(0, *(blocks->begin()));
-        BasicBlock* parentReturn = dynamic_cast<BasicBlock*>(ret->getParent());
-        assert(parentReturn &&
-               "The basic block containing the return is null.");
-        BasicBlock* split = parentReturn->splitBasicBlock(ret, "DEADRETURN");
-        parentReturn->getTerminator()->setSuccessor(0, continuation);
-        split->removeFromParent();
-        delete split;
-    }
+    if (!blocks->empty() && !ret->empty()) {
+        // Create the phi node to merge all the return instructions.
+        PHINode* node = nullptr;
 
-    // OSR Instrumentation.
-    OSRHandler::insertOSR(toOpt, toInstrument, fc->getArg_back(),
-                          fc->getGetFunc(), getOSRCondition(fc));
+        /*    PHINode::Create(ret->front()->getReturnValue()->getType(),
+        ret->size());
+        node->insertBefore(continuation->getFirstNonPHI());
+        fc->getIcStub()->replaceAllUsesWith(node);*/
+
+        // Set the correct successor for the callBlock.
+        callBlock->getTerminator()->setSuccessor(0, *(blocks->begin()));
+
+        for (auto r = ret->begin(); r != ret->end(); ++r) {
+            BasicBlock* parentReturn =
+                dynamic_cast<BasicBlock*>((*r)->getParent());
+            assert(parentReturn &&
+                   "The basic block containing the return is null.");
+
+            // Add the value to the phinode.
+            if (!node && fc->getIcStub()->getNumUses())
+                node = PHINode::Create((*r)->getReturnValue()->getType(),
+                                       ret->size(), "OSRInlineMerge",
+                                       continuation->getFirstNonPHI());
+
+            if (node && fc->getIcStub()->getNumUses())
+                node->addIncoming((*r)->getReturnValue(), parentReturn);
+
+            // Remove the return instruction.
+            BasicBlock* split = parentReturn->splitBasicBlock(*r, "DEADRETURN");
+            parentReturn->getTerminator()->setSuccessor(0, continuation);
+            split->removeFromParent();
+            delete split;
+        }
+
+        if (node)
+            fc->getIcStub()->replaceAllUsesWith(node);
+    }
 
     // Clean up.
     blocks->clear();
-
     // Remove the icStub from the StateMap.
     OSRHandler::removeEntry(toOpt, toInstrument, fc->getIcStub());
     deadBlock->removeFromParent();
@@ -180,8 +203,9 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     delete deadBlock;
     delete toInline;
 
-    // toOpt->dump();
-    /*toInstrument->dump();*/
+    // OSR Instrumentation.
+    OSRHandler::insertOSR(toOpt, toInstrument, fc->getArg_back(),
+                          fc->getGetFunc(), getOSRCondition(fc));
 }
 
 Inst_Vector* OSRInliner::getTrueCondition() {
