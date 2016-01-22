@@ -24,12 +24,7 @@ Error: clang-format executable not found.
 error: failed to push some refs to 'https://janvitek@bitbucket.org/reactorl/rjit.git'
 41 % 
 
-
 -j  
-
-
-
-
 
 [![wercker status](https://app.wercker.com/status/ba5d6ebd4d90bb4d6a4a9b1f12894063/m "wercker status")](https://app.wercker.com/project/bykey/ba5d6ebd4d90bb4d6a4a9b1f12894063)
 
@@ -39,6 +34,7 @@ TL;DR - complete script to get everything needed and build with ninja (-n)
 ```
 tools/setup.sh -n
 ```
+Note: thank at CMake v3.3 and ninja v1.3 are recommended.
 
 ## Running tests
 
