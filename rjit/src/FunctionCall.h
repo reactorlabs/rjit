@@ -25,9 +25,11 @@
 #define IS_STUB(x) NAME_CONTAINS((x)->getCalledFunction(), ICSTUB_NAME)
 #define IS_CONSTANT_CALL(x) IS_CALL_NAMED((x), CONSTANT_NAME)
 #define IS_USERLIT(x) IS_NAMED((x)->getCalledFunction(), USR_LIT)
+
+using namespace llvm;
 namespace osr {
 
-typedef std::vector<llvm::Instruction*> Inst_Vector;
+typedef std::vector<Instruction*> Inst_Vector;
 class FunctionCall;
 typedef std::vector<FunctionCall*> FunctionCalls;
 
@@ -38,28 +40,26 @@ typedef std::vector<FunctionCall*> FunctionCalls;
  */
 class FunctionCall {
   public:
-    FunctionCall(llvm::CallInst* getFunc, Inst_Vector args,
-                 llvm::CallInst* icStub)
+    FunctionCall(CallInst* getFunc, Inst_Vector args, CallInst* icStub)
         : getFunc(getFunc), args(args), icStub(icStub), inPtr(nullptr) {}
 
-    static FunctionCalls* getFunctionCalls(llvm::Function* f);
+    static FunctionCalls* getFunctionCalls(Function* f);
 
-    static Inst_Vector* extractArguments(llvm::Function* f,
-                                         llvm::inst_iterator it,
-                                         llvm::Instruction* end);
+    static Inst_Vector* extractArguments(Function* f, inst_iterator it,
+                                         Instruction* end);
 
     void printFunctionCall();
 
     int getNumbArguments();
 
-    llvm::CallInst* getGetFunc() { return getFunc; }
+    CallInst* getGetFunc() { return getFunc; }
     Inst_Vector* getArgs() { return &args; }
-    llvm::CallInst* getIcStub() { return icStub; }
-    llvm::Function* getFunction() {
+    CallInst* getIcStub() { return icStub; }
+    Function* getFunction() {
         if (getFunc && getFunc->getParent() &&
             getFunc->getParent()->getParent()) {
-            llvm::Function* func = dynamic_cast<llvm::Function*>(
-                getFunc->getParent()->getParent());
+            Function* func =
+                dynamic_cast<Function*>(getFunc->getParent()->getParent());
             return func;
         }
         return nullptr;
@@ -71,16 +71,16 @@ class FunctionCall {
     int getFunctionSymbol();
 
     void setInPtr(rjit::Compiler* c, SEXP addr);
-    llvm::Value* getInPtr();
-    llvm::Instruction* getArg_back();
+    Value* getInPtr();
+    Instruction* getArg_back();
 
   private:
-    llvm::CallInst* getFunc;
+    CallInst* getFunc;
     Inst_Vector args;
-    llvm::CallInst* icStub;
-    llvm::Value* inPtr;
+    CallInst* icStub;
+    Value* inPtr;
 
-    llvm::Value* getRho();
+    Value* getRho();
 };
 } // namespace osr
 #endif

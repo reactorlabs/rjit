@@ -50,6 +50,9 @@ class OSRInliner {
 
     static Inst_Vector* getTrueCondition();
     static Inst_Vector* getOSRCondition(FunctionCall* fc);
+    static Value* createNewRho(SEXP inFun, FunctionCall* fc);
+    static Function* closureQuickArgumentAdaptor;
+    static Function* CONS_NR;
 };
 
 } // namespace osr

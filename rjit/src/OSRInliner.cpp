@@ -11,6 +11,9 @@ namespace osr {
 /*                  Public functions */
 /******************************************************************************/
 
+llvm::Function* OSRInliner::closureQuickArgumentAdaptor;
+Function* OSRInliner::CONS_NR;
+
 SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
     /*Get the compiled version*/
     rjit::Compiler c("module");
@@ -198,6 +201,7 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     // OSR Instrumentation.
     OSRHandler::insertOSR(toOpt, toInstrument, fc->getArg_back(),
                           fc->getGetFunc(), getOSRCondition(fc));
+    toOpt->dump();
 }
 
 Inst_Vector* OSRInliner::getTrueCondition() {
@@ -217,6 +221,29 @@ Inst_Vector* OSRInliner::getOSRCondition(FunctionCall* fc) {
         new ICmpInst(ICmpInst::ICMP_NE, fc->getGetFunc(), fc->getInPtr());
     res->push_back(test);
     return res;
+}
+
+Value* OSRInliner::createNewRho(SEXP inFun, FunctionCall* fc) {
+    assert(TYPEOF(inFun) == CLOSXP);
+    SEXP inBody = CDR(inFun);
+    assert(TYPEOF(inBody) == NATIVESXP &&
+           "The function has not been compiled.");
+    Value* arglist = rjit::ir::Builder::convertToPointer(R_NilValue);
+
+    auto args = fc->getArgs();
+    // NEED THE FREAKING GETGETFUNCTION
+    for (auto it = args->begin(); it != args->end(); ++it) {
+        Value* arg = (*it);
+        std::vector<Value*> f_arg;
+        f_arg.push_back(arg);
+        f_arg.push_back(arglist);
+        arglist = CallInst::Create(CONS_NR, f_arg, "");
+    }
+
+    std::vector<Value*> f_args;
+    f_args.push_back(fc->getGetFunc());
+    f_args.push_back(arglist);
+    return CallInst::Create(closureQuickArgumentAdaptor, f_args, "");
 }
 
 } // namespace osr
