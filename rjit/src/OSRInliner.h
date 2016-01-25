@@ -4,6 +4,8 @@
 #include "llvm.h"
 #include "Compiler.h"
 #include "FunctionCall.h"
+#include "RDefs.h"
+#include "Types.h"
 #include <Rinternals.h>
 #include <list>
 using namespace llvm;
@@ -14,6 +16,7 @@ typedef std::list<llvm::ReturnInst*> Return_List;
 
 class OSRInliner {
   public:
+    OSRInliner(rjit::Compiler* c);
     /**
      * @brief      Inlines calls inside outer
      *
@@ -22,10 +25,12 @@ class OSRInliner {
      *
      * @return     a SEXP with a compiled version of f, where calls are inlined.
      */
-    static SEXP inlineCalls(SEXP f, SEXP env);
+    SEXP inlineCalls(SEXP f, SEXP env);
 
   private:
-    OSRInliner() {}
+    rjit::Compiler* c;
+    Function* closureQuickArgumentAdaptor;
+    Function* CONS_NR;
 
     static void setCP(SEXP firstP, SEXP secondP);
 
@@ -44,15 +49,12 @@ class OSRInliner {
     static void prepareCodeToInline(Function* toInline, FunctionCall* fc,
                                     int cpOffset, Return_List* ret);
 
-    static void insertBody(Function* toOpt, Function* toInline,
-                           Function* toInstrument, FunctionCall* fc,
-                           Return_List* ret);
+    void insertBody(Function* toOpt, Function* toInline, Function* toInstrument,
+                    FunctionCall* fc, Return_List* ret);
 
     static Inst_Vector* getTrueCondition();
     static Inst_Vector* getOSRCondition(FunctionCall* fc);
-    static Value* createNewRho(SEXP inFun, FunctionCall* fc);
-    static Function* closureQuickArgumentAdaptor;
-    static Function* CONS_NR;
+    Value* createNewRho(FunctionCall* fc);
 };
 
 } // namespace osr

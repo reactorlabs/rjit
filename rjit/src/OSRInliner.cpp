@@ -11,13 +11,19 @@ namespace osr {
 /*                  Public functions */
 /******************************************************************************/
 
-llvm::Function* OSRInliner::closureQuickArgumentAdaptor;
-Function* OSRInliner::CONS_NR;
+OSRInliner::OSRInliner(rjit::Compiler* c) : c(c) {
+    closureQuickArgumentAdaptor = Function::Create(
+        rjit::t::sexp_sexpsexp, Function::ExternalLinkage,
+        "closureQuickArgumentAdaptor", c->getBuilder()->module());
+    CONS_NR =
+        Function::Create(rjit::t::sexp_sexpsexp, Function::ExternalLinkage,
+                         "CONS_NR", c->getBuilder()->module());
+}
 
 SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
     /*Get the compiled version*/
-    rjit::Compiler c("module");
-    SEXP fSexp = c.compile("outer", f);
+    // rjit::Compiler c("module");
+    SEXP fSexp = c->compile("outer", f);
     Function* fLLVM = GET_LLVM(fSexp);
     assert(fLLVM && "Could not extract the LLVM function.");
 
@@ -31,17 +37,17 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
     for (auto it = calls->begin(); it != calls->end(); ++it) {
         // Get the callee
         SEXP constantPool = CDR(fSexp);
-        (*it)->fixNatives(constantPool, &c);
+        (*it)->fixNatives(constantPool, c);
         SEXP toInlineSexp =
             getFunction(constantPool, (*it)->getFunctionSymbol(), env);
         if (!toInlineSexp)
             continue;
 
         // For the OSR condition.
-        (*it)->setInPtr(&c, toInlineSexp);
+        (*it)->setInPtr(c, toInlineSexp);
 
         // Get the LLVM IR for the function to Inline.
-        toInlineSexp = c.compile("inner", BODY(toInlineSexp));
+        toInlineSexp = c->compile("inner", BODY(toInlineSexp));
 
         Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 
@@ -57,8 +63,8 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
         setCP(fSexp, toInlineSexp);
     }
     // Finish the compilation.
-    c.jitAll(); // TODO maybe need to remove what we want to keep
-                // uninstrumented.
+    c->jitAll(); // TODO maybe need to remove what we want to keep
+                 // uninstrumented.
     return fSexp;
 }
 
@@ -142,6 +148,9 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
         dynamic_cast<BasicBlock*>(fc->getGetFunc()->getParent());
     assert(callBlock && "Call block is null.");
 
+    // TODO aghosn
+    createNewRho(fc);
+
     // Isolate the function call.
     BasicBlock* deadBlock = callBlock->splitBasicBlock(fc->getIcStub(), "DEAD");
     BasicBlock::iterator it(fc->getIcStub());
@@ -223,27 +232,30 @@ Inst_Vector* OSRInliner::getOSRCondition(FunctionCall* fc) {
     return res;
 }
 
-Value* OSRInliner::createNewRho(SEXP inFun, FunctionCall* fc) {
-    assert(TYPEOF(inFun) == CLOSXP);
-    SEXP inBody = CDR(inFun);
-    assert(TYPEOF(inBody) == NATIVESXP &&
-           "The function has not been compiled.");
+Value* OSRInliner::createNewRho(FunctionCall* fc) {
     Value* arglist = rjit::ir::Builder::convertToPointer(R_NilValue);
 
     auto args = fc->getArgs();
-    // NEED THE FREAKING GETGETFUNCTION
-    for (auto it = args->begin(); it != args->end(); ++it) {
+    // TODO aghosn clean that
+    for (auto it = args->begin(); it != (--(args->end())); ++it) {
         Value* arg = (*it);
         std::vector<Value*> f_arg;
         f_arg.push_back(arg);
         f_arg.push_back(arglist);
-        arglist = CallInst::Create(CONS_NR, f_arg, "");
+        CallInst* inter =
+            CallInst::Create(CONS_NR, f_arg,
+                             ""); // TODO aghosn add somewhere in function.
+        arglist = inter;
+        inter->insertBefore(fc->getIcStub());
     }
 
     std::vector<Value*> f_args;
     f_args.push_back(fc->getGetFunc());
     f_args.push_back(arglist);
-    return CallInst::Create(closureQuickArgumentAdaptor, f_args, "");
+    auto res = CallInst::Create(closureQuickArgumentAdaptor, f_args, "");
+    res->insertBefore(fc->getIcStub());
+    return res;
 }
+// AND IN LLVM MODULE !!!!!!!!!!!!
 
 } // namespace osr
