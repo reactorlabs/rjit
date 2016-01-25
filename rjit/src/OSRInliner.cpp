@@ -97,16 +97,6 @@ void OSRInliner::updateCPAccess(CallInst* call, int offset) {
     }
 }
 
-void OSRInliner::replaceArgs(Inst_Vector* args, Inst_Vector* vars, int n) {
-    int counter = 0;
-    for (auto it = vars->begin(), ait = args->begin();
-         (it != vars->end()) && (ait != args->end()) && (counter < n);
-         ++it, ++ait, ++counter) {
-        (*it)->replaceAllUsesWith(*ait);
-        (*it)->removeFromParent();
-    }
-}
-
 SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     SEXP symb = VECTOR_ELT(cp, symbol);
     SEXP fSexp = findFun(symb, env);
@@ -122,11 +112,6 @@ void OSRInliner::prepareCodeToInline(Function* toInline, FunctionCall* fc,
     Function* caller = fc->getFunction();
     assert((caller && toInline) && "Null pointer.");
 
-    Inst_Vector vars;
-
-    /*for (auto RI = caller->arg_begin(), EI = toInline->arg_begin();
-         (RI != caller->arg_end()) && (EI != toInline->arg_end()); ++RI, ++EI)
-      (*EI).replaceAllUsesWith(&(*RI));*/
     assert(toInline->arg_size() == 3 && "Wrong function signature.");
     auto EI = toInline->arg_begin();
     auto RI = caller->arg_begin();
@@ -141,16 +126,11 @@ void OSRInliner::prepareCodeToInline(Function* toInline, FunctionCall* fc,
         CallInst* call = dynamic_cast<CallInst*>(&(*it));
         if (call)
             updateCPAccess(call, cpOffset);
-        if (call && IS_GET_VAR(call))
-            vars.push_back(&(*it));
 
         ReturnInst* ri = dynamic_cast<ReturnInst*>(&(*it));
         if (!call && ri)
             ret->push_back(ri);
     }
-
-    // replaceArgs(fc->getArgs(), &vars, fc->getNumbArguments());
-    vars.clear();
 }
 
 void OSRInliner::insertBody(Function* toOpt, Function* toInline,
@@ -246,7 +226,7 @@ CallInst* OSRInliner::createNewRho(FunctionCall* fc) {
 
     auto args = fc->getArgs();
     // TODO aghosn clean that
-    for (auto it = args->begin(); it != (--(args->end())); ++it) {
+    for (auto it = args->begin(); it != (args->end()); ++it) {
         Value* arg = (*it);
         std::vector<Value*> f_arg;
         f_arg.push_back(arg);

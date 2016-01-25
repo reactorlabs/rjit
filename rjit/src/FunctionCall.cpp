@@ -7,60 +7,39 @@
 using namespace llvm;
 namespace osr {
 
-Inst_Vector* FunctionCall::extractArguments(Function* f, inst_iterator it,
-                                            Instruction* ic) {
-    Inst_Vector* args = new Inst_Vector();
-    inst_iterator end = inst_end(f);
-    ++it; // skip the getFunction
-    for (; it != end && (&(*it) != ic); ++it) {
-        if (it->user_back() == ic) // TODO not sure that's correct
-            args->push_back(&(*it));
+FunctionCall::FunctionCall(CallInst* icStub) : icStub(icStub) {
+    unsigned size_arg = getNumbArguments();
+    assert((size_arg + 5) == icStub->getNumArgOperands() && "Bad signature.");
+    unsigned i = 0;
+    for (; i < size_arg; ++i) {
+        Instruction* inst =
+            dynamic_cast<Instruction*>(icStub->getArgOperand(i));
+        assert(inst && "Trying to add a value arg that is not an instruction.");
+        args.push_back(inst);
     }
-    return args;
+    assert(i == size_arg);
+    consts = dynamic_cast<Instruction*>(icStub->getArgOperand(i));
+    assert(consts && "Cannot convert consts to Instruction.");
+    ++i;
+    getFunc = dynamic_cast<CallInst*>(icStub->getArgOperand(i));
+    assert(getFunc && IS_GET_FUNCTION(getFunc) &&
+           "Could not find the getFunc.");
+    inPtr = nullptr;
 }
 
 FunctionCalls* FunctionCall::getFunctionCalls(Function* f) {
     FunctionCalls* result = new FunctionCalls();
-    CallInst* gf = nullptr;
-    CallInst* ics = nullptr;
-
     for (inst_iterator it = inst_begin(f), e = inst_end(f); it != e; ++it) {
-        gf = dynamic_cast<CallInst*>(&(*it));
-        // TODO we assume there is only one use for the getFunc
-        if (gf && IS_GET_FUNCTION(gf) && gf->getNumUses() == 1) {
-            ics = dynamic_cast<CallInst*>(gf->user_back());
-            if (ics && IS_STUB(ics)) {
-                inst_iterator argsIt = it;
-                Inst_Vector* args =
-                    extractArguments(f, argsIt, gf->user_back());
-                result->push_back(new FunctionCall(gf, *args, ics));
-            } else {
-                // TODO error malformed IR or wrong assumptions on my side
-                printf("Malformed call in getFunctionCalls\n");
-                return result;
-            }
-        }
+        CallInst* ic = dynamic_cast<CallInst*>(&(*it));
+        if (ic && IS_STUB(ic))
+            result->push_back(new FunctionCall(ic));
     }
-
     return result;
 }
 
-void FunctionCall::printFunctionCall() {
-    printf("------------------------------------------------\n");
-    printf("The getFunction:\n");
-    getFunc->dump();
-    printf("The intermediary args:\n");
-    for (Inst_Vector::iterator it = args.begin(); it != args.end(); ++it) {
-        (*it)->dump();
-    }
-    printf("The icStub:\n");
-    icStub->dump();
-    printf("------------------------------------------------\n");
-}
-
-int FunctionCall::getNumbArguments() {
+unsigned int FunctionCall::getNumbArguments() {
     std::string name = icStub->getCalledFunction()->getName().str();
-    return ((int)name.back() - '0');
+    return ((unsigned int)name.back() - '0');
 }
 
 int FunctionCall::getFunctionSymbol() {

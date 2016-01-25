@@ -42,8 +42,6 @@ class OSRInliner {
      */
     static void updateCPAccess(CallInst* call, int offset);
 
-    static void replaceArgs(Inst_Vector* args, Inst_Vector* vars, int n);
-
     static SEXP getFunction(SEXP cp, int symbol, SEXP env);
 
     static void prepareCodeToInline(Function* toInline, FunctionCall* fc,

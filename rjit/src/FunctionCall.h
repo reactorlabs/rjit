@@ -43,14 +43,11 @@ class FunctionCall {
     FunctionCall(CallInst* getFunc, Inst_Vector args, CallInst* icStub)
         : getFunc(getFunc), args(args), icStub(icStub), inPtr(nullptr) {}
 
+    FunctionCall(CallInst* icStub);
+
     static FunctionCalls* getFunctionCalls(Function* f);
 
-    static Inst_Vector* extractArguments(Function* f, inst_iterator it,
-                                         Instruction* end);
-
-    void printFunctionCall();
-
-    int getNumbArguments();
+    unsigned int getNumbArguments();
 
     CallInst* getGetFunc() { return getFunc; }
     Inst_Vector* getArgs() { return &args; }
@@ -77,6 +74,7 @@ class FunctionCall {
   private:
     CallInst* getFunc;
     Inst_Vector args;
+    Instruction* consts;
     CallInst* icStub;
     Value* inPtr;
 
