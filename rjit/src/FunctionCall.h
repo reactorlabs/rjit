@@ -40,9 +40,6 @@ typedef std::vector<FunctionCall*> FunctionCalls;
  */
 class FunctionCall {
   public:
-    FunctionCall(CallInst* getFunc, Inst_Vector args, CallInst* icStub)
-        : getFunc(getFunc), args(args), icStub(icStub), inPtr(nullptr) {}
-
     FunctionCall(CallInst* icStub);
 
     static FunctionCalls* getFunctionCalls(Function* f);
@@ -52,17 +49,8 @@ class FunctionCall {
     CallInst* getGetFunc() { return getFunc; }
     Inst_Vector* getArgs() { return &args; }
     CallInst* getIcStub() { return icStub; }
-    Function* getFunction() {
-        if (getFunc && getFunc->getParent() &&
-            getFunc->getParent()->getParent()) {
-            Function* func =
-                dynamic_cast<Function*>(getFunc->getParent()->getParent());
-            return func;
-        }
-        return nullptr;
-    }
-
-    void getNatives(SEXP cp);
+    Instruction* getConsts() { return consts; }
+    Function* getFunction();
     void fixNatives(SEXP cp, rjit::Compiler* c);
 
     int getFunctionSymbol();

@@ -197,7 +197,7 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     delete toInline;
 
     // OSR Instrumentation.
-    OSRHandler::insertOSR(toOpt, toInstrument, fc->getArg_back(),
+    OSRHandler::insertOSR(toOpt, toInstrument, fc->getConsts(),
                           fc->getGetFunc(), getOSRCondition(fc));
     // toOpt->dump();
 }

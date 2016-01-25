@@ -42,29 +42,14 @@ unsigned int FunctionCall::getNumbArguments() {
     return ((unsigned int)name.back() - '0');
 }
 
+Function* FunctionCall::getFunction() {
+    return dynamic_cast<Function*>(getFunc->getParent()->getParent());
+}
+
 int FunctionCall::getFunctionSymbol() {
     ConstantInt* cst =
         dynamic_cast<ConstantInt*>(this->getFunc->getArgOperand(2));
     return cst->getSExtValue();
-}
-
-void FunctionCall::getNatives(SEXP cp) {
-    for (auto it = args.begin(); it != args.end(); ++it) {
-        CallInst* call = dynamic_cast<CallInst*>(*it);
-        if (call && IS_USERLIT(call)) {
-            // Get the last argument
-            int end = call->getNumArgOperands() - 1;
-            ConstantInt* index =
-                dynamic_cast<ConstantInt*>(call->getArgOperand(end));
-            assert(index && "Could not access index");
-            int64_t value = index->getSExtValue();
-            SEXP access = VECTOR_ELT(cp, value);
-            if (TYPEOF(access) == NATIVESXP) {
-                printf("Found a problem!!\n");
-                (*it)->dump();
-            }
-        }
-    }
 }
 
 void FunctionCall::fixNatives(SEXP cp, rjit::Compiler* c) {
