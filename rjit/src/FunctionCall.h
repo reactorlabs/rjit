@@ -51,7 +51,7 @@ class FunctionCall {
     CallInst* getIcStub() { return icStub; }
     Instruction* getConsts() { return consts; }
     Function* getFunction();
-    void fixNatives(SEXP cp, rjit::Compiler* c);
+    void fixPromises(SEXP cp, SEXP inFun, rjit::Compiler* c);
 
     int getFunctionSymbol();
 
@@ -62,7 +62,7 @@ class FunctionCall {
   private:
     CallInst* getFunc;
     Inst_Vector args;
-    Instruction* consts;
+    CallInst* consts;
     CallInst* icStub;
     Value* inPtr;
 

@@ -18,7 +18,7 @@ FunctionCall::FunctionCall(CallInst* icStub) : icStub(icStub) {
         args.push_back(inst);
     }
     assert(i == size_arg);
-    consts = dynamic_cast<Instruction*>(icStub->getArgOperand(i));
+    consts = dynamic_cast<CallInst*>(icStub->getArgOperand(i));
     assert(consts && "Cannot convert consts to Instruction.");
     ++i;
     getFunc = dynamic_cast<CallInst*>(icStub->getArgOperand(i));
@@ -52,51 +52,57 @@ int FunctionCall::getFunctionSymbol() {
     return cst->getSExtValue();
 }
 
-void FunctionCall::fixNatives(SEXP cp, rjit::Compiler* c) {
-    for (unsigned int i = 0; i < args.size(); ++i) {
-        CallInst* call = dynamic_cast<CallInst*>(args.at(i));
-        if (call && IS_USERLIT(call)) {
-            ConstantInt* idx = dynamic_cast<ConstantInt*>(
-                call->getArgOperand(call->getNumArgOperands() - 1));
-            assert(idx && "Could not access the index in userLiteral");
-            int64_t value = idx->getSExtValue();
-            SEXP access = VECTOR_ELT(cp, value);
-            if (TYPEOF(access) == NATIVESXP) {
-                std::vector<Value*> args_;
-                args_.push_back(call);
-                args_.push_back(getRho());
+void FunctionCall::fixPromises(SEXP cp, SEXP inFun, rjit::Compiler* c) {
+    ConstantInt* callIdx = dynamic_cast<ConstantInt*>(consts->getArgOperand(1));
+    assert(callIdx);
+    SEXP call = VECTOR_ELT(cp, callIdx->getSExtValue());
 
-                /*CallInst* promise = CallInst::Create(
-                    c->getBuilder()->intrinsic<rjit::ir::CreatePromise>(),
-                    args_, "");*/
-                CallInst* promise = CallInst::Create(
-                    c->getBuilder()->intrinsic<rjit::ir::CallNative>(), args_,
-                    "");
-
-                promise->insertAfter(args.at(i));
-                AttributeSet PAL;
+    SEXP arg = CDR(call);
+    SEXP form = FORMALS(inFun);
+    unsigned i = 0;
+    while (arg != R_NilValue && form != R_NilValue) {
+        assert(TAG(arg) == R_NilValue);
+        assert(CAR(arg) != R_DotsSymbol && TAG(form) != R_DotsSymbol);
+        assert(CAR(arg) != R_MissingArg);
+        switch (TYPEOF(CAR(arg))) {
+        case LGLSXP:
+        case INTSXP:
+        case REALSXP:
+        case CPLXSXP:
+        case STRSXP:
+            break;
+        default:
+            Instruction* promiseInst = args.at(i);
+            std::vector<Value*> args_;
+            args_.push_back(promiseInst);
+            args_.push_back(getRho());
+            CallInst* promise = CallInst::Create(
+                c->getBuilder()->intrinsic<rjit::ir::CreatePromise>(), args_,
+                "");
+            promise->insertAfter(args.at(i));
+            AttributeSet PAL;
+            {
+                SmallVector<AttributeSet, 4> Attrs;
+                AttributeSet PAS;
                 {
-                    SmallVector<AttributeSet, 4> Attrs;
-                    AttributeSet PAS;
-                    {
-                        AttrBuilder B;
-                        auto id =
-                            rjit::JITCompileLayer::singleton.getSafepointId(
-                                getFunction());
-                        B.addAttribute("statepoint-id", std::to_string(id));
-                        PAS = AttributeSet::get(getGlobalContext(), ~0U, B);
-                    }
-                    Attrs.push_back(PAS);
-                    PAL = AttributeSet::get(getGlobalContext(), Attrs);
+                    AttrBuilder B;
+                    auto id = rjit::JITCompileLayer::singleton.getSafepointId(
+                        getFunction());
+                    B.addAttribute("statepoint-id", std::to_string(id));
+                    PAS = AttributeSet::get(getGlobalContext(), ~0U, B);
                 }
-                promise->setAttributes(PAL);
-
-                args.at(i)
-                    ->replaceUsesOutsideBlock(promise, args.at(i)->getParent());
-                // promise->insertAfter(args.at(i));
-                args.at(i) = promise;
+                Attrs.push_back(PAS);
+                PAL = AttributeSet::get(getGlobalContext(), Attrs);
             }
+            promise->setAttributes(PAL);
+
+            args.at(i)
+                ->replaceUsesOutsideBlock(promise, args.at(i)->getParent());
+            args.at(i) = promise;
         }
+        ++i;
+        arg = CDR(arg);
+        form = CDR(form);
     }
 }
 

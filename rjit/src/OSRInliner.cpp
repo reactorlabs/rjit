@@ -22,7 +22,6 @@ OSRInliner::OSRInliner(rjit::Compiler* c) : c(c) {
 
 SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
     /*Get the compiled version*/
-    // rjit::Compiler c("module");
     SEXP fSexp = c->compile("outer", f);
     Function* fLLVM = GET_LLVM(fSexp);
     assert(fLLVM && "Could not extract the LLVM function.");
@@ -37,7 +36,6 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
     for (auto it = calls->begin(); it != calls->end(); ++it) {
         // Get the callee
         SEXP constantPool = CDR(fSexp);
-        (*it)->fixNatives(constantPool, c);
         SEXP toInlineSexp =
             getFunction(constantPool, (*it)->getFunctionSymbol(), env);
         if (!toInlineSexp)
@@ -45,6 +43,9 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
 
         // For the OSR condition.
         (*it)->setInPtr(c, toInlineSexp);
+
+        // For the promises.
+        (*it)->fixPromises(constantPool, toInlineSexp, c);
 
         // Get the LLVM IR for the function to Inline.
         toInlineSexp = c->compile("inner", BODY(toInlineSexp));
