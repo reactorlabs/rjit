@@ -47,14 +47,15 @@ class OSRInliner {
     static SEXP getFunction(SEXP cp, int symbol, SEXP env);
 
     static void prepareCodeToInline(Function* toInline, FunctionCall* fc,
-                                    int cpOffset, Return_List* ret);
+                                    CallInst* newrho, int cpOffset,
+                                    Return_List* ret);
 
     void insertBody(Function* toOpt, Function* toInline, Function* toInstrument,
                     FunctionCall* fc, Return_List* ret);
 
     static Inst_Vector* getTrueCondition();
     static Inst_Vector* getOSRCondition(FunctionCall* fc);
-    Value* createNewRho(FunctionCall* fc);
+    CallInst* createNewRho(FunctionCall* fc);
 };
 
 } // namespace osr

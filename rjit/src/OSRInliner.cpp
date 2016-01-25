@@ -51,9 +51,12 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
 
         Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 
+        // TODO aghosn
+        auto newrho = createNewRho((*it));
+
         // Replace constant pool accesses and argument uses.
         Return_List ret;
-        prepareCodeToInline(toInline, *it, LENGTH(CDR(fSexp)), &ret);
+        prepareCodeToInline(toInline, *it, newrho, LENGTH(CDR(fSexp)), &ret);
         Function* toInstrument = OSRHandler::getToInstrument(toOpt);
         insertBody(toOpt, toInline, toInstrument, *it, &ret);
 
@@ -114,15 +117,24 @@ SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
 }
 
 void OSRInliner::prepareCodeToInline(Function* toInline, FunctionCall* fc,
-                                     int cpOffset, Return_List* ret) {
+                                     CallInst* newrho, int cpOffset,
+                                     Return_List* ret) {
     Function* caller = fc->getFunction();
     assert((caller && toInline) && "Null pointer.");
 
     Inst_Vector vars;
 
-    for (auto RI = caller->arg_begin(), EI = toInline->arg_begin();
+    /*for (auto RI = caller->arg_begin(), EI = toInline->arg_begin();
          (RI != caller->arg_end()) && (EI != toInline->arg_end()); ++RI, ++EI)
-        (*EI).replaceAllUsesWith(&(*RI));
+      (*EI).replaceAllUsesWith(&(*RI));*/
+    assert(toInline->arg_size() == 3 && "Wrong function signature.");
+    auto EI = toInline->arg_begin();
+    auto RI = caller->arg_begin();
+    // Replace the consts.
+    (*EI).replaceAllUsesWith(&(*RI));
+    ++EI;
+    // Replace the rho with the newrho
+    (*EI).replaceAllUsesWith(newrho);
 
     for (auto it = inst_begin(toInline), e = inst_end(toInline); it != e;
          ++it) {
@@ -137,7 +149,7 @@ void OSRInliner::prepareCodeToInline(Function* toInline, FunctionCall* fc,
             ret->push_back(ri);
     }
 
-    replaceArgs(fc->getArgs(), &vars, fc->getNumbArguments());
+    // replaceArgs(fc->getArgs(), &vars, fc->getNumbArguments());
     vars.clear();
 }
 
@@ -147,9 +159,6 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     BasicBlock* callBlock =
         dynamic_cast<BasicBlock*>(fc->getGetFunc()->getParent());
     assert(callBlock && "Call block is null.");
-
-    // TODO aghosn
-    createNewRho(fc);
 
     // Isolate the function call.
     BasicBlock* deadBlock = callBlock->splitBasicBlock(fc->getIcStub(), "DEAD");
@@ -210,7 +219,7 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     // OSR Instrumentation.
     OSRHandler::insertOSR(toOpt, toInstrument, fc->getArg_back(),
                           fc->getGetFunc(), getOSRCondition(fc));
-    toOpt->dump();
+    // toOpt->dump();
 }
 
 Inst_Vector* OSRInliner::getTrueCondition() {
@@ -232,7 +241,7 @@ Inst_Vector* OSRInliner::getOSRCondition(FunctionCall* fc) {
     return res;
 }
 
-Value* OSRInliner::createNewRho(FunctionCall* fc) {
+CallInst* OSRInliner::createNewRho(FunctionCall* fc) {
     Value* arglist = rjit::ir::Builder::convertToPointer(R_NilValue);
 
     auto args = fc->getArgs();
