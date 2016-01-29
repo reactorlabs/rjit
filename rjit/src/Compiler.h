@@ -25,9 +25,8 @@ class Compiler {
 
     void jitAll();
 
-    //TODO aghosn
+    // TODO aghosn
     ir::Builder* getBuilder() { return &b; }
-
 
   private:
     /** Compiles an expression.

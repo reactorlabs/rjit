@@ -170,8 +170,9 @@ Function* OSRLibrary::genContinuationFunc(
                 ->registerOneToOneValue(OSRDest_v, dest_v, false);
             if (Instruction* anOSRSrc = dyn_cast<Instruction>(OSRDest_v)) {
                 if (!isa<PHINode>(anOSRSrc)) {
-                    (*ptrForF2NewToF2Map)->registerLandingPad(
-                        anOSRSrc, cast<Instruction>(dest_v), false);
+                    (*ptrForF2NewToF2Map)
+                        ->registerLandingPad(anOSRSrc,
+                                             cast<Instruction>(dest_v), false);
                 }
             }
         }
@@ -450,8 +451,8 @@ OSRLibrary::OSRPair OSRLibrary::insertOpenOSR(
 
     Function::arg_iterator stubArgIt = stub->arg_begin();
     (stubArgIt++)->setName("profDataAddr");
-    for (std::vector<Value*>::iterator it = valuesToPass.begin(),
-                                       end = valuesToPass.end();
+    for (std::vector<Value *>::iterator it = valuesToPass.begin(),
+                                        end = valuesToPass.end();
          it != end; ++it) {
         if ((*it)->hasName()) {
             (stubArgIt++)->setName(Twine((*it)->getName(), "_osr"));
@@ -615,8 +616,8 @@ OSRLibrary::OSRPair OSRLibrary::insertOpenOSR(
                                       i8PointerTy); // we pass 0 as NULL value
     }
     newValuesToPass.push_back(newProfDataVal);
-    for (std::vector<Value*>::iterator it = valuesToPass.begin(),
-                                       end = valuesToPass.end();
+    for (std::vector<Value *>::iterator it = valuesToPass.begin(),
+                                        end = valuesToPass.end();
          it != end; ++it) {
         if (!config.updateF1) {
             newValuesToPass.push_back(srcToNewSrcVMap[*it]);
@@ -743,7 +744,7 @@ void OSRLibrary::duplicateBodyIntoNewFunction(Function* F, Function* NF,
     // TODO clone also debug info metadata
 
     // adapted from CloneFunction.cpp
-    Function* OldFunc = F, *NewFunc = NF;
+    Function *OldFunc = F, *NewFunc = NF;
     const char* NameSuffix = "";
     ClonedCodeInfo* CodeInfo = nullptr;
     /* SmallVector<ReturnInst*, 8> Returns; // ignore returns cloned */
@@ -801,13 +802,12 @@ void OSRLibrary::fixOperandReferencesFromVMap(Function* NF, Function* F,
     }
 }
 
-void
-OSRLibrary::replaceUsesAndFixSSA(Function* OSRCont, Instruction* OSRContLPad,
-                                 std::vector<Value*>& valuesToSetAtOrigLPad,
-                                 ValueToValueMapTy& VMap,
-                                 ValueToValueMapTy& updatesForVMap,
-                                 SmallVectorImpl<PHINode*>* insertedPHINodes,
-                                 bool verbose, StateMap** ptrForF2NewToF2Map) {
+void OSRLibrary::replaceUsesAndFixSSA(
+    Function* OSRCont, Instruction* OSRContLPad,
+    std::vector<Value*>& valuesToSetAtOrigLPad, ValueToValueMapTy& VMap,
+    ValueToValueMapTy& updatesForVMap,
+    SmallVectorImpl<PHINode*>* insertedPHINodes, bool verbose,
+    StateMap** ptrForF2NewToF2Map) {
     BasicBlock* entryPoint = &OSRCont->getEntryBlock();
     BasicBlock* OSRContLPadBlock = OSRContLPad->getParent();
 
