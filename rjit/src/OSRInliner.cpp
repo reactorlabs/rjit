@@ -48,7 +48,8 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
         (*it)->fixPromises(constantPool, toInlineSexp, c);
 
         // Get the LLVM IR for the function to Inline.
-        toInlineSexp = c->compile("inner", BODY(toInlineSexp), FORMALS(toInlineSexp));
+        toInlineSexp =
+            c->compile("inner", BODY(toInlineSexp), FORMALS(toInlineSexp));
 
         Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 

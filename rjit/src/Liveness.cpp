@@ -66,10 +66,9 @@ LivenessAnalysis::LiveValues LivenessAnalysis::analyzeLiveInForSeq(
     return liveIn;
 }
 
-bool
-LivenessAnalysis::processBlock(const BasicBlock* B,
-                               LivenessAnalysis::LiveValues& inValues,
-                               const LivenessAnalysis::LiveValues& outValues) {
+bool LivenessAnalysis::processBlock(
+    const BasicBlock* B, LivenessAnalysis::LiveValues& inValues,
+    const LivenessAnalysis::LiveValues& outValues) {
 
     BasicBlock::const_iterator firstNonPHIInstr = B->getFirstNonPHI();
     BasicBlock::const_iterator firstInstr = B->begin();
