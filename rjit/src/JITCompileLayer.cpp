@@ -52,9 +52,9 @@ ExecutionEngine* JITCompileLayer::getEngine(JITModule* m) {
     // Make sure we can resolve symbols in the program as well. The zero arg
     legacy::PassManager pm;
 
-    //pm.add(new ir::VariableAnalysis());
+    // pm.add(new ir::VariableAnalysis());
 
-    //pm.add(new ir::ConstantLoadOptimization());
+    // pm.add(new ir::ConstantLoadOptimization());
 
     pm.add(createTargetTransformInfoWrapperPass(TargetIRAnalysis()));
 
