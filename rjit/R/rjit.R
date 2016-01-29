@@ -56,3 +56,37 @@ jit.compileEnvironment <- function(environment, moduleName ="rjit module") {
 
 jit.enable <- function() .Call("jitEnable");
 jit.disable <- function() .Call("jitDisable");
+
+jit.printWithoutSP <- function(what, env = environment(what)) {
+    if(typeof(what) == "closure") {
+        native = .Call("printWithoutSP", what)
+        f = .Internal(bcClose(formals(what), native, env))
+        attrs = attributes(what)
+        if (!is.null(attrs))
+            attributes(f) = attrs
+        if (isS4(what))
+            f = asS4(f)
+        f
+    }else if (any(c("language", "symbol", "logical", "integer", "double", "complex", "character") == typeof(what))) {
+        .Call("printWithoutSP", what)
+    } else {
+       stop("Only bytecode expressions and asts can be jitted.")
+    }
+}
+
+jit.testOSR <- function(what, whut, env=environment(what)) {
+    if(typeof(what) == "closure") {
+        native = .Call("testOSR", what, env)
+        f = .Internal(bcClose(formals(what), native, env))
+        attrs = attributes(what)
+        if (!is.null(attrs))
+            attributes(f) = attrs
+        if (isS4(what))
+            f = asS4(f)
+        f
+    }else if (any(c("language", "symbol", "logical", "integer", "double", "complex", "character") == typeof(what))) {
+        .Call("testOSR", what)
+    } else {
+       stop("Only bytecode expressions and asts can be jitted.")
+    }
+}
