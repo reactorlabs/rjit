@@ -747,6 +747,7 @@ void OSRLibrary::duplicateBodyIntoNewFunction(Function* F, Function* NF,
 
     // adapted from CloneFunction.cpp
     Function *OldFunc = F, *NewFunc = NF;
+
     const char* NameSuffix = "";
     ClonedCodeInfo* CodeInfo = nullptr;
     /* SmallVector<ReturnInst*, 8> Returns; // ignore returns cloned */
@@ -810,6 +811,7 @@ void OSRLibrary::replaceUsesAndFixSSA(
     ValueToValueMapTy& updatesForVMap,
     SmallVectorImpl<PHINode*>* insertedPHINodes, bool verbose,
     StateMap** ptrForF2NewToF2Map) {
+
     BasicBlock* entryPoint = &OSRCont->getEntryBlock();
     BasicBlock* OSRContLPadBlock = OSRContLPad->getParent();
 
