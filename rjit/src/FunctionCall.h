@@ -10,7 +10,6 @@
 #define GETFUNCTION_NAME "getFunction"
 #define CONSTANT_NAME "constant"
 #define ICSTUB_NAME "icStub"
-#define LITERAL_NAME "userLiteral"
 #define GET_VAR_NAME "genericGetVar"
 #define USR_LIT "userLiteral"
 
