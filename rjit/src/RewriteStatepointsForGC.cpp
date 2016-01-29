@@ -1680,10 +1680,10 @@ static void relocationViaAlloca(
                     }
                 }
             } else {
-                if (Use && Use->getParent()) {
-                    LoadInst* Load = new LoadInst(Alloca, "", Use);
-                    Use->replaceUsesOfWith(Def, Load);
-                }
+                //                if (Use && Use->getParent()) {
+                LoadInst* Load = new LoadInst(Alloca, "", Use);
+                Use->replaceUsesOfWith(Def, Load);
+                //                }
             }
         }
 
