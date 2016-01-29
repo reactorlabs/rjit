@@ -61,6 +61,7 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
         // Replace constant pool accesses and argument uses.
         Return_List ret;
         prepareCodeToInline(toInline, *it, newrho, LENGTH(CDR(fSexp)), &ret);
+
         insertBody(toOpt, toInline, toInstrument, *it, &ret);
 
         // clean up
@@ -202,8 +203,12 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     // OSR Instrumentation.
     OSRHandler::insertOSR(toOpt, toInstrument, fc->getConsts(),
                           fc->getGetFunc(), getOSRCondition(fc));
+<<<<<<< HEAD
     toOpt->dump();
     toInstrument->dump();
+=======
+    // toOpt->dump();
+>>>>>>> First Step merge
 }
 
 Inst_Vector* OSRInliner::getTrueCondition() {
