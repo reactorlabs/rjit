@@ -27,7 +27,6 @@ class Compiler {
 
     // TODO aghosn
     ir::Builder* getBuilder() { return &b; }
-
   private:
     /** Compiles an expression.
 

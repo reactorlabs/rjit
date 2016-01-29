@@ -170,9 +170,8 @@ Function* OSRLibrary::genContinuationFunc(
                 ->registerOneToOneValue(OSRDest_v, dest_v, false);
             if (Instruction* anOSRSrc = dyn_cast<Instruction>(OSRDest_v)) {
                 if (!isa<PHINode>(anOSRSrc)) {
-                    (*ptrForF2NewToF2Map)
-                        ->registerLandingPad(anOSRSrc,
-                                             cast<Instruction>(dest_v), false);
+                    (*ptrForF2NewToF2Map)->registerLandingPad(
+                        anOSRSrc, cast<Instruction>(dest_v), false);
                 }
             }
         }
@@ -451,6 +450,7 @@ OSRLibrary::OSRPair OSRLibrary::insertOpenOSR(
 
     Function::arg_iterator stubArgIt = stub->arg_begin();
     (stubArgIt++)->setName("profDataAddr");
+
     for (std::vector<Value *>::iterator it = valuesToPass.begin(),
                                         end = valuesToPass.end();
          it != end; ++it) {
@@ -808,6 +808,7 @@ void OSRLibrary::replaceUsesAndFixSSA(
     ValueToValueMapTy& updatesForVMap,
     SmallVectorImpl<PHINode*>* insertedPHINodes, bool verbose,
     StateMap** ptrForF2NewToF2Map) {
+
     BasicBlock* entryPoint = &OSRCont->getEntryBlock();
     BasicBlock* OSRContLPadBlock = OSRContLPad->getParent();
 
