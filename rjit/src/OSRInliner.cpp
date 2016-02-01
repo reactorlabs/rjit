@@ -53,13 +53,14 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
 
         Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 
+        Function* toInstrument = OSRHandler::getToInstrument(toOpt);
+
         // TODO aghosn
         auto newrho = createNewRho((*it));
 
         // Replace constant pool accesses and argument uses.
         Return_List ret;
         prepareCodeToInline(toInline, *it, newrho, LENGTH(CDR(fSexp)), &ret);
-        Function* toInstrument = OSRHandler::getToInstrument(toOpt);
         insertBody(toOpt, toInline, toInstrument, *it, &ret);
 
         // clean up
@@ -201,7 +202,8 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     // OSR Instrumentation.
     OSRHandler::insertOSR(toOpt, toInstrument, fc->getConsts(),
                           fc->getGetFunc(), getOSRCondition(fc));
-    // toOpt->dump();
+    toOpt->dump();
+    toInstrument->dump();
 }
 
 Inst_Vector* OSRInliner::getTrueCondition() {
