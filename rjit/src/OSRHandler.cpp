@@ -60,8 +60,12 @@ void OSRHandler::insertOSR(Function* opt, Function* instrument,
         transitive->getCorrespondingOneToOneValue(pad));
     assert(lPad && "The landing pad could not be found.");
 
-    OSRLibrary::insertResolvedOSR(getGlobalContext(), *opt, *src, *instrument,
-                                  *lPad, *cond, *transitive, configuration);
+    auto res = OSRLibrary::insertResolvedOSR(getGlobalContext(), *opt, *src,
+                                             *instrument, *lPad, *cond,
+                                             *transitive, configuration);
+    // Printing
+    res.first->dump();
+    res.second->dump();
 }
 
 void OSRHandler::removeEntry(Function* opt, Function* instrument, Value* val) {
