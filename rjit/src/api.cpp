@@ -9,6 +9,7 @@
 #include "ir/Ir.h"
 #include "ir/Builder.h"
 #include "ir/Intrinsics.h"
+#include "OSRInliner.h"
 
 using namespace rjit;
 
@@ -16,6 +17,12 @@ using namespace rjit;
  */
 REXPORT SEXP jitAst(SEXP ast, SEXP formals, SEXP rho) {
     Compiler c("module");
+    if (OSR_INLINE && rho == R_GlobalEnv) {
+        printf("Should OSR compile.\n");
+        osr::OSRInliner inliner(&c);
+        SEXP result = inliner.inlineCalls(ast, formals, rho);
+        return result;
+    }
     SEXP result = c.compile("rfunction", ast, formals);
     c.jitAll();
     return result;
