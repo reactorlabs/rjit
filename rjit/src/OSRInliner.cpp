@@ -2,6 +2,7 @@
 #include "OSRInliner.h"
 #include "OSRHandler.h"
 #include <llvm/IR/BasicBlock.h>
+#include <string>
 
 using namespace llvm;
 
@@ -100,13 +101,15 @@ void OSRInliner::updateCPAccess(CallInst* call, int offset) {
     }
 }
 
+// TODO aghosn I am not inlining the print function because it generates a type
+// Problem. FIXME
 SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     SEXP symb = VECTOR_ELT(cp, symbol);
     SEXP fSexp = findFun(symb, env);
-    if (TYPEOF(fSexp) == CLOSXP) {
-        return fSexp;
-    }
-    return nullptr;
+    // std::string name = CHAR(PRINTNAME(symb));
+    if (TYPEOF(fSexp) != CLOSXP /*|| name.compare("print") == 0*/)
+        return nullptr;
+    return fSexp;
 }
 
 void OSRInliner::prepareCodeToInline(Function* toInline, FunctionCall* fc,
@@ -202,8 +205,6 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     // OSR Instrumentation.
     OSRHandler::insertOSR(toOpt, toInstrument, fc->getConsts(),
                           fc->getGetFunc(), getOSRCondition(fc));
-    toOpt->dump();
-    toInstrument->dump();
 }
 
 Inst_Vector* OSRInliner::getTrueCondition() {
