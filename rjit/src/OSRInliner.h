@@ -20,12 +20,13 @@ class OSRInliner {
     /**
      * @brief      Inlines calls inside outer
      *
-     * @param[in]  f  the outer function.
+     * @param[in]  f  the outer function body.
+     * @param[in]  formals formals for f.
      * @param[in]  env    the environment associated with f.
      *
      * @return     a SEXP with a compiled version of f, where calls are inlined.
      */
-    SEXP inlineCalls(SEXP f, SEXP env);
+    SEXP inlineCalls(SEXP f, SEXP formals, SEXP env);
 
   private:
     rjit::Compiler* c;

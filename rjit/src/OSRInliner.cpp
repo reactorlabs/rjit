@@ -21,9 +21,9 @@ OSRInliner::OSRInliner(rjit::Compiler* c) : c(c) {
                          "CONS_NR", c->getBuilder()->module());
 }
 
-SEXP OSRInliner::inlineCalls(SEXP f, SEXP env) {
+SEXP OSRInliner::inlineCalls(SEXP f, SEXP formals, SEXP env) {
     /*Get the compiled version*/
-    SEXP fSexp = c->compile("outer", BODY(f), FORMALS(f));
+    SEXP fSexp = c->compile("outer", f, formals);
     Function* fLLVM = GET_LLVM(fSexp);
     assert(fLLVM && "Could not extract the LLVM function.");
 
