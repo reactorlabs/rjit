@@ -33,7 +33,7 @@ Pattern* Pattern::match(BasicBlock::iterator& i) {
     llvm::Instruction* ins = &*i;
     Pattern* rjitIns = Pattern::getIR(ins);
     assert(rjitIns->start() == ins);
-    while (&*i && &*i != rjitIns->end())
+    while (&*i != rjitIns->end())
         i++;
     assert(rjitIns->end() == &*i);
     ++i; // move to next instruction
