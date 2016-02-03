@@ -3,6 +3,7 @@
 #include "OSRHandler.h"
 #include <llvm/IR/BasicBlock.h>
 #include <string>
+#include "api.h"
 
 using namespace llvm;
 
@@ -56,8 +57,9 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP formals, SEXP env) {
         (*it)->fixPromises(constantPool, toInlineSexp, c);
 
         // Get the LLVM IR for the function to Inline.
-        toInlineSexp =
-            c->compile("inner", BODY(toInlineSexp), FORMALS(toInlineSexp));
+        /*toInlineSexp =
+            c->compile("inner", BODY(toInlineSexp), FORMALS(toInlineSexp));*/
+        toInlineSexp = compile(BODY(toInlineSexp), FORMALS(toInlineSexp), env);
 
         Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 
@@ -79,8 +81,8 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP formals, SEXP env) {
     FunctionCall::fixIcStubs(toOpt);
     toOpt->dump();
     // Finish the compilation.
-    c->jitAll(); // TODO maybe need to remove what we want to keep
-                 // uninstrumented.
+    // c->jitAll(); // TODO maybe need to remove what we want to keep
+    // uninstrumented.
     return fSexp;
 }
 
@@ -278,5 +280,15 @@ CallInst* OSRInliner::createNewRho(FunctionCall* fc) {
     return res;
 }
 // AND IN LLVM MODULE !!!!!!!!!!!!
+
+SEXP OSRInliner::compile(SEXP body, SEXP formals, SEXP env) {
+    SEXP result = nullptr;
+    if (OSR_INLINE && env == R_GlobalEnv) {
+        result = this->inlineCalls(body, formals, env);
+    } else {
+        result = c->compile("inner", body, formals);
+    }
+    return result;
+}
 
 } // namespace osr

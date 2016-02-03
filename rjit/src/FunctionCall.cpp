@@ -42,7 +42,8 @@ FunctionCalls* FunctionCall::getFunctionCalls(Function* f) {
 
 unsigned int FunctionCall::getNumbArguments() {
     std::string name = icStub->getCalledFunction()->getName().str();
-    return ((unsigned int)name.back() - '0');
+    return (atoi(name.substr(name.find_last_of("_") + 1).c_str()));
+    // return ((unsigned int)name.back() - '0');
 }
 
 Function* FunctionCall::getFunction() {
