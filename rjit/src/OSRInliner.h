@@ -57,6 +57,8 @@ class OSRInliner {
     static Inst_Vector* getTrueCondition();
     static Inst_Vector* getOSRCondition(FunctionCall* fc);
     CallInst* createNewRho(FunctionCall* fc);
+
+    SEXP compile(SEXP body, SEXP formals, SEXP env);
 };
 
 } // namespace osr

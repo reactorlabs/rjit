@@ -32,15 +32,6 @@ REXPORT SEXP printWithoutSP(SEXP expr) {
     return result;
 }
 
-REXPORT SEXP testOSR(SEXP outer, SEXP env) {
-    Compiler c("module");
-    auto inliner = new OSRInliner(&c);
-    SEXP res = inliner->inlineCalls(BODY(outer), FORMALS(outer), env);
-    return res;
-    /* SEXP res = OSRInliner::getInstance()->inlineCalls(outer, env);
-     return res;*/
-}
-
 REXPORT SEXP printFormals(SEXP f) {
     SEXP res = FORMALS(f);
     return res;

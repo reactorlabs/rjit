@@ -24,12 +24,13 @@ using namespace rjit;
  */
 REXPORT SEXP jitAst(SEXP ast, SEXP formals, SEXP rho) {
     Compiler c("module");
-    if (OSR_INLINE && rho == R_GlobalEnv) {
+    SEXP result = nullptr;
+    if (OSR_INLINE /*&& rho == R_GlobalEnv*/) {
         osr::OSRInliner inliner(&c);
-        SEXP result = inliner.inlineCalls(ast, formals, rho);
-        return result;
+        result = inliner.inlineCalls(ast, formals, rho);
+    } else {
+        result = c.compile("rfunction", ast, formals);
     }
-    SEXP result = c.compile("rfunction", ast, formals);
     c.jitAll();
     return result;
 }
@@ -39,6 +40,16 @@ REXPORT SEXP jitSwapForNative(SEXP original, SEXP native) {
     CDR(original) = CDR(native);
     TAG(original) = TAG(native);
     return original;
+}
+
+// TODO aghosn
+REXPORT SEXP testOSR(SEXP outer, SEXP env) {
+    Compiler c("module");
+    OSR_INLINE = 1;
+    return jitAst(BODY(outer), FORMALS(outer), env);
+    /*auto inliner = new OSRInliner(&c);
+    SEXP res = inliner->inlineCalls(BODY(outer), FORMALS(outer), env);
+    return res;*/
 }
 
 /** More complex compilation method that compiles multiple functions into a
