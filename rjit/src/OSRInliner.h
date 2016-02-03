@@ -45,6 +45,8 @@ class OSRInliner {
 
     static SEXP getFunction(SEXP cp, int symbol, SEXP env);
 
+    static bool isMissingArgs(SEXP formals, FunctionCall* fc);
+
     static void prepareCodeToInline(Function* toInline, FunctionCall* fc,
                                     CallInst* newrho, int cpOffset,
                                     Return_List* ret);

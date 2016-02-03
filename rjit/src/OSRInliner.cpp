@@ -39,8 +39,13 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP formals, SEXP env) {
         SEXP constantPool = CDR(fSexp);
         SEXP toInlineSexp =
             getFunction(constantPool, (*it)->getFunctionSymbol(), env);
-        if (!toInlineSexp)
+
+        if (!toInlineSexp || isMissingArgs(FORMALS(toInlineSexp), (*it))) {
+            /*//Access the function pointer.
+            unsigned index = (*it)->getIcStub()->getNumArgOperands()-2;
+            (*it)->getIcStub()->setArgOperand(index, toOpt); */
             continue;
+        }
 
         // For the OSR condition.
         (*it)->setInPtr(c, toInlineSexp);
@@ -69,6 +74,8 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP formals, SEXP env) {
         // Set the constant pool.
         setCP(fSexp, toInlineSexp);
     }
+    FunctionCall::fixIcStubs(toOpt);
+    toOpt->dump();
     // Finish the compilation.
     c->jitAll(); // TODO maybe need to remove what we want to keep
                  // uninstrumented.
@@ -96,7 +103,8 @@ void OSRInliner::updateCPAccess(CallInst* call, int offset) {
         if (index) {
             int64_t newValue = index->getSExtValue() + offset;
             call->setArgOperand(
-                i, ConstantInt::get(getGlobalContext(), APInt(32, newValue)));
+                i, ConstantInt::get(getGlobalContext(),
+                                    APInt(index->getBitWidth(), newValue)));
         }
     }
 }
@@ -106,10 +114,26 @@ void OSRInliner::updateCPAccess(CallInst* call, int offset) {
 SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     SEXP symb = VECTOR_ELT(cp, symbol);
     SEXP fSexp = findFun(symb, env);
-    // std::string name = CHAR(PRINTNAME(symb));
+    /*std::string name = CHAR(PRINTNAME(symb));*/
     if (TYPEOF(fSexp) != CLOSXP /*|| name.compare("print") == 0*/)
         return nullptr;
+    SEXP formals = FORMALS(fSexp);
+    while (formals != R_NilValue) {
+        if (TAG(formals) == R_DotsSymbol)
+            return nullptr;
+        formals = CDR(formals);
+    }
     return fSexp;
+}
+
+bool OSRInliner::isMissingArgs(SEXP formals, FunctionCall* fc) {
+    SEXP form = formals;
+    unsigned i = 0;
+    while (form != R_NilValue) {
+        ++i;
+        form = CDR(form);
+    }
+    return (i != fc->getArgs()->size());
 }
 
 void OSRInliner::prepareCodeToInline(Function* toInline, FunctionCall* fc,

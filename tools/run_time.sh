@@ -19,7 +19,13 @@ BENCH_DIR=${SRC_DIR}/benchmarks
 LOG_FILE_NAME="log"
 FRESH_R_DIR="${TARGET}/freshr"
 FRESH_R_VERS="3-2"
+<<<<<<< HEAD
 BENCH_RUN_NUMBER=1
+=======
+BENCH_RUN_NUM="2"
+
+
+>>>>>>> Fixing patchpoints in the inlining
 SHOOT_DIR=${BENCH_DIR}/shootout/
 
 TIMEN=$(date +"%H-%M-%S_%F")
@@ -45,8 +51,8 @@ cd ${BENCH_DIR}
 echo "-> start running the shootout benchmark "
 for x in ` find ${SHOOT_DIR} -name "*.r" `; do
     echo "-> running $x"
-    R_LIBS_USER=${SRC_DIR}/packages R_ENABLE_JIT=5 ${R_HOME}/bin/R -e "source(\"${SRC_DIR}/benchmarks/run.r\");runbench(\"$x\", \"${LOG_FILE}\", \"rjit\", ${BENCH_RUN_NUM})" > /dev/null
-    R_ENABLE_JIT=3 ${FRESH_R_BIN} -e "source(\"${SRC_DIR}/benchmarks/run.r\");runbench(\"$x\", \"${LOG_FILE}\", \"gnur\", ${BENCH_RUN_NUM})" > /dev/null
+    OSR_INLINE=1 R_LIBS_USER=${TARGET}/rjit/packages R_ENABLE_JIT=5 ${TARGET}/gnur/bin/R -e "source(\"${SRC_DIR}/benchmarks/run.r\");runbench(\"$x\", \"${LOG_FILE}\", \"rjitInlining\", ${BENCH_RUN_NUM})" > /dev/null
+    R_LIBS_USER=${TARGET}/rjit/packages R_ENABLE_JIT=5 ${TARGET}/gnur/bin/R -e "source(\"${SRC_DIR}/benchmarks/run.r\");runbench(\"$x\", \"${LOG_FILE}\", \"rjit\", ${BENCH_RUN_NUM})" > /dev/null
 done
 
 # calclog and graphlog

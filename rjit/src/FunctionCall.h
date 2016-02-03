@@ -58,6 +58,8 @@ class FunctionCall {
     Value* getInPtr();
     Instruction* getArg_back();
 
+    static void fixIcStubs(Function* f);
+
   private:
     CallInst* getFunc;
     Inst_Vector args;
