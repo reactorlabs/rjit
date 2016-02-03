@@ -25,7 +25,6 @@ using namespace rjit;
 REXPORT SEXP jitAst(SEXP ast, SEXP formals, SEXP rho) {
     Compiler c("module");
     if (OSR_INLINE && rho == R_GlobalEnv) {
-        printf("Should OSR compile.\n");
         osr::OSRInliner inliner(&c);
         SEXP result = inliner.inlineCalls(ast, formals, rho);
         return result;

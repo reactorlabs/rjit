@@ -40,7 +40,9 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP formals, SEXP env) {
         SEXP toInlineSexp =
             getFunction(constantPool, (*it)->getFunctionSymbol(), env);
 
-        if (!toInlineSexp || isMissingArgs(FORMALS(toInlineSexp), (*it))) {
+        // Function not found or arguments are missing, or recursive call.
+        if (!toInlineSexp || isMissingArgs(FORMALS(toInlineSexp), (*it)) ||
+            f == BODY(toInlineSexp)) {
             /*//Access the function pointer.
             unsigned index = (*it)->getIcStub()->getNumArgOperands()-2;
             (*it)->getIcStub()->setArgOperand(index, toOpt); */
@@ -114,7 +116,7 @@ void OSRInliner::updateCPAccess(CallInst* call, int offset) {
 SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     SEXP symb = VECTOR_ELT(cp, symbol);
     SEXP fSexp = findFun(symb, env);
-    /*std::string name = CHAR(PRINTNAME(symb));*/
+    std::string name = CHAR(PRINTNAME(symb));
     if (TYPEOF(fSexp) != CLOSXP /*|| name.compare("print") == 0*/)
         return nullptr;
     SEXP formals = FORMALS(fSexp);
@@ -123,6 +125,7 @@ SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
             return nullptr;
         formals = CDR(formals);
     }
+    // printf("\n\n\nWE INLINE %s\n\n\n", name.c_str());
     return fSexp;
 }
 
