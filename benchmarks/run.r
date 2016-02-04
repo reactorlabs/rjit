@@ -145,3 +145,5 @@ calclog <- function(fileNames){
 }
 
 trim <- function (x) gsub("^\\s+|\\s+$", "", x)
+
+runbench("../benchmarks/shootout/knucleotide/knucleotide.r");
