@@ -7,9 +7,11 @@ namespace osr {
 
 /*      Initialize static variables     */
 OSRHandler OSRHandler::instance;
+uint64_t OSRHandler::id = 0;
 std::map<Function*, std::list<Function*>> OSRHandler::instruments;
 std::map<Function*, Function*> OSRHandler::toBase;
 std::map<std::pair<Function*, Function*>, StateMap*> OSRHandler::transitiveMaps;
+std::map<uint64_t, Function*> OSRHandler::exits;
 
 /******************************************************************************/
 /*                        Public functions                                    */
@@ -41,9 +43,9 @@ Function* OSRHandler::getToInstrument(Function* base) {
     return toInstrument.first;
 }
 
-void OSRHandler::insertOSR(Function* opt, Function* instrument,
-                           Instruction* src, Instruction* pad,
-                           Inst_Vector* cond) {
+std::pair<Function*, Function*>
+OSRHandler::insertOSR(Function* opt, Function* instrument, Instruction* src,
+                      Instruction* pad, Inst_Vector* cond) {
     StateMap* F2NewToF2Map = nullptr;
     OSRLibrary::OSRPointConfig configuration(
         false /*verbose*/, true /*updateF1*/, -1 /*branch taken prob*/,
@@ -60,12 +62,14 @@ void OSRHandler::insertOSR(Function* opt, Function* instrument,
         transitive->getCorrespondingOneToOneValue(pad));
     assert(lPad && "The landing pad could not be found.");
 
-    /*auto res =*/OSRLibrary::insertResolvedOSR(getGlobalContext(), *opt, *src,
-                                                *instrument, *lPad, *cond,
-                                                *transitive, configuration);
+    auto res = OSRLibrary::insertResolvedOSR(getGlobalContext(), *opt, *src,
+                                             *instrument, *lPad, *cond,
+                                             *transitive, configuration);
+    exits[++id] = instrument;
     // Printing
-    /*res.first->dump();
-    res.second->dump();*/
+    res.first->dump();
+    res.second->dump();
+    return res;
 }
 
 void OSRHandler::removeEntry(Function* opt, Function* instrument, Value* val) {
@@ -84,4 +88,9 @@ void OSRHandler::removeEntry(Function* opt, Function* instrument, Value* val) {
 bool OSRHandler::transContains(std::pair<Function*, Function*> key) {
     return transitiveMaps.find(key) != transitiveMaps.end();
 }
+
+uint64_t OSRHandler::getId() { return id; }
+
+Function* OSRHandler::getExit(uint64_t idx) { return exits[idx]; }
+
 } // namespace osr

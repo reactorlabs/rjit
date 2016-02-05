@@ -69,15 +69,9 @@ jit.printWithoutSP <- function(what, env = environment(what)) {
 jit.testOSR <- function(what, whut, env=environment(what)) {
     if(typeof(what) == "closure") {
         native = .Call("testOSR", what, env)
-        f = .Internal(bcClose(formals(what), native, env))
-        attrs = attributes(what)
-        if (!is.null(attrs))
-            attributes(f) = attrs
-        if (isS4(what))
-            f = asS4(f)
-        f
+        native
     }else if (any(c("language", "symbol", "logical", "integer", "double", "complex", "character") == typeof(what))) {
-        .Call("testOSR", what)
+        jit.compile(what)
     } else {
        stop("Only bytecode expressions and asts can be jitted.")
     }

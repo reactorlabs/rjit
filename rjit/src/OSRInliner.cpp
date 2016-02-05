@@ -4,6 +4,8 @@
 #include <llvm/IR/BasicBlock.h>
 #include <string>
 #include "api.h"
+#include <cstdint>
+#include "ir/Builder.h"
 
 using namespace llvm;
 
@@ -14,17 +16,30 @@ namespace osr {
 /******************************************************************************/
 
 OSRInliner::OSRInliner(rjit::Compiler* c) : c(c) {
+
     closureQuickArgumentAdaptor = Function::Create(
         rjit::t::sexp_sexpsexp, Function::ExternalLinkage,
         "closureQuickArgumentAdaptor", c->getBuilder()->module());
+
     CONS_NR =
         Function::Create(rjit::t::sexp_sexpsexp, Function::ExternalLinkage,
                          "CONS_NR", c->getBuilder()->module());
+
+    fixClosure =
+        Function::Create(rjit::t::fixclosure_t, Function::ExternalLinkage,
+                         "fixClosure", c->getBuilder()->module());
 }
 
-SEXP OSRInliner::inlineCalls(SEXP f, SEXP formals, SEXP env) {
+SEXP OSRInliner::inlineCalls(SEXP f) {
+    /*Get the elements out of the closure*/
+    assert(TYPEOF(f) == CLOSXP &&
+           "Call for OSR Inliner on a non-closure sexp.");
+    SEXP formals = FORMALS(f);
+    SEXP env = TAG(f);
+    assert(TYPEOF(env) == ENVSXP && "Cannot extract environment.");
+
     /*Get the compiled version*/
-    SEXP fSexp = c->compile("outer", f, formals);
+    SEXP fSexp = c->compile("outer", BODY(f), formals);
     Function* fLLVM = GET_LLVM(fSexp);
     assert(fLLVM && "Could not extract the LLVM function.");
 
@@ -43,12 +58,8 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP formals, SEXP env) {
 
         // Function not found or arguments are missing, or recursive call.
         if (!toInlineSexp || isMissingArgs(FORMALS(toInlineSexp), (*it)) ||
-            f == BODY(toInlineSexp)) {
-            /*//Access the function pointer.
-            unsigned index = (*it)->getIcStub()->getNumArgOperands()-2;
-            (*it)->getIcStub()->setArgOperand(index, toOpt); */
+            f == toInlineSexp)
             continue;
-        }
 
         // For the OSR condition.
         (*it)->setInPtr(c, toInlineSexp);
@@ -57,15 +68,18 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP formals, SEXP env) {
         (*it)->fixPromises(constantPool, toInlineSexp, c);
 
         // Get the LLVM IR for the function to Inline.
-        /*toInlineSexp =
-            c->compile("inner", BODY(toInlineSexp), FORMALS(toInlineSexp));*/
-        toInlineSexp = compile(BODY(toInlineSexp), FORMALS(toInlineSexp), env);
+        /*if (!INLINE_ALL) {*/
+        toInlineSexp =
+            c->compile("inner", BODY(toInlineSexp), FORMALS(toInlineSexp));
+        /*} else {
+            toInlineSexp =
+                compile(BODY(toInlineSexp), FORMALS(toInlineSexp), env);
+        }*/
 
         Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 
         Function* toInstrument = OSRHandler::getToInstrument(toOpt);
 
-        // TODO aghosn
         auto newrho = createNewRho((*it));
 
         // Replace constant pool accesses and argument uses.
@@ -79,11 +93,8 @@ SEXP OSRInliner::inlineCalls(SEXP f, SEXP formals, SEXP env) {
         setCP(fSexp, toInlineSexp);
     }
     FunctionCall::fixIcStubs(toOpt);
-    // toOpt->dump();
-    // Finish the compilation.
-    // c->jitAll(); // TODO maybe need to remove what we want to keep
-    // uninstrumented.
-    return fSexp;
+    SETCDR(f, fSexp);
+    return f;
 }
 
 /******************************************************************************/
@@ -119,7 +130,8 @@ SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     SEXP symb = VECTOR_ELT(cp, symbol);
     SEXP fSexp = findFun(symb, env);
     std::string name = CHAR(PRINTNAME(symb));
-    if (TYPEOF(fSexp) != CLOSXP)
+    if (TYPEOF(fSexp) != CLOSXP || TYPEOF(TAG(fSexp)) != ENVSXP ||
+        (TAG(fSexp) != R_GlobalEnv && ONLY_GLOBAL))
         return nullptr;
     SEXP formals = FORMALS(fSexp);
     while (formals != R_NilValue) {
@@ -232,8 +244,10 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     delete toInline;
 
     // OSR Instrumentation.
-    OSRHandler::insertOSR(toOpt, toInstrument, fc->getConsts(), fc->getConsts(),
-                          getOSRCondition(fc));
+    auto res = OSRHandler::insertOSR(toOpt, toInstrument, fc->getConsts(),
+                                     fc->getConsts(), getOSRCondition(fc));
+
+    insertFixClosureCall(res.second);
 }
 
 Inst_Vector* OSRInliner::getTrueCondition() {
@@ -282,13 +296,23 @@ CallInst* OSRInliner::createNewRho(FunctionCall* fc) {
 // AND IN LLVM MODULE !!!!!!!!!!!!
 
 SEXP OSRInliner::compile(SEXP body, SEXP formals, SEXP env) {
-    SEXP result = nullptr;
-    if (OSR_INLINE && env == R_GlobalEnv) {
-        result = this->inlineCalls(body, formals, env);
-    } else {
-        result = c->compile("inner", body, formals);
-    }
-    return result;
+    /*   SEXP result = nullptr;
+       if (OSR_INLINE && env == R_GlobalEnv) {
+           result = this->inlineCalls(body, formals, env);
+       } else {
+           result = c->compile("inner", body, formals);
+       }
+       return result;*/
+    return body;
+}
+
+void OSRInliner::insertFixClosureCall(Function* f) {
+    // Instruction entry = f->getEntryBlock().back();
+    std::vector<Value*> f_args;
+    // f_args.push_back(f);
+    f_args.push_back(
+        ConstantInt::get(getGlobalContext(), APInt(64, OSRHandler::getId())));
+    CallInst::Create(fixClosure, f_args, "", &(f->getEntryBlock().back()));
 }
 
 } // namespace osr

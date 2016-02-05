@@ -103,6 +103,8 @@ PointerType* initializeTypes() {
     DECLARE(patchIC_t, t::t_void, t::voidPtr, t::t_i64, t::nativeFunctionPtr_t);
     DECLARE(compileIC_t, t::voidPtr, t::t_i64, t::SEXP, t::SEXP, t::SEXP,
             t::t_i64);
+    // TODO aghosn
+    DECLARE(fixclosure_t, t::t_void, t::t_i64);
 #undef DECLARE
 
     // initialize LLVM backend
@@ -172,6 +174,8 @@ Type* nativeFunctionPtr_t;
 
 FunctionType* patchpoint_t;
 FunctionType* stackmap_t;
+
+FunctionType* fixclosure_t;
 
 } // namespace t
 

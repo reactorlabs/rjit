@@ -29,6 +29,11 @@ class OSRHandler : public OSRLibrary {
     static std::map<std::pair<Function*, Function*>, StateMap*> transitiveMaps;
 
     /**
+     * Map that keeps a reference to the exit functions.TODO
+     */
+    static std::map<uint64_t, Function*> exits;
+
+    /**
      * @brief      Returns the singleton of the OSRHandler.
      *
      * @return     A pointer to the singleton instance.
@@ -53,6 +58,8 @@ class OSRHandler : public OSRLibrary {
      */
     static Function* getToInstrument(Function* base);
 
+    static Function* getExit(uint64_t id);
+
     /**
      * @brief      Inserts an osr exit in opt to instrument.
      *
@@ -63,8 +70,11 @@ class OSRHandler : public OSRLibrary {
      * instrument.
      * @param      cond        OSR condition.
      */
-    static void insertOSR(Function* opt, Function* instrument, Instruction* src,
-                          Instruction* pad, Inst_Vector* cond);
+    static std::pair<Function*, Function*>
+    insertOSR(Function* opt, Function* instrument, Instruction* src,
+              Instruction* pad, Inst_Vector* cond);
+
+    static uint64_t getId();
 
     /**
      * @brief      Removes a bidirectional mapping in the stateMap registered
@@ -81,6 +91,7 @@ class OSRHandler : public OSRLibrary {
 
   private:
     static OSRHandler instance;
+    static uint64_t id;
 
     OSRHandler() {}
     // static bool existInstrument(Function* f);

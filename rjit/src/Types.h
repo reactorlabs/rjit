@@ -62,6 +62,8 @@ extern llvm::Type* nativeFunctionPtr_t;
 
 extern llvm::FunctionType* patchpoint_t;
 extern llvm::FunctionType* stackmap_t;
+// TODO aghosn
+extern llvm::FunctionType* fixclosure_t;
 
 } // namespace t
 
