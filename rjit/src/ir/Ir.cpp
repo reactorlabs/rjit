@@ -68,11 +68,7 @@ VectorGetElement* VectorGetElement::create(llvm::Instruction* insert,
         GetElementPtrInst::Create(t::SEXP, payloadPtr, index, "", insert);
     auto res = new LoadInst(el_ptr, "", false, insert);
     res->setAlignment(8);
-    VectorGetElement* p = new VectorGetElement(res);
-    p->attach(realVector);
-    p->attach(payload);
-    p->attach(payloadPtr);
-    p->attach(el_ptr);
+    VectorGetElement* p = new VectorGetElement(realVector, payload, payloadPtr, el_ptr, res);
     return p;
 }
 

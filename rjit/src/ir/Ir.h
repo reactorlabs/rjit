@@ -16,6 +16,8 @@ namespace rjit {
 namespace ir {
 
 class Verifier;
+class View;
+class Pass;
 
 /** Instruction Pattern
 
@@ -111,11 +113,17 @@ class Pattern {
         }
     }
 
+    virtual ~Pattern() {
+    }
+
+
     // TODO deprecated, perhaps needed for llvm
     Kind getKind() const { return kind; }
 
   protected:
     friend class Verifier;
+    friend class View;
+    friend class Pass;
 
     /** Each pattern must know the llvm::instruction that is its result.
 
@@ -129,9 +137,6 @@ class Pattern {
         // attach the pattern to the result instruction
         attach(result);
     }
-
-    // TODO create destructor that detaches itself from all instructions forming
-    // it
 
     template <typename LLVM_INS>
     LLVM_INS* ins() const {
@@ -149,6 +154,7 @@ class Pattern {
         llvm::MDNode* m = llvm::MDNode::get(ins->getContext(), v);
         ins->setMetadata(MD_NAME, m);
     }
+
 };
 
 class Return : public Pattern {
@@ -162,6 +168,14 @@ class Return : public Pattern {
     static Return* create(Builder& b, llvm::Value* value) {
         return new Return(
             llvm::ReturnInst::Create(llvm::getGlobalContext(), value, b));
+    }
+
+    static Return * insertBefore(llvm::Instruction * ins, llvm::Value * value) {
+        return new Return(llvm::ReturnInst::Create(llvm::getGlobalContext(), value, ins));
+    }
+
+    static Return * insertBefore(Pattern * p, llvm::Value * value) {
+        return insertBefore(p->first(), value);
     }
 
     static bool classof(Pattern const* s) {
@@ -344,6 +358,7 @@ class Cbr : public Pattern {
 
 class MarkNotMutable : public Pattern {
   public:
+    // TODO this should use builder semantics
     static void create(llvm::Instruction* insert, LLVMContext& c,
                        llvm::Value* val) {
         ConstantInt* int32_0 =
@@ -366,12 +381,33 @@ class MarkNotMutable : public Pattern {
         // TODO if I understand it correctly, MarkNotMutable does not really
         // have usable result? The attachments will be better off in the
         // constructor as they are for others?
-        MarkNotMutable* p = new MarkNotMutable(sexpinfo);
-        p->attach(sexpint);
-        p->attach(sexpval);
-        p->attach(clear);
-        p->attach(set);
-        p->attach(store);
+        new MarkNotMutable(sexpinfo, sexpint, sexpval, clear, set, store);
+    }
+
+    static MarkNotMutable * insertBefore(llvm::Instruction * ins, llvm::Value * val) {
+        LLVMContext & c = ins->getContext();
+        ConstantInt* int32_0 =
+            ConstantInt::get(c, APInt(32, StringRef("0"), 10));
+        ConstantInt* c1 = ConstantInt::get(c, APInt(32, StringRef("-193"), 10));
+        ConstantInt* c2 = ConstantInt::get(c, APInt(32, StringRef("128"), 10));
+        auto sexpinfo = GetElementPtrInst::Create(
+            t::SEXPREC, val, std::vector<Value*>({int32_0, int32_0}), "",
+            ins);
+        auto sexpint =
+            new BitCastInst(sexpinfo, PointerType::get(t::Int, 1), "", ins);
+        auto sexpval = new LoadInst(sexpint, "", false, ins);
+        sexpval->setAlignment(4);
+        auto clear = llvm::BinaryOperator::Create(llvm::Instruction::And,
+                                                  sexpval, c1, "", ins);
+        auto set = llvm::BinaryOperator::Create(llvm::Instruction::Or, clear,
+                                                c2, "", ins);
+        auto store = new StoreInst(set, sexpint, ins);
+        store->setAlignment(4);
+        return new MarkNotMutable(sexpinfo, sexpint, sexpval, clear, set, store);
+    }
+
+    static MarkNotMutable * insertBefore(Pattern * p, llvm::Value * value) {
+        return insertBefore(p->first(), value);
     }
 
     static bool classof(Pattern const* s) {
@@ -379,8 +415,14 @@ class MarkNotMutable : public Pattern {
     }
 
   private:
-    MarkNotMutable(llvm::Instruction* ins)
-        : Pattern(ins, Kind::MarkNotMutable) {}
+    MarkNotMutable(llvm::Instruction* sexpinfo, llvm::Instruction * sexpint, llvm::Instruction * sexpval, llvm::Instruction * clear, llvm::Instruction * set, llvm::Instruction * store):
+        Pattern(sexpinfo, Kind::MarkNotMutable) {
+        attach(sexpint);
+        attach(sexpval);
+        attach(clear);
+        attach(set);
+        attach(store);
+    }
 };
 
 class Car : public Pattern {
@@ -454,11 +496,39 @@ class Tag : public Pattern {
 
 class VectorGetElement : public Pattern {
   public:
-    VectorGetElement(llvm::Instruction* result)
-        : Pattern(result, Kind::VectorGetElement) {}
+    VectorGetElement(llvm::Instruction * realVector, llvm::Instruction * payload, llvm::Instruction * payloadPtr, llvm::Instruction * el_ptr, llvm::Instruction * result)
+        : Pattern(result, Kind::VectorGetElement) {
+        attach(realVector);
+        attach(payload);
+        attach(payloadPtr);
+        attach(el_ptr);
+    }
 
+    // TODO this should change to builder semantics
     static VectorGetElement* create(llvm::Instruction* insert, LLVMContext& c,
                                     llvm::Value* vector, llvm::Value* index);
+
+    static VectorGetElement * insertBefore(llvm::Instruction * ins, llvm::Value * vector, llvm::Value * index) {
+        LLVMContext & c = ins->getContext();
+        ConstantInt* int64_1 = ConstantInt::get(c, APInt(64, StringRef("1"), 10));
+        auto realVector = new BitCastInst(
+            vector, PointerType::get(t::VECTOR_SEXPREC, 1), "", ins);
+        auto payload =
+            GetElementPtrInst::Create(t::VECTOR_SEXPREC, realVector,
+                                      std::vector<Value*>({int64_1}), "", ins);
+        auto payloadPtr =
+            new BitCastInst(payload, PointerType::get(t::SEXP, 1), "", ins);
+        GetElementPtrInst* el_ptr =
+            GetElementPtrInst::Create(t::SEXP, payloadPtr, index, "", ins);
+        auto res = new LoadInst(el_ptr, "", false, ins);
+        res->setAlignment(8);
+        VectorGetElement* p = new VectorGetElement(realVector, payload, payloadPtr, el_ptr, res);
+        return p;
+    }
+
+    static VectorGetElement * insertBefore(Pattern * p, llvm::Value * vector, llvm::Value * index) {
+        return insertBefore(p->first(), vector, index);
+    }
 
     static bool classof(Pattern const* s) {
         return s->getKind() == Kind::VectorGetElement;
