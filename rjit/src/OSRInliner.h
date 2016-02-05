@@ -17,21 +17,14 @@ typedef std::list<llvm::ReturnInst*> Return_List;
 class OSRInliner {
   public:
     OSRInliner(rjit::Compiler* c);
-    /**
-     * @brief      Inlines calls inside outer
-     *
-     * @param[in]  f  the outer function body.
-     * @param[in]  formals formals for f.
-     * @param[in]  env    the environment associated with f.
-     *
-     * @return     a SEXP with a compiled version of f, where calls are inlined.
-     */
-    SEXP inlineCalls(SEXP f, SEXP formals, SEXP env);
+
+    SEXP inlineCalls(SEXP f);
 
   private:
     rjit::Compiler* c;
     Function* closureQuickArgumentAdaptor;
     Function* CONS_NR;
+    Function* fixClosure;
 
     static void setCP(SEXP firstP, SEXP secondP);
 
@@ -59,6 +52,7 @@ class OSRInliner {
     CallInst* createNewRho(FunctionCall* fc);
 
     SEXP compile(SEXP body, SEXP formals, SEXP env);
+    void insertFixClosureCall(Function* f);
 };
 
 } // namespace osr

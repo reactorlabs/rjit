@@ -57,6 +57,8 @@ extern llvm::FunctionType* sexp_contxtsexpsexp;
 extern llvm::FunctionType* nativeFunction_t;
 extern llvm::Type* nativeFunctionPtr_t;
 
+extern llvm::FunctionType* fixclosure_t;
+
 } // namespace t
 
 } // namespace rjit

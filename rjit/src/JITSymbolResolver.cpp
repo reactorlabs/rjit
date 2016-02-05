@@ -33,6 +33,7 @@ RuntimeDyld::SymbolInfo JITSymbolResolver::findSymbol(const std::string& name) {
     }
         check(patchIC);
         check(compileIC);
+        check(fixClosure);
 
     } while (false);
 

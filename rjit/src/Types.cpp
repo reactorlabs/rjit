@@ -88,6 +88,9 @@ PointerType* initializeTypes() {
     DECLARE(void_cntxtsexp, t_void, t::cntxtPtr, t::SEXP);
     DECLARE(void_cntxtsexpsexp, t_void, t::cntxtPtr, t::SEXP, t::SEXP);
     DECLARE(sexp_contxtsexpsexp, t::SEXP, t::cntxtPtr, t::SEXP, t::SEXP);
+    // TODO aghosn
+    DECLARE(fixclosure_t, t::t_void, t::t_i64);
+
 #undef DECLARE
 
     // initialize LLVM backend
@@ -152,6 +155,7 @@ FunctionType* sexp_contxtsexpsexp;
 FunctionType* nativeFunction_t;
 Type* nativeFunctionPtr_t;
 
+FunctionType* fixclosure_t;
 } // namespace t
 
 } // namespace rjit
