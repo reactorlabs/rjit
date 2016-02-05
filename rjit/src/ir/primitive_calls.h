@@ -15,19 +15,10 @@ class EndClosureContext : public PrimitiveCall {
     EndClosureContext(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::EndClosureContext) {}
 
-    static EndClosureContext* create(Builder& b, llvm::Value* cntxt,
-                                     llvm::Value* resul) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(cntxt);
-        args_.push_back(resul);
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<EndClosureContext>(), args_, "", b);
-
+    static EndClosureContext* create(Builder& b, llvm::Value* cntxt, llvm::Value* result) {
+        llvm::CallInst* ins = llvm::CallInst::Create(b.intrinsic<EndClosureContext>(), arguments(cntxt, result), "", b);
         b.markSafepoint(ins);
-        EndClosureContext* result = new EndClosureContext(ins);
-        return result;
+        return new EndClosureContext(ins);
     }
 
     static char const* intrinsicName() { return "endClosureContext"; }
@@ -39,6 +30,15 @@ class EndClosureContext : public PrimitiveCall {
     static bool classof(Pattern const* s) {
         return s->getKind() == Kind::EndClosureContext;
     }
+
+private:
+    static std::vector<llvm::Value *> arguments(llvm::Value * cntxt, llvm::Value * result) {
+        std::vector<llvm::Value*> args_;
+        args_.push_back(cntxt);
+        args_.push_back(result);
+        return args_;
+    }
+
 };
 
 class ClosureQuickArgumentAdaptor : public PrimitiveCall {
