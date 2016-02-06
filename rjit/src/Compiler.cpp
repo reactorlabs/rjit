@@ -585,8 +585,8 @@ Value* Compiler::compileForLoop(SEXP ast) {
     PHINode* control = PHINode::Create(t::Int, 2, "loopControl", b.block());
     control->addIncoming(b.integer(0), forStart);
     // now check if control is smaller than length
-    ICmpInst* test = ir::UnsignedIntegerLessThan::create(b, control, seqLength);
-    BranchInst::Create(forBody, b.breakTarget(), test, b.block());
+    auto test = ir::UnsignedIntegerLessThan::create(b, control, seqLength);
+    BranchInst::Create(forBody, b.breakTarget(), test->result(), b.block());
 
     // move to the for loop body, where we have to set the control variable
     // properly
@@ -715,12 +715,12 @@ Value* Compiler::compileSwitch(SEXP call) {
 
     ir::CheckSwitchControl::create(b, control, call);
     Value* ctype = ir::SexpType::create(b, control)->result();
-    ICmpInst* cond = ir::IntegerEquals::create(b, ctype, b.integer(STRSXP));
+    auto cond = ir::IntegerEquals::create(b, ctype, b.integer(STRSXP));
     BasicBlock* switchIntegral = b.createBasicBlock("switchIntegral");
     BasicBlock* switchCharacter = b.createBasicBlock("switchCharacter");
     BasicBlock* switchNext = b.createBasicBlock("switchNext");
 
-    BranchInst::Create(switchCharacter, switchIntegral, cond, b.block());
+    BranchInst::Create(switchCharacter, switchIntegral, cond->result(), b.block());
 
     // integral switch is simple
     b.setBlock(switchIntegral);
