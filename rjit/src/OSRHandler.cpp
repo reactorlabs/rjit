@@ -7,13 +7,8 @@ namespace osr {
 
 /*      Initialize static variables     */
 OSRHandler OSRHandler::instance;
-uint64_t OSRHandler::id = 0;
 std::map<SEXP, SEXP> OSRHandler::baseVersions;
-std::map<Function*, std::list<Function*>> OSRHandler::instruments;
-std::map<Function*, Function*> OSRHandler::toBase;
 std::map<std::pair<Function*, Function*>, StateMap*> OSRHandler::transitiveMaps;
-std::map<uint64_t, Function*> OSRHandler::exits;
-
 /******************************************************************************/
 /*                        Public functions                                    */
 /******************************************************************************/
@@ -22,7 +17,6 @@ Function* OSRHandler::setupOpt(Function* base) {
 
     // Generate a new clone of the function that we can modify.
     auto toOpt = StateMap::generateIdentityMapping(base);
-    toBase[toOpt.first] = base;
 
     // Add the function to the module.
     base->getParent()->getFunctionList().push_back(toOpt.first);
@@ -32,7 +26,6 @@ Function* OSRHandler::setupOpt(Function* base) {
 
 Function* OSRHandler::getToInstrument(Function* base) {
     auto toInstrument = StateMap::generateIdentityMapping(base);
-    (instruments[base]).push_back(toInstrument.first);
 
     auto transitiveKey =
         std::pair<Function*, Function*>(base, toInstrument.first);
@@ -45,8 +38,8 @@ Function* OSRHandler::getToInstrument(Function* base) {
 }
 
 std::pair<Function*, Function*>
-OSRHandler::insertOSR(Function* opt, Function* instrument, Instruction* src,
-                      Instruction* pad, Inst_Vector* cond) {
+OSRHandler::insertOSRExit(Function* opt, Function* instrument, Instruction* src,
+                          Inst_Vector* cond, Inst_Vector* compensation) {
     StateMap* F2NewToF2Map = nullptr;
     OSRLibrary::OSRPointConfig configuration(
         false /*verbose*/, true /*updateF1*/, -1 /*branch taken prob*/,
@@ -60,13 +53,17 @@ OSRHandler::insertOSR(Function* opt, Function* instrument, Instruction* src,
         transitiveMaps[std::pair<Function*, Function*>(opt, instrument)];
     assert(transitive && "No transitive map registered for this pair.");
     Instruction* lPad = dynamic_cast<Instruction*>(
-        transitive->getCorrespondingOneToOneValue(pad));
+        transitive->getCorrespondingOneToOneValue(src));
     assert(lPad && "The landing pad could not be found.");
 
     auto res = OSRLibrary::insertResolvedOSR(getGlobalContext(), *opt, *src,
                                              *instrument, *lPad, *cond,
                                              *transitive, configuration);
-    exits[++id] = instrument;
+    if (compensation) {
+        for (auto it = compensation->begin(); it != compensation->end(); ++it)
+            (*it)->insertBefore(&(res.second->getEntryBlock().back()));
+    }
+
     // Printing
     res.first->dump();
     res.second->dump();
@@ -128,15 +125,10 @@ bool OSRHandler::baseVersionContains(SEXP key) {
     return baseVersions.find(key) != baseVersions.end();
 }
 
-uint64_t OSRHandler::getId() { return id; }
-
-Function* OSRHandler::getExit(uint64_t idx) { return exits[idx]; }
-
 SEXP OSRHandler::cloneSEXP(SEXP func, Function* llvm) {
     SEXP result = CONS(nullptr, CDR(func));
     SET_TAG(result, reinterpret_cast<SEXP>(llvm));
     SET_TYPEOF(result, NATIVESXP);
-    // TODO it is not in the relocations for the moment !!!
     return result;
 }
 

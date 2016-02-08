@@ -20,11 +20,14 @@ class OSRInliner {
 
     SEXP inlineCalls(SEXP f);
 
+    static std::map<uint64_t, SEXP> exits;
+
   private:
     rjit::Compiler* c;
     Function* closureQuickArgumentAdaptor;
     Function* CONS_NR;
     Function* fixClosure;
+    static uint64_t id;
 
     static void setCP(SEXP firstP, SEXP secondP);
 
@@ -50,7 +53,7 @@ class OSRInliner {
     static Inst_Vector* getTrueCondition();
     static Inst_Vector* getOSRCondition(FunctionCall* fc);
     CallInst* createNewRho(FunctionCall* fc);
-    void insertFixClosureCall(Function* f);
+    Inst_Vector* createCompensation(SEXP fun, SEXP formals);
 };
 
 } // namespace osr

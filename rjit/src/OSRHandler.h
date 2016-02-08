@@ -19,24 +19,9 @@ class OSRHandler : public OSRLibrary {
   public:
     static std::map<SEXP, SEXP> baseVersions;
     /**
-     * Map from base function to instrumented
-     */
-    static std::map<Function*, std::list<Function*>> instruments;
-
-    /**
-     * Map from version to base.
-     */
-    static std::map<Function*, Function*> toBase;
-
-    /**
      * Map from a function pair <toOpt, toInstrument> to their statemaps.
      */
     static std::map<std::pair<Function*, Function*>, StateMap*> transitiveMaps;
-
-    /**
-     * Map that keeps a reference to the exit functions.TODO
-     */
-    static std::map<uint64_t, Function*> exits;
 
     /**
      * @brief      Returns the singleton of the OSRHandler.
@@ -63,21 +48,9 @@ class OSRHandler : public OSRLibrary {
      */
     static Function* getToInstrument(Function* base);
 
-    static Function* getExit(uint64_t id);
-
-    /**
-     * @brief      Inserts an osr exit in opt to instrument.
-     *
-     * @param      opt         Optimized function (e.g., source).
-     * @param      instrument  Continuation function.
-     * @param      src         Where to put the exit condition.
-     * @param      pad         Point in opt that corresponds to landing pad in
-     * instrument.
-     * @param      cond        OSR condition.
-     */
     static std::pair<Function*, Function*>
-    insertOSR(Function* opt, Function* instrument, Instruction* src,
-              Instruction* pad, Inst_Vector* cond);
+    insertOSRExit(Function* opt, Function* instrument, Instruction* src,
+                  Inst_Vector* cond, Inst_Vector* compensation = nullptr);
 
     static uint64_t getId();
 
@@ -97,6 +70,8 @@ class OSRHandler : public OSRLibrary {
     static SEXP getFreshIR(SEXP closure, rjit::Compiler* c,
                            bool compile = true);
 
+    static SEXP cloneSEXP(SEXP func, Function* llvm);
+
   private:
     static OSRHandler instance;
     static uint64_t id;
@@ -105,7 +80,6 @@ class OSRHandler : public OSRLibrary {
     // static bool existInstrument(Function* f);
     static bool transContains(std::pair<Function*, Function*> key);
     static bool baseVersionContains(SEXP key);
-    static SEXP cloneSEXP(SEXP func, Function* llvm);
 };
 
 } // namespace osr
