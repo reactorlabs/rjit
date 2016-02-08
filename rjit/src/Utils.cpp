@@ -20,6 +20,7 @@
 
 #include "OSRHandler.h"
 #include "OSRInliner.h"
+#include "StateMap.hpp"
 
 using namespace rjit;
 namespace osr {
@@ -35,5 +36,20 @@ REXPORT SEXP printWithoutSP(SEXP expr) {
 REXPORT SEXP printFormals(SEXP f) {
     SEXP res = FORMALS(f);
     return res;
+}
+
+REXPORT SEXP testme(SEXP expr) {
+    Compiler c("module");
+    /*SEXP result = c.compile("rfunction", BODY(expr), FORMALS(expr));
+    auto test = StateMap::generateIdentityMapping(GET_LLVM(result));
+    //test.first->removeFromParent();
+    (GET_LLVM(result))->getParent()->getFunctionList().push_back(test.first);
+    FunctionCall::fixIcStubs(test.first);
+    c.jitAll();
+    test.first->dump();*/
+    SEXP result = OSRHandler::getFreshIR(expr, &c, true);
+    FunctionCall::fixIcStubs(GET_LLVM(result));
+    c.jitAll();
+    return result;
 }
 }

@@ -20,6 +20,9 @@ class JITModule : public llvm::Module {
     SEXP constPool(llvm::Function* f);
     SEXP formals(llvm::Function* f);
 
+    // TODO aghosn
+    void fixRelocations(SEXP formals, SEXP fun, llvm::Function* f);
+
   private:
     /** List of relocations to be done when compiling.
 

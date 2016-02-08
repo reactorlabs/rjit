@@ -84,3 +84,11 @@ jit.testOSR <- function(what, whut, env=environment(what)) {
        stop("Only bytecode expressions and asts can be jitted.")
     }
 }
+
+jit.testme <- function(what) {
+    res = .Call("testme", what)
+    result = .Internal(bcClose(formals(what), res, environment(what)))
+    result
+}
+
+

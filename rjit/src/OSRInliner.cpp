@@ -4,7 +4,6 @@
 #include <llvm/IR/BasicBlock.h>
 #include <string>
 #include "api.h"
-#include <cstdint>
 #include "ir/Builder.h"
 
 using namespace llvm;
@@ -292,18 +291,6 @@ CallInst* OSRInliner::createNewRho(FunctionCall* fc) {
     auto res = CallInst::Create(closureQuickArgumentAdaptor, f_args, "");
     res->insertBefore(fc->getIcStub());
     return res;
-}
-// AND IN LLVM MODULE !!!!!!!!!!!!
-
-SEXP OSRInliner::compile(SEXP body, SEXP formals, SEXP env) {
-    /*   SEXP result = nullptr;
-       if (OSR_INLINE && env == R_GlobalEnv) {
-           result = this->inlineCalls(body, formals, env);
-       } else {
-           result = c->compile("inner", body, formals);
-       }
-       return result;*/
-    return body;
 }
 
 void OSRInliner::insertFixClosureCall(Function* f) {
