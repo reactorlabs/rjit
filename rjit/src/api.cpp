@@ -119,6 +119,6 @@ REXPORT SEXP jitEnable(SEXP expression) {
 // TODO aghosn
 REXPORT void fixClosure(uint64_t bim) {
     printf("I'am here %d\n", (int)bim);
-    auto f = osr::OSRHandler::getExit(bim);
-    f->dump();
+    auto f = osr::OSRInliner::exits[bim];
+    GET_LLVM(f)->dump();
 }
