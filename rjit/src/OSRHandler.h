@@ -4,15 +4,20 @@
 #include "llvm.h"
 #include <list>
 #include "OSRLibrary.hpp"
+#include "Compiler.h"
+#include <Rinternals.h>
 
 using namespace llvm;
 namespace osr {
 
 #define GET_LLVM(sexp) (reinterpret_cast<llvm::Function*>(TAG(sexp)))
 typedef std::vector<Instruction*> Inst_Vector;
+typedef std::pair<Function*, Function*> OSRPair;
+typedef std::pair<SEXP, Function*> SEXPFunc;
 
 class OSRHandler : public OSRLibrary {
   public:
+    static std::map<SEXP, SEXP> baseVersions;
     /**
      * Map from base function to instrumented
      */
@@ -89,6 +94,9 @@ class OSRHandler : public OSRLibrary {
      */
     static void removeEntry(Function* opt, Function* instrument, Value* val);
 
+    static SEXP getFreshIR(SEXP closure, rjit::Compiler* c,
+                           bool compile = true);
+
   private:
     static OSRHandler instance;
     static uint64_t id;
@@ -96,6 +104,8 @@ class OSRHandler : public OSRLibrary {
     OSRHandler() {}
     // static bool existInstrument(Function* f);
     static bool transContains(std::pair<Function*, Function*> key);
+    static bool baseVersionContains(SEXP key);
+    static SEXP cloneSEXP(SEXP func, Function* llvm);
 };
 
 } // namespace osr

@@ -8,6 +8,7 @@ namespace osr {
 /*      Initialize static variables     */
 OSRHandler OSRHandler::instance;
 uint64_t OSRHandler::id = 0;
+std::map<SEXP, SEXP> OSRHandler::baseVersions;
 std::map<Function*, std::list<Function*>> OSRHandler::instruments;
 std::map<Function*, Function*> OSRHandler::toBase;
 std::map<std::pair<Function*, Function*>, StateMap*> OSRHandler::transitiveMaps;
@@ -81,6 +82,40 @@ void OSRHandler::removeEntry(Function* opt, Function* instrument, Value* val) {
     map->unregisterOneToOneValue(bidirect);
 }
 
+SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
+    assert(TYPEOF(closure) == CLOSXP && "getFreshIR requires a closure.");
+
+    SEXP body = BODY(closure);
+    SEXP func = R_NilValue;
+
+    if (TYPEOF(body) == NATIVESXP &&
+        GET_LLVM(body)->getParent() == c->getBuilder()->module())
+        func = body;
+    else {
+        if (!baseVersionContains(closure)) {
+            // Setup the copy.
+            func = c->compile("rfunction", body, FORMALS(closure));
+            Function* clone =
+                StateMap::generateIdentityMapping(GET_LLVM(func)).first;
+            baseVersions[closure] = cloneSEXP(func, clone);
+            assert(baseVersionContains(closure));
+        }
+
+        SEXP entry = baseVersions[closure];
+        Function* workingCopy =
+            StateMap::generateIdentityMapping(GET_LLVM(entry)).first;
+
+        func = cloneSEXP(entry, workingCopy);
+        // Adding the result to the relocations.
+        if (compile) {
+            c->getBuilder()->module()->getFunctionList().push_back(workingCopy);
+            c->getBuilder()->module()->fixRelocations(FORMALS(closure), func,
+                                                      workingCopy);
+        }
+    }
+    return func;
+}
+
 /******************************************************************************/
 /*                        Private functions                                   */
 /******************************************************************************/
@@ -89,8 +124,20 @@ bool OSRHandler::transContains(std::pair<Function*, Function*> key) {
     return transitiveMaps.find(key) != transitiveMaps.end();
 }
 
+bool OSRHandler::baseVersionContains(SEXP key) {
+    return baseVersions.find(key) != baseVersions.end();
+}
+
 uint64_t OSRHandler::getId() { return id; }
 
 Function* OSRHandler::getExit(uint64_t idx) { return exits[idx]; }
+
+SEXP OSRHandler::cloneSEXP(SEXP func, Function* llvm) {
+    SEXP result = CONS(nullptr, CDR(func));
+    SET_TAG(result, reinterpret_cast<SEXP>(llvm));
+    SET_TYPEOF(result, NATIVESXP);
+    // TODO it is not in the relocations for the moment !!!
+    return result;
+}
 
 } // namespace osr

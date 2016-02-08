@@ -29,3 +29,8 @@ void JITModule::finalizeNativeSEXPs(llvm::ExecutionEngine* engine) {
         SETCAR(s, reinterpret_cast<SEXP>(fp));
     }
 }
+
+void JITModule::fixRelocations(SEXP formals, SEXP fun, llvm::Function* f) {
+    formals_[f] = formals;
+    relocations[f] = fun;
+}

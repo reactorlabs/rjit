@@ -22,6 +22,9 @@ class JITModule : public llvm::Module {
         return formals_.count(f) ? formals_.at(f) : R_NilValue;
     }
 
+    // TODO aghosn
+    void fixRelocations(SEXP formals, SEXP fun, llvm::Function* f);
+
   private:
     /** List of relocations to be done when compiling.
 
