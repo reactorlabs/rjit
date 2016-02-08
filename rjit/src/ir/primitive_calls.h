@@ -15,10 +15,16 @@ class EndClosureContext : public PrimitiveCall {
     EndClosureContext(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::EndClosureContext) {}
 
-    static EndClosureContext* create(Builder& b, llvm::Value* cntxt, llvm::Value* result) {
+    static EndClosureContext* create(Builder& b, ir::Value cntxt, ir::Value result) {
         llvm::CallInst* ins = llvm::CallInst::Create(b.intrinsic<EndClosureContext>(), arguments(cntxt, result), "", b);
         b.markSafepoint(ins);
         return new EndClosureContext(ins);
+    }
+
+    static EndClosureContext* insertBefore(llvm::Instruction * ins, ir::Value cntxt, ir::Value result) {
+        llvm::CallInst* i = llvm::CallInst::Create(primitiveFunction<EndClosureContext>(ins->getModule()), arguments(cntxt, result), "", ins);
+        Builder::markSafepoint(i);
+        return new EndClosureContext(i);
     }
 
     static char const* intrinsicName() { return "endClosureContext"; }
@@ -65,6 +71,22 @@ class ClosureQuickArgumentAdaptor : public PrimitiveCall {
         return result;
     }
 
+    static ClosureQuickArgumentAdaptor* insertBefore(llvm::Instruction * ins, ir::Value op,
+                                               ir::Value arglis) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(op);
+        args_.push_back(arglis);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<ClosureQuickArgumentAdaptor>(ins->getModule()), args_, "", ins);
+
+        Builder::markSafepoint(i);
+        ClosureQuickArgumentAdaptor* result =
+            new ClosureQuickArgumentAdaptor(i);
+        return result;
+    }
+
     static char const* intrinsicName() { return "closureQuickArgumentAdaptor"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -95,6 +117,21 @@ class CallNative : public PrimitiveCall {
 
         b.markSafepoint(ins);
         CallNative* result = new CallNative(ins);
+        return result;
+    }
+
+    static CallNative* insertBefore(llvm::Instruction* ins, ir::Value native,
+                              ir::Value rho) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(native);
+        args_.push_back(rho);
+
+        llvm::CallInst* i =
+            llvm::CallInst::Create(primitiveFunction<CallNative>(ins->getModule()), args_, "", ins);
+
+        Builder::markSafepoint(i);
+        CallNative* result = new CallNative(i);
         return result;
     }
 
@@ -133,6 +170,21 @@ class ClosureNativeCallTrampoline : public PrimitiveCall {
         ClosureNativeCallTrampoline* result =
             new ClosureNativeCallTrampoline(ins);
         return result;
+    }
+
+    static ClosureNativeCallTrampoline* create(llvm::Instruction * ins, ir::Value cntxt,
+                                               ir::Value native,
+                                               ir::Value rh) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(cntxt);
+        args_.push_back(native);
+        args_.push_back(rh);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<ClosureNativeCallTrampoline>(ins->getModule()), args_, "", ins);
+
+        return new ClosureNativeCallTrampoline(i);
     }
 
     static char const* intrinsicName() { return "closureNativeCallTrampoline"; }
@@ -181,6 +233,34 @@ class ConvertToLogicalNoNA : public PrimitiveCall {
         return result;
     }
 
+    static ConvertToLogicalNoNA * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value constantPool,
+            ir::Value what,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(what);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<ConvertToLogicalNoNA>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new ConvertToLogicalNoNA(i);
+    }
+
+    static ConvertToLogicalNoNA * insertBefore(Pattern * p,
+            ir::Value what,
+            ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),what,constantPool,call);
+    }
+
     static char const* intrinsicName() { return "convertToLogicalNoNA"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -210,6 +290,28 @@ class PrintValue : public PrimitiveCall {
         b.markSafepoint(ins);
         PrintValue* result = new PrintValue(ins);
         return result;
+    }
+
+    static PrintValue * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value value) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(value);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<PrintValue>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new PrintValue(i);
+    }
+
+    static PrintValue * insertBefore(Pattern * p,
+            ir::Value value) {
+        return insertBefore(p->first(),value);
     }
 
     static char const* intrinsicName() { return "printValue"; }
@@ -246,6 +348,32 @@ class StartFor : public PrimitiveCall {
         StartFor* result = new StartFor(ins);
         return result;
     }
+
+    static StartFor * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value seq,
+            ir::Value rho) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(seq);
+        args_.push_back(rho);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<StartFor>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new StartFor(i);
+    }
+
+    static StartFor * insertBefore(Pattern * p,
+            ir::Value seq,
+            ir::Value rho) {
+        return insertBefore(p->first(),seq,rho);
+    }
+
 
     static char const* intrinsicName() { return "startFor"; }
 
@@ -291,6 +419,35 @@ class LoopSequenceLength : public PrimitiveCall {
         return result;
     }
 
+    static LoopSequenceLength * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value seq,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(seq);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<LoopSequenceLength>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new LoopSequenceLength(i);
+    }
+
+    static LoopSequenceLength * insertBefore(Pattern * p,
+            ir::Value seq,
+            ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),seq,constantPool,call);
+    }
+
+
     static char const* intrinsicName() { return "loopSequenceLength"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -328,6 +485,32 @@ class GetForLoopValue : public PrimitiveCall {
         return result;
     }
 
+    static GetForLoopValue * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value seq,
+            ir::Value index) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(seq);
+        args_.push_back(index);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GetForLoopValue>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GetForLoopValue(i);
+    }
+
+    static GetForLoopValue * insertBefore(Pattern * p,
+            ir::Value seq,
+            ir::Value index) {
+        return insertBefore(p->first(),seq,index);
+    }
+
+
     static char const* intrinsicName() { return "getForLoopValue"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -354,6 +537,25 @@ class MarkVisible : public PrimitiveCall {
         b.markSafepoint(ins);
         MarkVisible* result = new MarkVisible(ins);
         return result;
+    }
+
+    static MarkVisible * insertBefore (
+            llvm::Instruction * ins) {
+
+        std::vector<llvm::Value*> args_;
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<MarkVisible>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new MarkVisible(i);
+    }
+
+    static MarkVisible * insertBefore(Pattern * p) {
+        return insertBefore(p->first());
     }
 
     static char const* intrinsicName() { return "markVisible"; }
@@ -385,6 +587,26 @@ class MarkInvisible : public PrimitiveCall {
         MarkInvisible* result = new MarkInvisible(ins);
         return result;
     }
+
+    static MarkInvisible * insertBefore (
+            llvm::Instruction * ins) {
+
+        std::vector<llvm::Value*> args_;
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<MarkInvisible>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new MarkInvisible(i);
+    }
+
+    static MarkInvisible * insertBefore(Pattern * p) {
+        return insertBefore(p->first());
+    }
+
 
     static char const* intrinsicName() { return "markInvisible"; }
 
@@ -431,6 +653,32 @@ class UserLiteral : public PrimitiveCall {
         return result;
     }
 
+    static UserLiteral * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value constantPool,
+            ir::Value index) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(constantPool);
+        args_.push_back(index);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<UserLiteral>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new UserLiteral(i);
+    }
+
+    static UserLiteral * insertBefore(Pattern * p,
+            ir::Value constantPool,
+            ir::Value index) {
+        return insertBefore(p->first(),constantPool,index);
+    }
+
+
     static char const* intrinsicName() { return "userLiteral"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -460,6 +708,21 @@ class PatchIC : public PrimitiveCall {
         b.markSafepoint(ins);
         PatchIC* result = new PatchIC(ins);
         return result;
+    }
+
+    static PatchIC* insertBefore(llvm::Instruction * ins, ir::Value addr,
+                           ir::Value stackmapId, ir::Value caller) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(addr);
+        args_.push_back(stackmapId);
+        args_.push_back(caller);
+
+        llvm::CallInst* i =
+            llvm::CallInst::Create(primitiveFunction<PatchIC>(ins->getModule()), args_, "", ins);
+
+        Builder::markSafepoint(i);
+        return new PatchIC(ins);
     }
 
     static char const* intrinsicName() { return "patchIC"; }
@@ -640,6 +903,30 @@ class Constant : public PrimitiveCall {
         return result;
     }
 
+    static Constant * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value constantPool,
+            ir::Value index) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(constantPool);
+        args_.push_back(index);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<Constant>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new Constant(i);
+    }
+
+    static Constant * insertBefore(Pattern * p,
+            ir::Value constantPool, ir::Value index) {
+        return insertBefore(p->first(),constantPool, index);
+    }
+
     static char const* intrinsicName() { return "constant"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -683,6 +970,34 @@ class GenericGetVar : public PrimitiveCall {
         b.markSafepoint(ins);
         GenericGetVar* result = new GenericGetVar(ins);
         return result;
+    }
+
+    static GenericGetVar * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value symbol) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(symbol);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericGetVar>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericGetVar(i);
+    }
+
+    static GenericGetVar * insertBefore(Pattern * p,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value symbol) {
+        return insertBefore(p->first(),rho,constantPool,symbol);
     }
 
     static char const* intrinsicName() { return "genericGetVar"; }
@@ -729,6 +1044,35 @@ class GenericGetEllipsisArg : public PrimitiveCall {
         return result;
     }
 
+    static GenericGetEllipsisArg * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value symbol) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(symbol);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericGetEllipsisArg>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericGetEllipsisArg(i);
+    }
+
+    static GenericGetEllipsisArg * insertBefore(Pattern * p,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value symbol) {
+        return insertBefore(p->first(),rho,constantPool,symbol);
+    }
+
+
     static char const* intrinsicName() { return "genericGetEllipsisArg"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -773,6 +1117,37 @@ class GenericSetVar : public PrimitiveCall {
         b.markSafepoint(ins);
         GenericSetVar* result = new GenericSetVar(ins);
         return result;
+    }
+
+    static GenericSetVar * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value value,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value symbol) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(value);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(symbol);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericSetVar>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericSetVar(i);
+    }
+
+    static GenericSetVar * insertBefore(Pattern * p,
+            ir::Value value,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value symbol) {
+        return insertBefore(p->first(),value,rho,constantPool,symbol);
     }
 
     static char const* intrinsicName() { return "genericSetVar"; }
@@ -821,6 +1196,38 @@ class GenericSetVarParent : public PrimitiveCall {
         return result;
     }
 
+    static GenericSetVarParent * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value value,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value symbol) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(value);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(symbol);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericSetVarParent>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericSetVarParent(i);
+    }
+
+    static GenericSetVarParent * insertBefore(Pattern * p,
+            ir::Value value,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value symbol) {
+        return insertBefore(p->first(),value,rho,constantPool,symbol);
+    }
+
+
     static char const* intrinsicName() { return "genericSetVarParent"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -864,6 +1271,35 @@ class GetFunction : public PrimitiveCall {
         return result;
     }
 
+    static GetFunction * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value symbol) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(symbol);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GetFunction>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GetFunction(i);
+    }
+
+    static GetFunction * insertBefore(Pattern * p,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value symbol) {
+        return insertBefore(p->first(),rho,constantPool,symbol);
+    }
+
+
     static char const* intrinsicName() { return "getFunction"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -905,6 +1341,32 @@ class GetGlobalFunction : public PrimitiveCall {
         return result;
     }
 
+    static GetGlobalFunction * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value constantPool,
+            ir::Value symbol) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(constantPool);
+        args_.push_back(symbol);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GetGlobalFunction>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GetGlobalFunction(i);
+    }
+
+    static GetGlobalFunction * insertBefore(Pattern * p,
+            ir::Value constantPool,
+            ir::Value symbol) {
+        return insertBefore(p->first(),constantPool,symbol);
+    }
+
+
     static char const* intrinsicName() { return "getGlobalFunction"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -945,6 +1407,32 @@ class GetSymFunction : public PrimitiveCall {
         return result;
     }
 
+    static GetSymFunction * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value constantPool,
+            ir::Value name) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(constantPool);
+        args_.push_back(name);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GetSymFunction>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GetSymFunction(i);
+    }
+
+    static GetSymFunction * insertBefore(Pattern * p,
+            ir::Value constantPool,
+            ir::Value name) {
+        return insertBefore(p->first(),constantPool,name);
+    }
+
+
     static char const* intrinsicName() { return "getSymFunction"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -984,6 +1472,32 @@ class GetBuiltinFunction : public PrimitiveCall {
         GetBuiltinFunction* result = new GetBuiltinFunction(ins);
         return result;
     }
+
+    static GetBuiltinFunction * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value constantPool,
+            ir::Value name) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(constantPool);
+        args_.push_back(name);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GetBuiltinFunction>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GetBuiltinFunction(i);
+    }
+
+    static GetBuiltinFunction * insertBefore(Pattern * p,
+            ir::Value constantPool,
+            ir::Value name) {
+        return insertBefore(p->first(),constantPool,name);
+    }
+
 
     static char const* intrinsicName() { return "getBuiltinFunction"; }
 
@@ -1026,6 +1540,32 @@ class GetInternalBuiltinFunction : public PrimitiveCall {
         return result;
     }
 
+    static GetInternalBuiltinFunction * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value constantPool,
+            ir::Value name) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(constantPool);
+        args_.push_back(name);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GetInternalBuiltinFunction>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GetInternalBuiltinFunction(i);
+    }
+
+    static GetInternalBuiltinFunction * insertBefore(Pattern * p,
+            ir::Value constantPool,
+            ir::Value name) {
+        return insertBefore(p->first(),constantPool,name);
+    }
+
+
     static char const* intrinsicName() { return "getInternalBuiltinFunction"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -1055,6 +1595,28 @@ class CheckFunction : public PrimitiveCall {
         b.markSafepoint(ins);
         CheckFunction* result = new CheckFunction(ins);
         return result;
+    }
+
+    static CheckFunction * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value f) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(f);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<CheckFunction>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new CheckFunction(i);
+    }
+
+    static CheckFunction * insertBefore(Pattern * p,
+            ir::Value f) {
+        return insertBefore(p->first(),f);
     }
 
     static char const* intrinsicName() { return "checkFunction"; }
@@ -1093,6 +1655,31 @@ class CreatePromise : public PrimitiveCall {
         return result;
     }
 
+    static CreatePromise * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value fun,
+            ir::Value rho) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(fun);
+        args_.push_back(rho);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<CreatePromise>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new CreatePromise(i);
+    }
+
+    static CreatePromise * insertBefore(Pattern * p,
+            ir::Value fun,
+            ir::Value rho) {
+        return insertBefore(p->first(),fun,rho);
+    }
+
     static char const* intrinsicName() { return "createPromise"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -1123,6 +1710,28 @@ class SexpType : public PrimitiveCall {
         b.markSafepoint(ins);
         SexpType* result = new SexpType(ins);
         return result;
+    }
+
+    static SexpType * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value value) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(value);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<SexpType>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new SexpType(i);
+    }
+
+    static SexpType * insertBefore(Pattern * p,
+            ir::Value value) {
+        return insertBefore(p->first(),value);
     }
 
     static char const* intrinsicName() { return "sexpType"; }
@@ -1157,6 +1766,30 @@ class AddArgument : public PrimitiveCall {
         b.markSafepoint(ins);
         AddArgument* result = new AddArgument(ins);
         return result;
+    }
+    static AddArgument * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value args,
+            ir::Value arg) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(args);
+        args_.push_back(arg);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<AddArgument>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new AddArgument(i);
+    }
+
+    static AddArgument * insertBefore(Pattern * p,
+            ir::Value args,
+            ir::Value arg) {
+        return insertBefore(p->first(),args,arg);
     }
 
     static char const* intrinsicName() { return "addArgument"; }
@@ -1193,6 +1826,34 @@ class AddKeywordArgument : public PrimitiveCall {
         b.markSafepoint(ins);
         AddKeywordArgument* result = new AddKeywordArgument(ins);
         return result;
+    }
+
+    static AddKeywordArgument * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value args,
+            ir::Value arg,
+            ir::Value name) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(args);
+        args_.push_back(arg);
+        args_.push_back(name);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<AddKeywordArgument>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new AddKeywordArgument(i);
+    }
+
+    static AddKeywordArgument * insertBefore(Pattern * p,
+            ir::Value args,
+            ir::Value arg,
+            ir::Value name) {
+        return insertBefore(p->first(),args,arg,name);
     }
 
     static char const* intrinsicName() { return "addKeywordArgument"; }
@@ -1233,6 +1894,34 @@ class AddEllipsisArgumentHead : public PrimitiveCall {
         return result;
     }
 
+    static AddEllipsisArgumentHead * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value args,
+            ir::Value rho,
+            ir::Value eager) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(args);
+        args_.push_back(rho);
+        args_.push_back(eager);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<AddEllipsisArgumentHead>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new AddEllipsisArgumentHead(i);
+    }
+
+    static AddEllipsisArgumentHead * insertBefore(Pattern * p,
+            ir::Value args,
+            ir::Value rho,
+            ir::Value eager) {
+        return insertBefore(p->first(),args,rho,eager);
+    }
+
     static char const* intrinsicName() { return "addEllipsisArgumentHead"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -1269,6 +1958,34 @@ class AddEllipsisArgumentTail : public PrimitiveCall {
         b.markSafepoint(ins);
         AddEllipsisArgumentTail* result = new AddEllipsisArgumentTail(ins);
         return result;
+    }
+
+    static AddEllipsisArgumentTail * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value args,
+            ir::Value rho,
+            ir::Value eager) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(args);
+        args_.push_back(rho);
+        args_.push_back(eager);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<AddEllipsisArgumentTail>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new AddEllipsisArgumentTail(i);
+    }
+
+    static AddEllipsisArgumentTail * insertBefore(Pattern * p,
+            ir::Value args,
+            ir::Value rho,
+            ir::Value eager) {
+        return insertBefore(p->first(),args,rho,eager);
     }
 
     static char const* intrinsicName() { return "addEllipsisArgumentTail"; }
@@ -1311,6 +2028,37 @@ class CallBuiltin : public PrimitiveCall {
         return result;
     }
 
+    static CallBuiltin * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value call,
+            ir::Value closure,
+            ir::Value arguments,
+            ir::Value rho) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(call);
+        args_.push_back(closure);
+        args_.push_back(arguments);
+        args_.push_back(rho);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<CallBuiltin>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new CallBuiltin(i);
+    }
+
+    static CallBuiltin * insertBefore(Pattern * p,
+            ir::Value call,
+            ir::Value closure,
+            ir::Value arguments,
+            ir::Value rho) {
+        return insertBefore(p->first(),call,closure,arguments,rho);
+    }
+
     static char const* intrinsicName() { return "callBuiltin"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -1349,6 +2097,36 @@ class CallSpecial : public PrimitiveCall {
         b.markSafepoint(ins);
         CallSpecial* result = new CallSpecial(ins);
         return result;
+    }
+    static CallSpecial * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value call,
+            ir::Value closure,
+            ir::Value arguments,
+            ir::Value rho) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(call);
+        args_.push_back(closure);
+        args_.push_back(arguments);
+        args_.push_back(rho);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<CallSpecial>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new CallSpecial(i);
+    }
+
+    static CallSpecial * insertBefore(Pattern * p,
+            ir::Value call,
+            ir::Value closure,
+            ir::Value arguments,
+            ir::Value rho) {
+        return insertBefore(p->first(),call,closure,arguments,rho);
     }
 
     static char const* intrinsicName() { return "callSpecial"; }
@@ -1390,6 +2168,38 @@ class CallClosure : public PrimitiveCall {
         CallClosure* result = new CallClosure(ins);
         return result;
     }
+
+    static CallClosure * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value call,
+            ir::Value closure,
+            ir::Value arguments,
+            ir::Value rho) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(call);
+        args_.push_back(closure);
+        args_.push_back(arguments);
+        args_.push_back(rho);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<CallClosure>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new CallClosure(i);
+    }
+
+    static CallClosure * insertBefore(Pattern * p,
+            ir::Value call,
+            ir::Value closure,
+            ir::Value arguments,
+            ir::Value rho) {
+        return insertBefore(p->first(),call,closure,arguments,rho);
+    }
+
 
     static char const* intrinsicName() { return "callClosure"; }
 
@@ -1444,6 +2254,37 @@ class CreateClosure : public PrimitiveCall {
         return result;
     }
 
+    static CreateClosure * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value forms,
+            ir::Value body) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(forms);
+        args_.push_back(body);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<CreateClosure>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new CreateClosure(i);
+    }
+
+    static CreateClosure * insertBefore(Pattern * p,
+            ir::Value rho,
+                                        ir::Value constantPool,
+            ir::Value forms,
+            ir::Value body) {
+        return insertBefore(p->first(),rho,constantPool,forms,body);
+    }
+
     static char const* intrinsicName() { return "createClosure"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -1490,6 +2331,37 @@ class GenericUnaryMinus : public PrimitiveCall {
         return result;
     }
 
+    static GenericUnaryMinus * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value op,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(op);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericUnaryMinus>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericUnaryMinus(i);
+    }
+
+    static GenericUnaryMinus * insertBefore(Pattern * p,
+            ir::Value op,
+            ir::Value rho,
+                                            ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),op,rho,constantPool,call);
+    }
+
     static char const* intrinsicName() { return "genericUnaryMinus"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -1534,6 +2406,37 @@ class GenericUnaryPlus : public PrimitiveCall {
         b.markSafepoint(ins);
         GenericUnaryPlus* result = new GenericUnaryPlus(ins);
         return result;
+    }
+
+    static GenericUnaryPlus * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value op,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(op);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericUnaryPlus>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericUnaryPlus(i);
+    }
+
+    static GenericUnaryPlus * insertBefore(Pattern * p,
+            ir::Value op,
+            ir::Value rho,
+                                           ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),op,rho,constantPool,call);
     }
 
     static char const* intrinsicName() { return "genericUnaryPlus"; }
@@ -1583,6 +2486,40 @@ class GenericAdd : public PrimitiveCall {
         return result;
     }
 
+    static GenericAdd * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericAdd>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericAdd(i);
+    }
+
+    static GenericAdd * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                     ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
     static char const* intrinsicName() { return "genericAdd"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -1629,6 +2566,41 @@ class GenericSub : public PrimitiveCall {
         GenericSub* result = new GenericSub(ins);
         return result;
     }
+
+    static GenericSub * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericSub>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericSub(i);
+    }
+
+    static GenericSub * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                     ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
 
     static char const* intrinsicName() { return "genericSub"; }
 
@@ -1677,6 +2649,41 @@ class GenericMul : public PrimitiveCall {
         return result;
     }
 
+    static GenericMul * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericMul>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericMul(i);
+    }
+
+    static GenericMul * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                     ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
+
     static char const* intrinsicName() { return "genericMul"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -1723,6 +2730,41 @@ class GenericDiv : public PrimitiveCall {
         GenericDiv* result = new GenericDiv(ins);
         return result;
     }
+
+    static GenericDiv * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericDiv>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericDiv(i);
+    }
+
+    static GenericDiv * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                     ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
 
     static char const* intrinsicName() { return "genericDiv"; }
 
@@ -1771,6 +2813,41 @@ class GenericPow : public PrimitiveCall {
         return result;
     }
 
+    static GenericPow * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericPow>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericPow(i);
+    }
+
+    static GenericPow * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                     ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
+
     static char const* intrinsicName() { return "genericPow"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -1816,6 +2893,36 @@ class GenericSqrt : public PrimitiveCall {
         GenericSqrt* result = new GenericSqrt(ins);
         return result;
     }
+    static GenericSqrt * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value op,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(op);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericSqrt>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericSqrt(i);
+    }
+
+    static GenericSqrt * insertBefore(Pattern * p,
+            ir::Value op,
+            ir::Value rho,
+                                      ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),op,rho,constantPool,call);
+    }
 
     static char const* intrinsicName() { return "genericSqrt"; }
 
@@ -1860,6 +2967,37 @@ class GenericExp : public PrimitiveCall {
         b.markSafepoint(ins);
         GenericExp* result = new GenericExp(ins);
         return result;
+    }
+
+    static GenericExp * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value op,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(op);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericExp>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericExp(i);
+    }
+
+    static GenericExp * insertBefore(Pattern * p,
+            ir::Value op,
+            ir::Value rho,
+                                     ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),op,rho,constantPool,call);
     }
 
     static char const* intrinsicName() { return "genericExp"; }
@@ -1916,6 +3054,41 @@ class GenericEq : public PrimitiveCall {
             t::SEXP, {t::SEXP, t::SEXP, t::SEXP, t::SEXP, t::Int}, false);
     }
 
+    static GenericEq * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericEq>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericEq(i);
+    }
+
+    static GenericEq * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                    ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
+
     static bool classof(Pattern const* s) {
         return s->getKind() == Kind::GenericEq;
     }
@@ -1955,6 +3128,41 @@ class GenericNe : public PrimitiveCall {
         GenericNe* result = new GenericNe(ins);
         return result;
     }
+
+    static GenericNe * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericNe>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericNe(i);
+    }
+
+    static GenericNe * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                    ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
 
     static char const* intrinsicName() { return "genericNe"; }
 
@@ -2003,6 +3211,41 @@ class GenericLt : public PrimitiveCall {
         return result;
     }
 
+    static GenericLt * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericLt>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericLt(i);
+    }
+
+    static GenericLt * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                    ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
+
     static char const* intrinsicName() { return "genericLt"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -2049,6 +3292,41 @@ class GenericLe : public PrimitiveCall {
         GenericLe* result = new GenericLe(ins);
         return result;
     }
+
+    static GenericLe * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericLe>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericLe(i);
+    }
+
+    static GenericLe * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                    ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
 
     static char const* intrinsicName() { return "genericLe"; }
 
@@ -2097,6 +3375,41 @@ class GenericGe : public PrimitiveCall {
         return result;
     }
 
+    static GenericGe * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericGe>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericGe(i);
+    }
+
+    static GenericGe * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                    ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
+
     static char const* intrinsicName() { return "genericGe"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -2143,6 +3456,41 @@ class GenericGt : public PrimitiveCall {
         GenericGt* result = new GenericGt(ins);
         return result;
     }
+
+    static GenericGt * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericGt>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericGt(i);
+    }
+
+    static GenericGt * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                    ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
 
     static char const* intrinsicName() { return "genericGt"; }
 
@@ -2192,6 +3540,41 @@ class GenericBitAnd : public PrimitiveCall {
         return result;
     }
 
+    static GenericBitAnd * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericBitAnd>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericBitAnd(i);
+    }
+
+    static GenericBitAnd * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                        ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
+
     static char const* intrinsicName() { return "genericBitAnd"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -2240,6 +3623,41 @@ class GenericBitOr : public PrimitiveCall {
         return result;
     }
 
+    static GenericBitOr * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericBitOr>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericBitOr(i);
+    }
+
+    static GenericBitOr * insertBefore(Pattern * p,
+            ir::Value lhs,
+            ir::Value rhs,
+            ir::Value rho,
+                                       ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),lhs,rhs,rho,constantPool,call);
+    }
+
+
     static char const* intrinsicName() { return "genericBitOr"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -2285,6 +3703,38 @@ class GenericNot : public PrimitiveCall {
         return result;
     }
 
+    static GenericNot * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value op,
+            ir::Value rho,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(op);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericNot>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericNot(i);
+    }
+
+    static GenericNot * insertBefore(Pattern * p,
+            ir::Value op,
+            ir::Value rho,
+                                     ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),op,rho,constantPool,call);
+    }
+
+
     static char const* intrinsicName() { return "genericNot"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -2320,6 +3770,32 @@ class GenericGetVarMissOK : public PrimitiveCall {
         return result;
     }
 
+    static GenericGetVarMissOK * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value symbol,
+            ir::Value rho) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(symbol);
+        args_.push_back(rho);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericGetVarMissOK>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericGetVarMissOK(i);
+    }
+
+    static GenericGetVarMissOK * insertBefore(Pattern * p,
+            ir::Value symbol,
+            ir::Value rho) {
+        return insertBefore(p->first(),symbol,rho);
+    }
+
+
     static char const* intrinsicName() { return "genericGetVarMissOK"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -2353,6 +3829,31 @@ class GenericGetEllipsisValueMissOK : public PrimitiveCall {
         GenericGetEllipsisValueMissOK* result =
             new GenericGetEllipsisValueMissOK(ins);
         return result;
+    }
+
+    static GenericGetEllipsisValueMissOK * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value symbol,
+            ir::Value rho) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(symbol);
+        args_.push_back(rho);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GenericGetEllipsisValueMissOK>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GenericGetEllipsisValueMissOK(i);
+    }
+
+    static GenericGetEllipsisValueMissOK * insertBefore(Pattern * p,
+            ir::Value symbol,
+            ir::Value rho) {
+        return insertBefore(p->first(),symbol,rho);
     }
 
     static char const* intrinsicName() {
@@ -2399,6 +3900,35 @@ class CheckSwitchControl : public PrimitiveCall {
         CheckSwitchControl* result = new CheckSwitchControl(ins);
         return result;
     }
+
+    static CheckSwitchControl * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value ctrl,
+            ir::Value constantPool,
+            ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(ctrl);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<CheckSwitchControl>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new CheckSwitchControl(i);
+    }
+
+    static CheckSwitchControl * insertBefore(Pattern * p,
+            ir::Value ctrl,
+                                             ir::Value constantPool,
+            ir::Value call) {
+        return insertBefore(p->first(),ctrl,constantPool,call);
+    }
+
 
     static char const* intrinsicName() { return "checkSwitchControl"; }
 
@@ -2453,6 +3983,38 @@ class SwitchControlCharacter : public PrimitiveCall {
         return result;
     }
 
+    static SwitchControlCharacter * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value ctrl,
+            ir::Value constantPool,
+            ir::Value call,
+            ir::Value cases) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(ctrl);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+        args_.push_back(cases);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<SwitchControlCharacter>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new SwitchControlCharacter(i);
+    }
+
+    static SwitchControlCharacter * insertBefore(Pattern * p,
+            ir::Value ctrl,
+                                                 ir::Value constantPool,
+            ir::Value call,
+            ir::Value cases) {
+        return insertBefore(p->first(),ctrl,constantPool,call,cases);
+    }
+
+
     static char const* intrinsicName() { return "switchControlCharacter"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -2488,6 +4050,31 @@ class SwitchControlInteger : public PrimitiveCall {
         return result;
     }
 
+    static SwitchControlInteger * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value ctrl,
+            int numCases) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(ctrl);
+        args_.push_back(Builder::integer(numCases));
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<SwitchControlInteger>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new SwitchControlInteger(i);
+    }
+
+    static SwitchControlInteger * insertBefore(Pattern * p,
+            ir::Value ctrl,
+            int numCases) {
+        return insertBefore(p->first(),ctrl,numCases);
+    }
+
     static char const* intrinsicName() { return "switchControlInteger"; }
 
     static llvm::FunctionType* intrinsicType() {
@@ -2519,6 +4106,31 @@ class ReturnJump : public PrimitiveCall {
         b.markSafepoint(ins);
         ReturnJump* result = new ReturnJump(ins);
         return result;
+    }
+
+    static ReturnJump * insertBefore (
+            llvm::Instruction * ins,
+            ir::Value value,
+            ir::Value rho) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(value);
+        args_.push_back(rho);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<ReturnJump>(ins->getModule()),
+            args_,
+            "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new ReturnJump(i);
+    }
+
+    static ReturnJump * insertBefore(Pattern * p,
+            ir::Value value,
+            ir::Value rho) {
+        return insertBefore(p->first(),value,rho);
     }
 
     static char const* intrinsicName() { return "returnJump"; }

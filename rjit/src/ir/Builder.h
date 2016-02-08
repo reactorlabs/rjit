@@ -143,6 +143,8 @@ class Builder {
       the given type.
 
       NOTE that this function assumes that the intrinsic does not use varargs.
+
+      TODO deprecated, use PrimitiveCall::primitiveFunction instead.
      */
     template <typename INTRINSIC>
     llvm::Function* intrinsic() {
@@ -167,14 +169,15 @@ class Builder {
 
     /** Given a call instruction, sets its attributes wrt stack map statepoints.
      */
-    llvm::CallInst* markSafepoint(llvm::CallInst* f) {
+    static llvm::CallInst* markSafepoint(llvm::CallInst* f) {
+        llvm::Module * m_ = f->getModule();
         llvm::AttributeSet PAL;
         {
             llvm::SmallVector<llvm::AttributeSet, 4> Attrs;
             llvm::AttributeSet PAS;
             {
                 llvm::AttrBuilder B;
-                auto id = JITCompileLayer::singleton.getSafepointId(this->f());
+                auto id = JITCompileLayer::singleton.getSafepointId(f->getParent()->getParent());
                 B.addAttribute("statepoint-id", std::to_string(id));
                 PAS = llvm::AttributeSet::get(m_->getContext(), ~0U, B);
             }

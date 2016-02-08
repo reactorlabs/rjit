@@ -41,6 +41,7 @@ class Pass {
     }
 
 protected:
+
     void replaceAllUsesWith(llvm::Instruction * o, llvm::Instruction * n) {
         o->replaceAllUsesWith(n);
     }

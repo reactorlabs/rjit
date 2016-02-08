@@ -833,6 +833,24 @@ class PrimitiveCall : public Pattern {
                "Primitive calls must be llvm call instructions");
     }
 
+    /** Returns the llvm::Function corresponding to the primitive of given name.
+      If such function is not present in the module yet, it is declared using
+      the given type.
+
+      NOTE that this function assumes that the intrinsic does not use varargs.
+     */
+    template <typename INTRINSIC>
+    static llvm::Function* primitiveFunction(llvm::Module * m) {
+        llvm::Function* result = m->getFunction(INTRINSIC::intrinsicName());
+        // if the intrinsic has not been declared, declare it
+        if (result == nullptr)
+            result = llvm::Function::Create(INTRINSIC::intrinsicType(),
+                                            llvm::GlobalValue::ExternalLinkage,
+                                            INTRINSIC::intrinsicName(), m);
+        return result;
+    }
+
+
     llvm::Value* getValue(unsigned argIndex) {
         return ins()->getArgOperand(argIndex);
     }
