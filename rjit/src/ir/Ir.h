@@ -210,7 +210,6 @@ private:
 
 };
 
-static_assert(sizeof(ir::Value) == sizeof(llvm::Value*), "ir::Value must have the same representation as llvm::Value (vector typecasting)");
 
 
 /** Nop instruction, which internally is iadd 0,0.
@@ -218,7 +217,7 @@ static_assert(sizeof(ir::Value) == sizeof(llvm::Value*), "ir::Value must have th
   Used as a sentinel in basic blocks so that inserting before an instruction and adding at the end has the same semantics. This is also why the pattern does not support the usual create & insertBefore methods.
 
  */
-class Nop : public Pattern {
+class Nop : public ir::Pattern {
 public:
 
     static bool classof(Pattern const * s) {
@@ -888,6 +887,10 @@ class PrimitiveCall : public Pattern {
 
 } // namespace ir
 
+static_assert(sizeof(ir::Value) == sizeof(llvm::Value*), "ir::Value must have the same representation as llvm::Value (vector typecasting)");
+
 } // namespace rjit
+
+
 
 #endif // IR_H
