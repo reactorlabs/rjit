@@ -656,21 +656,6 @@ protected:
         attach(ptr);
     }
 
-<<<<<<< HEAD
-    virtual llvm::Instruction* first() const override {
-        llvm::Instruction* r = ins_->getPrevNode()->getPrevNode();
-        // TODO better check for start
-        assert(Pattern::get(r) == this);
-        return r;
-    }
-
-    size_t length() const override { return 3; }
-
-    static Cdr* create(Builder& b, llvm::Value* sexp);
-
-    static bool classof(Pattern const* s) { return s->getKind() == Kind::Cdr; }
-=======
->>>>>>> Patterns corrected to follow create() method guides.
 };
 
 class Tag : public Pattern {
@@ -719,22 +704,6 @@ protected:
         attach(consValuePtr);
         attach(ptr);
     }
-<<<<<<< HEAD
-
-    virtual llvm::Instruction* first() const override {
-        llvm::Instruction* r = ins_->getPrevNode()->getPrevNode();
-        // TODO better check for start
-        assert(Pattern::get(r) == this);
-        return r;
-    }
-
-    size_t length() const override { return 3; }
-
-    static Tag* create(Builder& b, llvm::Value* sexp);
-
-    static bool classof(Pattern const* s) { return s->getKind() == Kind::Tag; }
-=======
->>>>>>> Patterns corrected to follow create() method guides.
 };
 
 class VectorGetElement : public Pattern {
