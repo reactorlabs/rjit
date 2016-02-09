@@ -21,9 +21,6 @@ class Pass;
 class Value;
 class Builder;
 
-
-
-
 /** Instruction Pattern
 
   Each llvm instruction can be part of a pattern. Pattern identifies a high
