@@ -13,7 +13,7 @@ import subprocess
 doxygenRoot = ""
 destDir = ""
 force = False
-verbose = False
+verbose = True
 cppRoot = ""
 clangFormat = ""
 
@@ -565,6 +565,7 @@ def calculateLLVMInstructions():
                     if (not argName.startswith("llvm::")):
                         argName = "llvm::" + argName
                         m.args[i] = argName
+                    D("    {0}".format(argName))
                     instructions.add(argName)
 
 
