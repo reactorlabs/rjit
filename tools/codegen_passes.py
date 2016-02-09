@@ -347,6 +347,10 @@ class CppClass:
             D("Documentation for class {0} not found (expected filename {1})".format(name, self.filename))
             self._xml = False
         else:
+            with open(self.filename) as f:
+                print("---------------------------------------------------------------------------------------------------------------------------------------")
+                for l in f:
+                    print(l.strip())
             self._xml = et.parse(self.filename).getroot()[0]
             # get the subclasses
             for child in self._xml:
@@ -491,7 +495,7 @@ def loadClassHierarchy(baseClass):
     D("Loading class hierarchy for {0}".format(baseClass))
     result = {}
     # load the classes
-    q = [ baseClass ]
+    q = [ baseClass, ]
     while (q):
         key = q.pop()
         if (not key in result):
