@@ -70,6 +70,7 @@ class OSRHandler : public OSRLibrary {
     static SEXP getFreshIR(SEXP closure, rjit::Compiler* c,
                            bool compile = true);
 
+    static SEXP addIRToModule(SEXP func, rjit::Compiler* c);
     static SEXP cloneSEXP(SEXP func, Function* llvm);
 
   private:
@@ -80,6 +81,7 @@ class OSRHandler : public OSRLibrary {
     // static bool existInstrument(Function* f);
     static bool transContains(std::pair<Function*, Function*> key);
     static bool baseVersionContains(SEXP key);
+    static void setAttributes(CallInst* call, uint64_t smid);
 };
 
 } // namespace osr

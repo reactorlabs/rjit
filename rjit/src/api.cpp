@@ -134,6 +134,6 @@ REXPORT SEXP jitEnable(SEXP expression) {
 REXPORT void fixClosure(uint64_t bim) {
     printf("I'am here %d\n", (int)bim);
     auto f = osr::OSRInliner::exits[bim];
-    GET_LLVM(f.second)->dump();
+    // GET_LLVM(f.second)->dump();
     SETCDR(f.first, f.second);
 }

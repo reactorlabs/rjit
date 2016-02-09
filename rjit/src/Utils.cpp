@@ -48,7 +48,7 @@ REXPORT SEXP testme(SEXP expr) {
     c.jitAll();
     test.first->dump();*/
     SEXP result = OSRHandler::getFreshIR(expr, &c, true);
-    FunctionCall::fixIcStubs(GET_LLVM(result));
+    // FunctionCall::fixIcStubs(GET_LLVM(result));
     c.jitAll();
     return result;
 }

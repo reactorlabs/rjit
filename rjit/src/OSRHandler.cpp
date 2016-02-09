@@ -1,5 +1,7 @@
 #include "OSRHandler.h"
 #include "OSRLibrary.hpp"
+#include <llvm/IR/InstIterator.h>
+#include "JITCompileLayer.h"
 
 using namespace llvm;
 
@@ -65,8 +67,8 @@ OSRHandler::insertOSRExit(Function* opt, Function* instrument, Instruction* src,
     }
 
     // Printing
-    res.first->dump();
-    res.second->dump();
+    /*res.first->dump();
+    res.second->dump();*/
     return res;
 }
 
@@ -87,11 +89,16 @@ SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
 
     if (TYPEOF(body) == NATIVESXP &&
         GET_LLVM(body)->getParent() == c->getBuilder()->module())
-        func = body;
+        func = body; // TODO that's wrong
     else {
         if (!baseVersionContains(closure)) {
             // Setup the copy.
             func = c->compile("rfunction", body, FORMALS(closure));
+
+            // TODO remove
+            printf("Original compile result\n");
+            GET_LLVM(func)->dump();
+
             Function* clone =
                 StateMap::generateIdentityMapping(GET_LLVM(func)).first;
             baseVersions[closure] = cloneSEXP(func, clone);
@@ -108,11 +115,41 @@ SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
             c->getBuilder()->module()->getFunctionList().push_back(workingCopy);
             c->getBuilder()->module()->fixRelocations(FORMALS(closure), func,
                                                       workingCopy);
+            // TODO remove
+            printf("The working copy\n");
+            workingCopy->dump();
+            addIRToModule(func, c);
         }
     }
     return func;
 }
+SEXP OSRHandler::cloneSEXP(SEXP func, Function* llvm) {
+    SEXP result = CONS(nullptr, CDR(func));
+    SET_TAG(result, reinterpret_cast<SEXP>(llvm));
+    SET_TYPEOF(result, NATIVESXP);
+    return result;
+}
 
+SEXP OSRHandler::addIRToModule(SEXP func, rjit::Compiler* c) {
+    assert(TYPEOF(func) == NATIVESXP && GET_LLVM(func) && "Invalid function.");
+    Function* f = GET_LLVM(func);
+    Module* m = c->getBuilder()->module();
+    for (inst_iterator it = inst_begin(f), e = inst_end(f); it != e; ++it) {
+        CallInst* call = dynamic_cast<CallInst*>(&(*it));
+        if (call && call->getCalledFunction()->getParent() != m) {
+            Function* target = call->getCalledFunction();
+            Function* resolve = m->getFunction(target->getName());
+            if (!resolve)
+                resolve = Function::Create(target->getFunctionType(),
+                                           Function::ExternalLinkage,
+                                           target->getName(), m);
+            call->setCalledFunction(resolve);
+            auto id = rjit::JITCompileLayer::singleton.getSafepointId(f);
+            setAttributes(call, id);
+        }
+    }
+    return func;
+}
 /******************************************************************************/
 /*                        Private functions                                   */
 /******************************************************************************/
@@ -125,11 +162,22 @@ bool OSRHandler::baseVersionContains(SEXP key) {
     return baseVersions.find(key) != baseVersions.end();
 }
 
-SEXP OSRHandler::cloneSEXP(SEXP func, Function* llvm) {
-    SEXP result = CONS(nullptr, CDR(func));
-    SET_TAG(result, reinterpret_cast<SEXP>(llvm));
-    SET_TYPEOF(result, NATIVESXP);
-    return result;
+void OSRHandler::setAttributes(CallInst* call, uint64_t smid) {
+    Module* m = call->getParent()->getParent()->getParent();
+    assert(m && "Module not set for call instruction.");
+    llvm::AttributeSet PAL;
+    {
+        llvm::SmallVector<llvm::AttributeSet, 4> Attrs;
+        llvm::AttributeSet PAS;
+        {
+            llvm::AttrBuilder B;
+            B.addAttribute("statepoint-id", std::to_string(smid));
+            PAS = llvm::AttributeSet::get(m->getContext(), ~0U, B);
+        }
+        Attrs.push_back(PAS);
+        PAL = llvm::AttributeSet::get(m->getContext(), Attrs);
+    }
+    call->setAttributes(PAL);
 }
 
 } // namespace osr
