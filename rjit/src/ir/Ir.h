@@ -810,26 +810,25 @@ class CallToAddress : public Pattern {
      */
     llvm::CallInst* ins() { return Pattern::ins<llvm::CallInst>(); }
 
-    static CallToAddress* create(Builder& b, llvm::Value* fun,
+    static CallToAddress* create(Builder& b, ir::Value fun,
                                  std::vector<llvm::Value*> args) {
-        return new CallToAddress(
-            llvm::CallInst::Create(fun, *reinterpret_cast<std::vector<llvm::Value *>*>(&args), "", b));
+        return new CallToAddress(llvm::CallInst::Create(fun, args, "", b));
     }
 
     static CallToAddress* create(Builder& b, llvm::Value* fun,
-                                 std::vector<ir::Value*> args) {
-        return create(b, fun, *reinterpret_cast<std::vector<llvm::Value *>*>(&args));
+                                 std::vector<ir::Value> args) {
+        return create(b, fun, std::vector<llvm::Value*>(args.begin(), args.end()));
     }
 
-    static CallToAddress* create(Builder& b, llvm::Value* fun,
+    static CallToAddress* create(Builder& b, ir::Value fun,
                                  std::initializer_list<llvm::Value*> args) {
         return new CallToAddress(
             llvm::CallInst::Create(fun, args, "", b.block()));
     }
 
-    static CallToAddress* create(Builder& b, llvm::Value* fun,
-                                 std::initializer_list<ir::Value*> args) {
-        return create(b, fun, *reinterpret_cast<std::initializer_list<llvm::Value*>*>(&args));
+    static CallToAddress* create(Builder& b, ir::Value fun,
+                                 std::initializer_list<ir::Value> args) {
+        return create(b, fun, std::vector<llvm::Value*>(args.begin(), args.end()));
     }
 
 

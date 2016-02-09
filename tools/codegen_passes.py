@@ -13,7 +13,7 @@ import subprocess
 doxygenRoot = ""
 destDir = ""
 force = False
-verbose = True
+verbose = False
 cppRoot = ""
 clangFormat = ""
 
