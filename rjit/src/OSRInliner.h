@@ -13,6 +13,7 @@ using namespace llvm;
 namespace osr {
 typedef std::vector<llvm::Instruction*> Inst_Vector;
 typedef std::list<llvm::ReturnInst*> Return_List;
+typedef std::pair<SEXP, SEXP> ExitEntry;
 
 class OSRInliner {
   public:
@@ -20,7 +21,7 @@ class OSRInliner {
 
     SEXP inlineCalls(SEXP f);
 
-    static std::map<uint64_t, SEXP> exits;
+    static std::map<uint64_t, ExitEntry> exits;
 
   private:
     rjit::Compiler* c;
