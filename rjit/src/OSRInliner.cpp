@@ -55,30 +55,31 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
     for (auto it = calls->begin(); it != calls->end(); ++it) {
         // Get the callee
         SEXP constantPool = CDR(fSexp);
-        SEXP toInlineSexp =
+        SEXP toInlineClosure =
             getFunction(constantPool, (*it)->getFunctionSymbol(), env);
 
         // Function not found or arguments are missing, or recursive call.
-        if (!toInlineSexp || isMissingArgs(FORMALS(toInlineSexp), (*it)) ||
-            f == toInlineSexp)
+        if (!toInlineClosure ||
+            isMissingArgs(FORMALS(toInlineClosure), (*it)) ||
+            f == toInlineClosure)
             continue;
 
         // For the OSR condition.
-        (*it)->setInPtr(c, toInlineSexp);
+        (*it)->setInPtr(c, toInlineClosure);
 
         // For the promises.
-        (*it)->fixPromises(constantPool, toInlineSexp, c);
+        (*it)->fixPromises(constantPool, toInlineClosure, c);
 
         // Get the LLVM IR for the function to Inline.
-        /*if (!INLINE_ALL) {*/
-        toInlineSexp =
-            c->compile("inner", BODY(toInlineSexp), FORMALS(toInlineSexp));
-        /*} else {
-            toInlineSexp =
-                compile(BODY(toInlineSexp), FORMALS(toInlineSexp), env);
-        }*/
+        SEXP toInlineFunc = R_NilValue;
+        if (!INLINE_ALL) {
+            toInlineFunc = OSRHandler::getFreshIR(toInlineClosure, c, true);
+        } else {
+            toInlineClosure = inlineCalls(toInlineClosure);
+            toInlineFunc = CDR(toInlineClosure);
+        }
 
-        Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
+        Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineFunc));
 
         Function* toInstrument = OSRHandler::getToInstrument(toOpt);
         FunctionCall::fixIcStubs(toInstrument);
@@ -96,9 +97,10 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
         // clean up
         ret.clear();
         // Set the constant pool.
-        setCP(fSexp, toInlineSexp);
+        setCP(fSexp, toInlineFunc);
     }
     FunctionCall::fixIcStubs(toOpt);
+    OSRHandler::addIRToModule(fSexp, c);
     SETCDR(f, fSexp);
     return f;
 }
@@ -145,7 +147,7 @@ SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
             return nullptr;
         formals = CDR(formals);
     }
-    printf("\n\n\nWE INLINE %s\n\n\n", name.c_str());
+    // printf("\n\n\nWE INLINE %s\n\n\n", name.c_str());
     return fSexp;
 }
 
@@ -307,4 +309,5 @@ Inst_Vector* OSRInliner::createCompensation(SEXP fun, SEXP closure) {
     exits[id] = ExitEntry(closure, fun);
     return compensation;
 }
+
 } // namespace osr
