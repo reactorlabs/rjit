@@ -18,9 +18,19 @@ namespace rjit {
 
 namespace ir {
 
+class Nop;
+
 /** Helper class that aids with building and modifying LLVM IR for functions.
 
   The interface provided is intended for the intrinsic wrappers.
+
+  <b>Sentinels</b>
+
+  The builder inserts a sentinel (ir::Nop) to each basic block when they are created. The sentinel is then used by create() methods of all patterns so that they can route to insertBefore() methods and we do not have to deal with code duplication in these two methods (create effectively becomes insertBefore sentinel).
+
+  However adding the sentinels creates problems for llvm as it means that terminators are not last instructions in a bb. So closing functions for ICs and functions now call removeSentinels() which removes the sentinels from all basic blocks in the function. Of course after this, the create methods may no longer be used on the function.
+
+  When adding llvm instructions manually one has to be aware of this and instead of llvm::BasicBlock * atEnd functions, insertBefore ones should be used, where Builder.blockSentinel()->first() gives the instruction to insert before.
 
   */
 class Builder {
@@ -48,6 +58,8 @@ class Builder {
      */
     llvm::BasicBlock* block() { return c_->b; }
 
+    ir::Nop * blockSentinel();
+
     /** Returns the current break target.
      */
     llvm::BasicBlock* breakTarget() {
@@ -64,13 +76,9 @@ class Builder {
         return c_->nextTarget;
     }
 
-    llvm::BasicBlock* createBasicBlock() {
-        return llvm::BasicBlock::Create(m_->getContext(), "", c_->f);
-    }
+    llvm::BasicBlock* createBasicBlock();
 
-    llvm::BasicBlock* createBasicBlock(std::string const& name) {
-        return llvm::BasicBlock::Create(m_->getContext(), name, c_->f);
-    }
+    llvm::BasicBlock* createBasicBlock(std::string const& name);
 
     /** Returns the environment of the current context.
      */
@@ -352,6 +360,13 @@ class Builder {
             return nullptr;
         }
     };
+
+    /** Removes the sentinels from all basic blocks in current context's function.
+
+      This is necessary because basic blocks with NOPs are not valid ones because there it means there are instructions after a basic block terminator.
+     */
+    void removeSentinels();
+
 
     /** The module into which we are currently building.
      */

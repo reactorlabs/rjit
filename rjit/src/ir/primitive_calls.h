@@ -16,15 +16,17 @@ class EndClosureContext : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::EndClosureContext) {}
 
     static EndClosureContext* create(Builder& b, ir::Value cntxt, ir::Value result) {
-        llvm::CallInst* ins = llvm::CallInst::Create(b.intrinsic<EndClosureContext>(), arguments(cntxt, result), "", b);
-        b.markSafepoint(ins);
-        return new EndClosureContext(ins);
+        return insertBefore(b.blockSentinel(), cntxt, result);
     }
 
     static EndClosureContext* insertBefore(llvm::Instruction * ins, ir::Value cntxt, ir::Value result) {
         llvm::CallInst* i = llvm::CallInst::Create(primitiveFunction<EndClosureContext>(ins->getModule()), arguments(cntxt, result), "", ins);
         Builder::markSafepoint(i);
         return new EndClosureContext(i);
+    }
+
+    static EndClosureContext * insertBefore(Pattern * p, ir::Value context, ir::Value result) {
+        return insertBefore(p->first(), context, result);
     }
 
     static char const* intrinsicName() { return "endClosureContext"; }
@@ -55,20 +57,9 @@ class ClosureQuickArgumentAdaptor : public PrimitiveCall {
     ClosureQuickArgumentAdaptor(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::ClosureQuickArgumentAdaptor) {}
 
-    static ClosureQuickArgumentAdaptor* create(Builder& b, llvm::Value* op,
-                                               llvm::Value* arglis) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(op);
-        args_.push_back(arglis);
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<ClosureQuickArgumentAdaptor>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        ClosureQuickArgumentAdaptor* result =
-            new ClosureQuickArgumentAdaptor(ins);
-        return result;
+    static ClosureQuickArgumentAdaptor* create(Builder& b, ir::Value op,
+                                               ir::Value arglist) {
+        return insertBefore(b.blockSentinel()->first(), op, arglist);
     }
 
     static ClosureQuickArgumentAdaptor* insertBefore(llvm::Instruction * ins, ir::Value op,
@@ -105,19 +96,9 @@ class CallNative : public PrimitiveCall {
 
     CallNative(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::CallNative) {}
 
-    static CallNative* create(Builder& b, llvm::Value* native,
-                              llvm::Value* rho) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(native);
-        args_.push_back(rho);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<CallNative>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        CallNative* result = new CallNative(ins);
-        return result;
+    static CallNative* create(Builder& b, ir::Value native,
+                              ir::Value rho) {
+        return insertBefore(b.blockSentinel()->first(), native, rho);
     }
 
     static CallNative* insertBefore(llvm::Instruction* ins, ir::Value native,
@@ -155,24 +136,14 @@ class ClosureNativeCallTrampoline : public PrimitiveCall {
     ClosureNativeCallTrampoline(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::ClosureNativeCallTrampoline) {}
 
-    static ClosureNativeCallTrampoline* create(Builder& b, llvm::Value* cntxt,
-                                               llvm::Value* native,
-                                               llvm::Value* rh) {
+    static ClosureNativeCallTrampoline* create(Builder& b, ir::Value cntxt,
+                                               ir::Value native,
+                                               ir::Value rh) {
 
-        std::vector<llvm::Value*> args_;
-        args_.push_back(cntxt);
-        args_.push_back(native);
-        args_.push_back(rh);
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<ClosureNativeCallTrampoline>(), args_, "", b);
-
-        ClosureNativeCallTrampoline* result =
-            new ClosureNativeCallTrampoline(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), cntxt, native, rh);
     }
 
-    static ClosureNativeCallTrampoline* create(llvm::Instruction * ins, ir::Value cntxt,
+    static ClosureNativeCallTrampoline* insertBefore(llvm::Instruction * ins, ir::Value cntxt,
                                                ir::Value native,
                                                ir::Value rh) {
 
@@ -217,26 +188,15 @@ class ConvertToLogicalNoNA : public PrimitiveCall {
     ConvertToLogicalNoNA(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::ConvertToLogicalNoNA) {}
 
-    static ConvertToLogicalNoNA* create(Builder& b, llvm::Value* what,
+    static ConvertToLogicalNoNA* create(Builder& b, ir::Value what,
                                         SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(what);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<ConvertToLogicalNoNA>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        ConvertToLogicalNoNA* result = new ConvertToLogicalNoNA(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), what, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static ConvertToLogicalNoNA * insertBefore (
             llvm::Instruction * ins,
-            ir::Value constantPool,
             ir::Value what,
+            ir::Value constantPool,
             ir::Value call) {
 
         std::vector<llvm::Value*> args_;
@@ -279,17 +239,8 @@ class PrintValue : public PrimitiveCall {
 
     PrintValue(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::PrintValue) {}
 
-    static PrintValue* create(Builder& b, llvm::Value* value) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(value);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<PrintValue>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        PrintValue* result = new PrintValue(ins);
-        return result;
+    static PrintValue* create(Builder& b, ir::Value value) {
+        return insertBefore(b.blockSentinel()->first(), value);
     }
 
     static PrintValue * insertBefore (
@@ -335,18 +286,8 @@ class StartFor : public PrimitiveCall {
 
     StartFor(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::StartFor) {}
 
-    static StartFor* create(Builder& b, llvm::Value* seq, llvm::Value* rho) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(seq);
-        args_.push_back(rho);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<StartFor>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        StartFor* result = new StartFor(ins);
-        return result;
+    static StartFor* create(Builder& b, ir::Value seq, ir::Value rho) {
+        return insertBefore(b.blockSentinel()->first(), seq, rho);
     }
 
     static StartFor * insertBefore (
@@ -404,19 +345,8 @@ class LoopSequenceLength : public PrimitiveCall {
     LoopSequenceLength(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::LoopSequenceLength) {}
 
-    static LoopSequenceLength* create(Builder& b, llvm::Value* seq, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(seq);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<LoopSequenceLength>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        LoopSequenceLength* result = new LoopSequenceLength(ins);
-        return result;
+    static LoopSequenceLength* create(Builder& b, ir::Value seq, SEXP call) {
+        return insertBefore(b.blockSentinel()->first(), seq, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static LoopSequenceLength * insertBefore (
@@ -470,19 +400,9 @@ class GetForLoopValue : public PrimitiveCall {
     GetForLoopValue(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GetForLoopValue) {}
 
-    static GetForLoopValue* create(Builder& b, llvm::Value* seq,
-                                   llvm::Value* index) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(seq);
-        args_.push_back(index);
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<GetForLoopValue>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GetForLoopValue* result = new GetForLoopValue(ins);
-        return result;
+    static GetForLoopValue* create(Builder& b, ir::Value seq,
+                                   ir::Value index) {
+        return insertBefore(b.blockSentinel(), seq, index);
     }
 
     static GetForLoopValue * insertBefore (
@@ -528,15 +448,7 @@ class MarkVisible : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::MarkVisible) {}
 
     static MarkVisible* create(Builder& b) {
-
-        std::vector<llvm::Value*> args_;
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<MarkVisible>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        MarkVisible* result = new MarkVisible(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first());
     }
 
     static MarkVisible * insertBefore (
@@ -577,15 +489,7 @@ class MarkInvisible : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::MarkInvisible) {}
 
     static MarkInvisible* create(Builder& b) {
-
-        std::vector<llvm::Value*> args_;
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<MarkInvisible>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        MarkInvisible* result = new MarkInvisible(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first());
     }
 
     static MarkInvisible * insertBefore (
@@ -640,17 +544,7 @@ class UserLiteral : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::UserLiteral) {}
 
     static UserLiteral* create(Builder& b, SEXP index) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(index)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<UserLiteral>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        UserLiteral* result = new UserLiteral(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), b.consts(), Builder::integer(b.constantPoolIndex(index)));
     }
 
     static UserLiteral * insertBefore (
@@ -696,18 +590,7 @@ class PatchIC : public PrimitiveCall {
 
     static PatchIC* create(Builder& b, llvm::Value* addr,
                            llvm::Value* stackmapId, llvm::Value* caller) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(addr);
-        args_.push_back(stackmapId);
-        args_.push_back(caller);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<PatchIC>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        PatchIC* result = new PatchIC(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), addr, stackmapId, caller);
     }
 
     static PatchIC* insertBefore(llvm::Instruction * ins, ir::Value addr,
@@ -722,7 +605,7 @@ class PatchIC : public PrimitiveCall {
             llvm::CallInst::Create(primitiveFunction<PatchIC>(ins->getModule()), args_, "", ins);
 
         Builder::markSafepoint(i);
-        return new PatchIC(ins);
+        return new PatchIC(i);
     }
 
     static char const* intrinsicName() { return "patchIC"; }
@@ -744,7 +627,10 @@ class CompileIC : public PrimitiveCall {
     static CompileIC* create(Builder& b, llvm::Value* size, llvm::Value* call,
                              llvm::Value* fun, llvm::Value* rho,
                              llvm::Value* stackmapId) {
+        return insertBefore(b.blockSentinel()->first(), size, call, fun, rho, stackmapId);
+    }
 
+    static CompileIC * insertBefore(llvm::Instruction * ins, ir::Value size, ir::Value call, ir::Value fun, ir::Value rho, ir::Value stackmapId) {
         std::vector<llvm::Value*> args_;
         args_.push_back(size);
         args_.push_back(call);
@@ -752,12 +638,11 @@ class CompileIC : public PrimitiveCall {
         args_.push_back(rho);
         args_.push_back(stackmapId);
 
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<CompileIC>(), args_, "", b);
+        llvm::CallInst* i =
+            llvm::CallInst::Create(primitiveFunction<CompileIC>(ins->getModule()), args_, "", ins);
 
-        b.markSafepoint(ins);
-        CompileIC* result = new CompileIC(ins);
-        return result;
+        Builder::markSafepoint(i);
+        return new CompileIC(i);
     }
 
     static char const* intrinsicName() { return "compileIC"; }
@@ -781,6 +666,10 @@ class InitClosureContext : public PrimitiveCall {
                                       llvm::Value* call, llvm::Value* newrho,
                                       llvm::Value* rho, llvm::Value* actuals,
                                       llvm::Value* fun) {
+        return insertBefore(b.blockSentinel()->first(), context, call,newrho, rho, actuals, fun);
+    }
+
+    static InitClosureContext * insertBefore(llvm::Instruction * ins, ir::Value context, ir::Value call, ir::Value newrho, ir::Value rho, ir::Value actuals, ir::Value fun) {
 
         std::vector<llvm::Value*> args_;
         args_.push_back(context);
@@ -790,12 +679,11 @@ class InitClosureContext : public PrimitiveCall {
         args_.push_back(actuals);
         args_.push_back(fun);
 
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<InitClosureContext>(), args_, "", b);
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<InitClosureContext>(ins->getModule()), args_, "", ins);
 
-        b.markSafepoint(ins);
-        InitClosureContext* result = new InitClosureContext(ins);
-        return result;
+        Builder::markSafepoint(i);
+        return new InitClosureContext(i);
     }
 
     static char const* intrinsicName() { return "initClosureContext"; }
@@ -818,18 +706,21 @@ class NewEnv : public PrimitiveCall {
 
     static NewEnv* create(Builder& b, llvm::Value* names, llvm::Value* values,
                           llvm::Value* parent) {
+        return insertBefore(b.blockSentinel()->first(), names, values, parent);
+    }
+
+    static NewEnv * insertBefore(llvm::Instruction * ins, ir::Value names, ir::Value values, ir::Value parent) {
 
         std::vector<llvm::Value*> args_;
         args_.push_back(names);
         args_.push_back(values);
         args_.push_back(parent);
 
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<NewEnv>(), args_, "", b);
+        llvm::CallInst* i =
+            llvm::CallInst::Create(primitiveFunction<NewEnv>(ins->getModule()), args_, "", ins);
 
-        b.markSafepoint(ins);
-        NewEnv* result = new NewEnv(ins);
-        return result;
+        Builder::markSafepoint(i);
+        return new NewEnv(i);
     }
 
     static char const* intrinsicName() { return "Rf_NewEnvironment"; }
@@ -850,17 +741,18 @@ class ConsNr : public PrimitiveCall {
     ConsNr(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::ConsNr) {}
 
     static ConsNr* create(Builder& b, llvm::Value* car, llvm::Value* cdr) {
+        return insertBefore(b.blockSentinel()->first(), car, cdr);
+    }
 
+    static ConsNr * insertBefore(llvm::Instruction * ins, ir::Value car, ir::Value cdr) {
         std::vector<llvm::Value*> args_;
         args_.push_back(car);
         args_.push_back(cdr);
+        llvm::CallInst* i =
+            llvm::CallInst::Create(primitiveFunction<ConsNr>(ins->getModule()), args_, "", ins);
 
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<ConsNr>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        ConsNr* result = new ConsNr(ins);
-        return result;
+        Builder::markSafepoint(i);
+        return new ConsNr(i);
     }
 
     static char const* intrinsicName() { return "CONS_NR"; }
@@ -890,17 +782,7 @@ class Constant : public PrimitiveCall {
     Constant(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::Constant) {}
 
     static Constant* create(Builder& b, SEXP index) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(index)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<Constant>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        Constant* result = new Constant(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), b.consts(), Builder::integer(b.constantPoolIndex(index)));
     }
 
     static Constant * insertBefore (
@@ -958,18 +840,7 @@ class GenericGetVar : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::GenericGetVar) {}
 
     static GenericGetVar* create(Builder& b, llvm::Value* rho, SEXP symbol) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(symbol)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericGetVar>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericGetVar* result = new GenericGetVar(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GenericGetVar * insertBefore (
@@ -1030,18 +901,7 @@ class GenericGetEllipsisArg : public PrimitiveCall {
 
     static GenericGetEllipsisArg* create(Builder& b, llvm::Value* rho,
                                          SEXP symbol) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(symbol)));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<GenericGetEllipsisArg>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericGetEllipsisArg* result = new GenericGetEllipsisArg(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GenericGetEllipsisArg * insertBefore (
@@ -1104,19 +964,7 @@ class GenericSetVar : public PrimitiveCall {
 
     static GenericSetVar* create(Builder& b, llvm::Value* value,
                                  llvm::Value* rho, SEXP symbol) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(value);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(symbol)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericSetVar>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericSetVar* result = new GenericSetVar(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), value, rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GenericSetVar * insertBefore (
@@ -1181,19 +1029,7 @@ class GenericSetVarParent : public PrimitiveCall {
 
     static GenericSetVarParent* create(Builder& b, llvm::Value* value,
                                        llvm::Value* rho, SEXP symbol) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(value);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(symbol)));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<GenericSetVarParent>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericSetVarParent* result = new GenericSetVarParent(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), value, rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GenericSetVarParent * insertBefore (
@@ -1257,18 +1093,7 @@ class GetFunction : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::GetFunction) {}
 
     static GetFunction* create(Builder& b, llvm::Value* rho, SEXP symbol) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(symbol)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GetFunction>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GetFunction* result = new GetFunction(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GetFunction * insertBefore (
@@ -1328,17 +1153,7 @@ class GetGlobalFunction : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::GetGlobalFunction) {}
 
     static GetGlobalFunction* create(Builder& b, SEXP symbol) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(symbol)));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<GetGlobalFunction>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GetGlobalFunction* result = new GetGlobalFunction(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GetGlobalFunction * insertBefore (
@@ -1394,17 +1209,7 @@ class GetSymFunction : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::GetSymFunction) {}
 
     static GetSymFunction* create(Builder& b, SEXP name) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(name)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GetSymFunction>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GetSymFunction* result = new GetSymFunction(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), b.consts(), Builder::integer(b.constantPoolIndex(name)));
     }
 
     static GetSymFunction * insertBefore (
@@ -1460,17 +1265,7 @@ class GetBuiltinFunction : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::GetBuiltinFunction) {}
 
     static GetBuiltinFunction* create(Builder& b, SEXP name) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(name)));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<GetBuiltinFunction>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GetBuiltinFunction* result = new GetBuiltinFunction(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), b.consts(), Builder::integer(b.constantPoolIndex(name)));
     }
 
     static GetBuiltinFunction * insertBefore (
@@ -1526,18 +1321,7 @@ class GetInternalBuiltinFunction : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::GetInternalBuiltinFunction) {}
 
     static GetInternalBuiltinFunction* create(Builder& b, SEXP name) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(name)));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<GetInternalBuiltinFunction>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GetInternalBuiltinFunction* result =
-            new GetInternalBuiltinFunction(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), b.consts(), Builder::integer(b.constantPoolIndex(name)));
     }
 
     static GetInternalBuiltinFunction * insertBefore (
@@ -1585,16 +1369,7 @@ class CheckFunction : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::CheckFunction) {}
 
     static CheckFunction* create(Builder& b, llvm::Value* f) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(f);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<CheckFunction>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        CheckFunction* result = new CheckFunction(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), f);
     }
 
     static CheckFunction * insertBefore (
@@ -1642,17 +1417,7 @@ class CreatePromise : public PrimitiveCall {
 
     static CreatePromise* create(Builder& b, llvm::Value* fun,
                                  llvm::Value* rho) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(fun);
-        args_.push_back(rho);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<CreatePromise>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        CreatePromise* result = new CreatePromise(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), fun, rho);
     }
 
     static CreatePromise * insertBefore (
@@ -1700,16 +1465,7 @@ class SexpType : public PrimitiveCall {
     SexpType(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::SexpType) {}
 
     static SexpType* create(Builder& b, llvm::Value* value) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(value);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<SexpType>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        SexpType* result = new SexpType(ins);
-        return result;
+        return insertBefore(b.blockSentinel()->first(), value);
     }
 
     static SexpType * insertBefore (
@@ -1755,17 +1511,7 @@ class AddArgument : public PrimitiveCall {
 
     static AddArgument* create(Builder& b, llvm::Value* args,
                                llvm::Value* arg) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(args);
-        args_.push_back(arg);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<AddArgument>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        AddArgument* result = new AddArgument(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), args, arg);
     }
     static AddArgument * insertBefore (
             llvm::Instruction * ins,
@@ -1814,18 +1560,7 @@ class AddKeywordArgument : public PrimitiveCall {
 
     static AddKeywordArgument* create(Builder& b, llvm::Value* args,
                                       llvm::Value* arg, llvm::Value* name) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(args);
-        args_.push_back(arg);
-        args_.push_back(name);
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<AddKeywordArgument>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        AddKeywordArgument* result = new AddKeywordArgument(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), args, arg,name);
     }
 
     static AddKeywordArgument * insertBefore (
@@ -1880,18 +1615,7 @@ class AddEllipsisArgumentHead : public PrimitiveCall {
     static AddEllipsisArgumentHead* create(Builder& b, llvm::Value* args,
                                            llvm::Value* rho,
                                            llvm::Value* eager) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(args);
-        args_.push_back(rho);
-        args_.push_back(eager);
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<AddEllipsisArgumentHead>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        AddEllipsisArgumentHead* result = new AddEllipsisArgumentHead(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), args, rho, eager);
     }
 
     static AddEllipsisArgumentHead * insertBefore (
@@ -1946,18 +1670,7 @@ class AddEllipsisArgumentTail : public PrimitiveCall {
     static AddEllipsisArgumentTail* create(Builder& b, llvm::Value* args,
                                            llvm::Value* rho,
                                            llvm::Value* eager) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(args);
-        args_.push_back(rho);
-        args_.push_back(eager);
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<AddEllipsisArgumentTail>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        AddEllipsisArgumentTail* result = new AddEllipsisArgumentTail(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), args, rho, eager);
     }
 
     static AddEllipsisArgumentTail * insertBefore (
@@ -2013,19 +1726,7 @@ class CallBuiltin : public PrimitiveCall {
     static CallBuiltin* create(Builder& b, llvm::Value* call,
                                llvm::Value* closure, llvm::Value* arguments,
                                llvm::Value* rho) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(call);
-        args_.push_back(closure);
-        args_.push_back(arguments);
-        args_.push_back(rho);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<CallBuiltin>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        CallBuiltin* result = new CallBuiltin(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), call, closure, arguments, rho);
     }
 
     static CallBuiltin * insertBefore (
@@ -2084,20 +1785,9 @@ class CallSpecial : public PrimitiveCall {
     static CallSpecial* create(Builder& b, llvm::Value* call,
                                llvm::Value* closure, llvm::Value* arguments,
                                llvm::Value* rho) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(call);
-        args_.push_back(closure);
-        args_.push_back(arguments);
-        args_.push_back(rho);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<CallSpecial>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        CallSpecial* result = new CallSpecial(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), call, closure, arguments, rho);
     }
+
     static CallSpecial * insertBefore (
             llvm::Instruction * ins,
             ir::Value call,
@@ -2154,19 +1844,7 @@ class CallClosure : public PrimitiveCall {
     static CallClosure* create(Builder& b, llvm::Value* call,
                                llvm::Value* closure, llvm::Value* arguments,
                                llvm::Value* rho) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(call);
-        args_.push_back(closure);
-        args_.push_back(arguments);
-        args_.push_back(rho);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<CallClosure>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        CallClosure* result = new CallClosure(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), call, closure, arguments, rho);
     }
 
     static CallClosure * insertBefore (
@@ -2239,19 +1917,7 @@ class CreateClosure : public PrimitiveCall {
 
     static CreateClosure* create(Builder& b, llvm::Value* rho, SEXP forms,
                                  SEXP body) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(forms)));
-        args_.push_back(Builder::integer(b.constantPoolIndex(body)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<CreateClosure>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        CreateClosure* result = new CreateClosure(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), rho, b.consts(), Builder::integer(b.constantPoolIndex(forms)), Builder::integer(b.constantPoolIndex(body)));
     }
 
     static CreateClosure * insertBefore (
@@ -2316,19 +1982,7 @@ class GenericUnaryMinus : public PrimitiveCall {
 
     static GenericUnaryMinus* create(Builder& b, llvm::Value* op,
                                      llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(op);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<GenericUnaryMinus>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericUnaryMinus* result = new GenericUnaryMinus(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericUnaryMinus * insertBefore (
@@ -2393,19 +2047,7 @@ class GenericUnaryPlus : public PrimitiveCall {
 
     static GenericUnaryPlus* create(Builder& b, llvm::Value* op,
                                     llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(op);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<GenericUnaryPlus>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericUnaryPlus* result = new GenericUnaryPlus(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericUnaryPlus * insertBefore (
@@ -2470,20 +2112,7 @@ class GenericAdd : public PrimitiveCall {
 
     static GenericAdd* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                               llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericAdd>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericAdd* result = new GenericAdd(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericAdd * insertBefore (
@@ -2551,20 +2180,7 @@ class GenericSub : public PrimitiveCall {
 
     static GenericSub* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                               llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericSub>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericSub* result = new GenericSub(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericSub * insertBefore (
@@ -2633,20 +2249,7 @@ class GenericMul : public PrimitiveCall {
 
     static GenericMul* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                               llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericMul>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericMul* result = new GenericMul(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericMul * insertBefore (
@@ -2715,20 +2318,7 @@ class GenericDiv : public PrimitiveCall {
 
     static GenericDiv* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                               llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericDiv>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericDiv* result = new GenericDiv(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericDiv * insertBefore (
@@ -2797,20 +2387,7 @@ class GenericPow : public PrimitiveCall {
 
     static GenericPow* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                               llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericPow>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericPow* result = new GenericPow(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericPow * insertBefore (
@@ -2879,20 +2456,9 @@ class GenericSqrt : public PrimitiveCall {
 
     static GenericSqrt* create(Builder& b, llvm::Value* op, llvm::Value* rho,
                                SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(op);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericSqrt>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericSqrt* result = new GenericSqrt(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
+
     static GenericSqrt * insertBefore (
             llvm::Instruction * ins,
             ir::Value op,
@@ -2954,19 +2520,7 @@ class GenericExp : public PrimitiveCall {
 
     static GenericExp* create(Builder& b, llvm::Value* op, llvm::Value* rho,
                               SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(op);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericExp>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericExp* result = new GenericExp(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericExp * insertBefore (
@@ -3031,20 +2585,7 @@ class GenericEq : public PrimitiveCall {
 
     static GenericEq* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                              llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericEq>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericEq* result = new GenericEq(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static char const* intrinsicName() { return "genericEq"; }
@@ -3113,20 +2654,7 @@ class GenericNe : public PrimitiveCall {
 
     static GenericNe* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                              llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericNe>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericNe* result = new GenericNe(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericNe * insertBefore (
@@ -3195,20 +2723,7 @@ class GenericLt : public PrimitiveCall {
 
     static GenericLt* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                              llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericLt>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericLt* result = new GenericLt(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericLt * insertBefore (
@@ -3277,20 +2792,7 @@ class GenericLe : public PrimitiveCall {
 
     static GenericLe* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                              llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericLe>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericLe* result = new GenericLe(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericLe * insertBefore (
@@ -3359,20 +2861,7 @@ class GenericGe : public PrimitiveCall {
 
     static GenericGe* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                              llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericGe>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericGe* result = new GenericGe(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericGe * insertBefore (
@@ -3441,20 +2930,7 @@ class GenericGt : public PrimitiveCall {
 
     static GenericGt* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                              llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericGt>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericGt* result = new GenericGt(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericGt * insertBefore (
@@ -3524,20 +3000,7 @@ class GenericBitAnd : public PrimitiveCall {
 
     static GenericBitAnd* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                                  llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericBitAnd>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericBitAnd* result = new GenericBitAnd(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericBitAnd * insertBefore (
@@ -3607,20 +3070,7 @@ class GenericBitOr : public PrimitiveCall {
 
     static GenericBitOr* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
                                 llvm::Value* rho, SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
-        args_.push_back(rhs);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericBitOr>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericBitOr* result = new GenericBitOr(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericBitOr * insertBefore (
@@ -3688,19 +3138,7 @@ class GenericNot : public PrimitiveCall {
 
     static GenericNot* create(Builder& b, llvm::Value* op, llvm::Value* rho,
                               SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(op);
-        args_.push_back(rho);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<GenericNot>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericNot* result = new GenericNot(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericNot * insertBefore (
@@ -3757,17 +3195,7 @@ class GenericGetVarMissOK : public PrimitiveCall {
 
     static GenericGetVarMissOK* create(Builder& b, llvm::Value* symbol,
                                        llvm::Value* rho) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(symbol);
-        args_.push_back(rho);
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<GenericGetVarMissOK>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericGetVarMissOK* result = new GenericGetVarMissOK(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), symbol, rho);
     }
 
     static GenericGetVarMissOK * insertBefore (
@@ -3817,18 +3245,7 @@ class GenericGetEllipsisValueMissOK : public PrimitiveCall {
 
     static GenericGetEllipsisValueMissOK*
     create(Builder& b, llvm::Value* symbol, llvm::Value* rho) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(symbol);
-        args_.push_back(rho);
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<GenericGetEllipsisValueMissOK>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        GenericGetEllipsisValueMissOK* result =
-            new GenericGetEllipsisValueMissOK(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), symbol, rho);
     }
 
     static GenericGetEllipsisValueMissOK * insertBefore (
@@ -3887,18 +3304,7 @@ class CheckSwitchControl : public PrimitiveCall {
 
     static CheckSwitchControl* create(Builder& b, llvm::Value* ctrl,
                                       SEXP call) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(ctrl);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<CheckSwitchControl>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        CheckSwitchControl* result = new CheckSwitchControl(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), ctrl, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static CheckSwitchControl * insertBefore (
@@ -3968,19 +3374,7 @@ class SwitchControlCharacter : public PrimitiveCall {
 
     static SwitchControlCharacter* create(Builder& b, llvm::Value* ctrl,
                                           SEXP call, SEXP cases) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(ctrl);
-        args_.push_back(b.consts());
-        args_.push_back(Builder::integer(b.constantPoolIndex(call)));
-        args_.push_back(Builder::integer(b.constantPoolIndex(cases)));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<SwitchControlCharacter>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        SwitchControlCharacter* result = new SwitchControlCharacter(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), ctrl, b.consts(), Builder::integer(b.constantPoolIndex(call)), Builder::integer(b.constantPoolIndex(cases)));
     }
 
     static SwitchControlCharacter * insertBefore (
@@ -4037,17 +3431,7 @@ class SwitchControlInteger : public PrimitiveCall {
 
     static SwitchControlInteger* create(Builder& b, llvm::Value* ctrl,
                                         int numCases) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(ctrl);
-        args_.push_back(Builder::integer(numCases));
-
-        llvm::CallInst* ins = llvm::CallInst::Create(
-            b.intrinsic<SwitchControlInteger>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        SwitchControlInteger* result = new SwitchControlInteger(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), ctrl, numCases);
     }
 
     static SwitchControlInteger * insertBefore (
@@ -4095,17 +3479,7 @@ class ReturnJump : public PrimitiveCall {
 
     static ReturnJump* create(Builder& b, llvm::Value* value,
                               llvm::Value* rho) {
-
-        std::vector<llvm::Value*> args_;
-        args_.push_back(value);
-        args_.push_back(rho);
-
-        llvm::CallInst* ins =
-            llvm::CallInst::Create(b.intrinsic<ReturnJump>(), args_, "", b);
-
-        b.markSafepoint(ins);
-        ReturnJump* result = new ReturnJump(ins);
-        return result;
+        return insertBefore(b.blockSentinel(), value, rho);
     }
 
     static ReturnJump * insertBefore (

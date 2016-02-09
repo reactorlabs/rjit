@@ -19,6 +19,7 @@ class Verifier;
 class View;
 class Pass;
 class Value;
+class Builder;
 
 
 
@@ -106,13 +107,9 @@ class Pattern {
       provide specialized versions based on the knowledge of their length.
      */
     virtual void advance(llvm::BasicBlock::iterator& i) const {
-        assert(get(i) == this and "advance of pattern is called on instruction "
-                                  "that is not part of it");
-        while (get(i) == this) {
-            if (i->isTerminator()) {
-                ++i;
-                return;
-            }
+        for (size_t l = 0; l < length(); ++l) {
+            assert(get(i) == this and "advance of pattern is called on instruction "
+                                      "that is not part of it");
             ++i;
         }
     }
@@ -129,6 +126,7 @@ class Pattern {
     friend class View;
     friend class Pass;
     friend class Value;
+    friend class Builder;
 
     /** Each pattern must know the llvm::instruction that is its result.
 
@@ -151,6 +149,10 @@ class Pattern {
     /** Attaches the pattern to given llvm instruction.
      */
     void attach(llvm::Instruction* ins) {
+        Pattern * p = get(ins);
+        if (p != nullptr) {
+            assert(false);
+        }
         assert(get(ins) == nullptr and "Instruction already has a pattern");
         std::vector<llvm::Metadata*> v = {
             llvm::ValueAsMetadata::get(llvm::ConstantInt::get(
@@ -190,13 +192,37 @@ private:
 
 static_assert(sizeof(ir::Value) == sizeof(llvm::Value*), "ir::Value must have the same representation as llvm::Value (vector typecasting)");
 
+
+/** Nop instruction, which internally is iadd 0,0.
+
+  Used as a sentinel in basic blocks so that inserting before an instruction and adding at the end has the same semantics. This is also why the pattern does not support the usual create & insertBefore methods.
+
+ */
+class Nop : public Pattern {
+public:
+
+    static Nop * create(BasicBlock * b) {
+        return new Nop(llvm::BinaryOperator::Create(
+            llvm::Instruction::Add, Builder::integer(0), Builder::integer(0), "nop", b));
+    }
+
+    static bool classof(Pattern const * s) {
+        return s->kind == Kind::Nop;
+    }
+
+protected:
+   Nop(llvm::Instruction * ins) : Pattern(ins, Kind::Nop) {
+   }
+
+};
+
+
 class Return : public Pattern {
   public:
     llvm::Value* value() { return ins<llvm::ReturnInst>()->getOperand(0); }
 
     static Return* create(Builder& b, ir::Value value) {
-        return new Return(
-            llvm::ReturnInst::Create(llvm::getGlobalContext(), value, b));
+        return insertBefore(b.blockSentinel()->first(), value);
     }
 
     static Return * insertBefore(llvm::Instruction * ins, ir::Value value) {
@@ -225,7 +251,7 @@ class Branch : public Pattern {
     }
 
     static Branch* create(Builder& b, llvm::BasicBlock* target) {
-        return new Branch(llvm::BranchInst::Create(target, b));
+        return insertBefore(b.blockSentinel()->first(), target);
     }
 
     static Branch * insertBefore(llvm::Instruction * ins, llvm::BasicBlock * target) {
@@ -270,10 +296,8 @@ protected:
 class IntegerLessThan : public IntegerComparison {
   public:
 
-    static IntegerLessThan* create(Builder& b, ir::Value lhs,
-                                   ir::Value rhs) {
-        return new IntegerLessThan(
-            new llvm::ICmpInst(*b.block(), Predicate::ICMP_SLT, lhs, rhs));
+    static IntegerLessThan* create(Builder& b, ir::Value lhs, ir::Value rhs) {
+        return insertBefore(b.blockSentinel()->first(), lhs, rhs);
     }
 
     static IntegerLessThan * insertBefore(llvm::Instruction * ins, ir::Value lhs, ir::Value rhs) {
@@ -303,7 +327,7 @@ class IntegerEquals : public IntegerComparison {
 
     static IntegerEquals * create(Builder& b, ir::Value lhs,
                                   ir::Value rhs) {
-        return new IntegerEquals(new llvm::ICmpInst(*b.block(), Predicate::ICMP_EQ, lhs, rhs));
+        return insertBefore(b.blockSentinel()->first(), lhs, rhs);
     }
 
     static IntegerEquals * insertBefore(llvm::Instruction * ins, ir::Value lhs, ir::Value rhs) {
@@ -332,7 +356,7 @@ class UnsignedIntegerLessThan : public IntegerComparison {
 
     static UnsignedIntegerLessThan *  create(Builder& b, ir::Value lhs,
                                   ir::Value rhs) {
-        return new UnsignedIntegerLessThan(new llvm::ICmpInst(*b.block(), Predicate::ICMP_ULT, lhs, rhs));
+        return insertBefore(b.blockSentinel()->first(), lhs, rhs);
     }
 
     static UnsignedIntegerLessThan * insertBefore(llvm::Instruction * ins, ir::Value lhs, ir::Value rhs) {
@@ -370,8 +394,7 @@ class IntegerAdd : public BinaryOperator {
     llvm::Value* rhs() { return ins<llvm::ICmpInst>()->getOperand(1); }
 
     static IntegerAdd* create(Builder& b, ir::Value lhs, ir::Value rhs) {
-        return new IntegerAdd(llvm::BinaryOperator::Create(
-            llvm::Instruction::Add, lhs, rhs, "", b));
+        return insertBefore(b.blockSentinel()->first(), lhs, rhs);
     }
 
     static IntegerAdd * insertBefore(llvm::Instruction * ins, ir::Value lhs, ir::Value rhs) {
@@ -427,10 +450,7 @@ class Cbr : public Pattern {
     static Cbr * create(Builder& b, ir::Value cond,
                        llvm::BasicBlock* trueCase,
                        llvm::BasicBlock* falseCase) {
-        ICmpInst* test = new ICmpInst(*b.block(), ICmpInst::ICMP_NE, cond,
-                                      b.integer(0), "condition");
-        auto branch = BranchInst::Create(trueCase, falseCase, test, b);
-        return new Cbr(test, branch);
+        return insertBefore(b.blockSentinel()->first(), cond, trueCase, falseCase);
     }
 
     static Cbr * insertBefore(llvm::Instruction * ins, ir::Value cond, llvm::BasicBlock * trueCase, llvm::BasicBlock * falseCase) {
@@ -457,23 +477,7 @@ class MarkNotMutable : public Pattern {
   public:
     static MarkNotMutable * create(Builder & b,
                        ir::Value val) {
-        LLVMContext & c = b.getContext();
-        ConstantInt* int32_0 =
-            ConstantInt::get(c, APInt(32, StringRef("0"), 10));
-        ConstantInt* c1 = ConstantInt::get(c, APInt(32, StringRef("-193"), 10));
-        ConstantInt* c2 = ConstantInt::get(c, APInt(32, StringRef("128"), 10));
-        auto sexpinfo = GetElementPtrInst::Create(t::SEXPREC, val, std::vector<llvm::Value*>({int32_0, int32_0}), "", b.block());
-        auto sexpint =
-            new BitCastInst(sexpinfo, PointerType::get(t::Int, 1), "", b.block());
-        auto sexpval = new LoadInst(sexpint, "", false, b.block());
-        sexpval->setAlignment(4);
-        auto clear = llvm::BinaryOperator::Create(llvm::Instruction::And,
-                                                  sexpval, c1, "", b.block());
-        auto set = llvm::BinaryOperator::Create(llvm::Instruction::Or, clear,
-                                                c2, "", b.block());
-        auto store = new StoreInst(set, sexpint, b.block());
-        store->setAlignment(4);
-        return new MarkNotMutable(sexpinfo, sexpint, sexpval, clear, set, store);
+        return insertBefore(b.blockSentinel(), val);
     }
 
     static MarkNotMutable * insertBefore(llvm::Instruction * ins, ir::Value val) {
@@ -528,7 +532,9 @@ class MarkNotMutable : public Pattern {
 class Car : public Pattern {
   public:
 
-    static Car* create(Builder& b, ir::Value sexp);
+    static Car* create(Builder& b, ir::Value sexp) {
+        return insertBefore(b.blockSentinel()->first(), sexp);
+    }
 
     static Car * insertBefore(llvm::Instruction * ins, ir::Value sexp) {
         LLVMContext & c = ins->getContext();
@@ -572,7 +578,9 @@ protected:
 class Cdr : public Pattern {
   public:
 
-    static Cdr* create(Builder& b, ir::Value sexp);
+    static Cdr* create(Builder& b, ir::Value sexp) {
+        return insertBefore(b.blockSentinel()->first(), sexp);
+    }
 
     static Cdr * insertBefore(llvm::Instruction * ins, ir::Value sexp) {
         LLVMContext & c = ins->getContext();
@@ -634,7 +642,9 @@ protected:
 class Tag : public Pattern {
   public:
 
-    static Tag* create(Builder& b, ir::Value sexp);
+    static Tag* create(Builder& b, ir::Value sexp) {
+        return insertBefore(b.blockSentinel()->first(), sexp);
+    }
 
     static Tag * insertBefore(llvm::Instruction * ins, ir::Value sexp) {
         LLVMContext & c = ins->getContext();
@@ -694,8 +704,9 @@ protected:
 
 class VectorGetElement : public Pattern {
   public:
-    // TODO this should change to builder semantics
-    static VectorGetElement* create(Builder & b, ir::Value vector, ir::Value index);
+    static VectorGetElement* create(Builder & b, ir::Value vector, ir::Value index) {
+        return insertBefore(b.blockSentinel()->first(), vector, index);
+    }
 
     static VectorGetElement * insertBefore(llvm::Instruction * ins, ir::Value vector, ir::Value index) {
         LLVMContext & c = ins->getContext();
@@ -763,8 +774,16 @@ class Switch : public Pattern {
 
     static Switch* create(Builder& b, ir::Value cond,
                           llvm::BasicBlock* defaultTarget, int numCases) {
+        return insertBefore(b.blockSentinel(), cond, defaultTarget, numCases);
+    }
+
+    static Switch * insertBefore(llvm::Instruction * ins, ir::Value cond, llvm::BasicBlock * defaultTarget, int numCases) {
         return new Switch(
-            llvm::SwitchInst::Create(cond, defaultTarget, numCases, b));
+            llvm::SwitchInst::Create(cond, defaultTarget, numCases, ins));
+    }
+
+    static Switch * insertBefore(Pattern * p, ir::Value cond, llvm::BasicBlock * defaultTarget, int numCases) {
+        return insertBefore(p->first(), cond, defaultTarget, numCases);
     }
 
     void setDefaultDest(llvm::BasicBlock* target) {
@@ -792,7 +811,7 @@ class CallToAddress : public Pattern {
     static CallToAddress* create(Builder& b, llvm::Value* fun,
                                  std::vector<llvm::Value*> args) {
         return new CallToAddress(
-            llvm::CallInst::Create(fun, *reinterpret_cast<std::vector<llvm::Value *>*>(&args), "", b.block()));
+            llvm::CallInst::Create(fun, *reinterpret_cast<std::vector<llvm::Value *>*>(&args), "", b.blockSentinel()->first()));
     }
 
     static CallToAddress* create(Builder& b, llvm::Value* fun,

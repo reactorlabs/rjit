@@ -122,18 +122,21 @@ Function* ICCompiler::compileCallStub() {
     ir::PatchIC::create(b, icAddr, stackmapId(), caller());
     // create new intrinics function for patchIC (maybe?)
 
-    Value* ic = new BitCastInst(icAddr, PointerType::get(ic_t, 0), "", b);
+    // TODO adding llvm instruction directly w/o builder is not such a good idea
+    Value* ic = new BitCastInst(icAddr, PointerType::get(ic_t, 0), "", b.blockSentinel()->first());
 
     auto res = ir::CallToAddress::create(b, ic, b.args())->result();
-    ReturnInst::Create(getGlobalContext(), res, b);
+    // TODO adding llvm instruction directly w/o builder is not such a good idea
+    ReturnInst::Create(getGlobalContext(), res, b.blockSentinel()->first());
 
     auto stub = b.f();
+    b.closeIC();
 
     return stub;
 }
 
 bool ICCompiler::compileIc(SEXP inCall, SEXP inFun) {
-    auto f = b.f();
+    //auto f = b.f();
 
     if (TYPEOF(inFun) == CLOSXP) {
         std::vector<bool> promarg(size, false);
@@ -205,18 +208,16 @@ bool ICCompiler::compileIc(SEXP inCall, SEXP inFun) {
         SEXP inBody = CDR(inFun);
         if (TYPEOF(inBody) == NATIVESXP) {
 
-            BasicBlock* icMatch =
-                BasicBlock::Create(getGlobalContext(), "icMatch", f, nullptr);
-            BasicBlock* icMiss =
-                BasicBlock::Create(getGlobalContext(), "icMiss", f, nullptr);
+            BasicBlock* icMatch = b.createBasicBlock("icMatch");
+            BasicBlock* icMiss = b.createBasicBlock("icMiss");
 
             // Insert a guard to check if the incomming function matches
             // the one we got this time
             Value* nativeFun = ir::Cdr::create(b, fun())->result();
             ICmpInst* test = new ICmpInst(
-                *b.block(), ICmpInst::ICMP_EQ, nativeFun,
+                b.blockSentinel()->first(), ICmpInst::ICMP_EQ, nativeFun,
                 ir::Builder::convertToPointer(BODY(inFun)), "guard");
-            BranchInst::Create(icMatch, icMiss, test, b.block());
+            BranchInst::Create(icMatch, icMiss, test, b.blockSentinel()->first());
             b.setBlock(icMatch);
 
             // This is an inlined version of applyNativeClosure
@@ -237,7 +238,7 @@ bool ICCompiler::compileIc(SEXP inCall, SEXP inFun) {
                                    actuals, ir::Tag::create(b, fun())->result())
                     ->result();
 
-            Value* cntxt = new AllocaInst(t::cntxt, "", b.block());
+            Value* cntxt = new AllocaInst(t::cntxt, "", b.blockSentinel()->first());
 
             ir::InitClosureContext::create(b, cntxt, call(), newrho, rho(),
                                            actuals, fun());
@@ -280,14 +281,13 @@ void ICCompiler::compileSpecialIC() {
     // Specials only care about the ast, so we can call any special through
     // this ic
     Value* ftype = ir::SexpType::create(b, fun())->result();
-    Value* test = new ICmpInst(*b.block(), ICmpInst::ICMP_EQ, ftype,
+    Value* test = new ICmpInst(b.blockSentinel()->first(), ICmpInst::ICMP_EQ, ftype,
                                b.integer(SPECIALSXP), "guard");
 
-    BranchInst::Create(icMatch, icMiss, test, b.block());
+    BranchInst::Create(icMatch, icMiss, test, b.blockSentinel()->first());
     b.setBlock(icMatch);
 
-    Value* res = ir::CallSpecial::create(
-                     b, call(), fun(), b.convertToPointer(R_NilValue), b.rho())
+    Value* res = ir::CallSpecial::create(b, call(), fun(), b.convertToPointer(R_NilValue), b.rho())
                      ->result();
     ir::Return::create(b, res);
 
@@ -302,10 +302,10 @@ bool ICCompiler::compileGenericIc(SEXP inCall, SEXP inFun) {
 
     Value* body = ir::Cdr::create(b, fun())->result();
     Value* test =
-        new ICmpInst(*b.block(), ICmpInst::ICMP_EQ, body,
+        new ICmpInst(b.blockSentinel()->first(), ICmpInst::ICMP_EQ, body,
                      ir::Builder::convertToPointer(BODY(inFun)), "guard");
 
-    BranchInst::Create(icMatch, icMiss, test, b.block());
+    BranchInst::Create(icMatch, icMiss, test, b.blockSentinel()->first());
     b.setBlock(icMatch);
 
     Value* res;

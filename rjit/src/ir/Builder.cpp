@@ -22,6 +22,8 @@ Builder::Context::Context(std::string const& name, JITModule* m,
 
     // create first basic block
     b = llvm::BasicBlock::Create(llvm::getGlobalContext(), "start", f, nullptr);
+    // insert sentinel at the end of the basic block. And do not forget to remove when finalizing.
+    ir::Nop::create(b);
 }
 
 Builder::ClosureContext::ClosureContext(std::string name, JITModule* m,
@@ -69,6 +71,30 @@ Builder::ICContext::ICContext(std::string name, JITModule* m,
     args_.push_back(stackmapId);
 }
 
+ir::Nop * Builder::blockSentinel() {
+    //std::cerr << "-----------------------------------------------------------" << std::endl;
+    //c_->f->dump();
+    Pattern * p = Pattern::get(&c_->b->back());
+    assert(p->kind == Pattern::Kind::Nop and "Sentinel must be ir::Nop pattern");
+    return dyn_cast<ir::Nop>(p);
+}
+
+llvm::BasicBlock* Builder::createBasicBlock() {
+    llvm::BasicBlock * b = llvm::BasicBlock::Create(m_->getContext(), "", c_->f);
+    // insert sentinel at the end of the basic block. And do not forget to remove when finalizing.
+    ir::Nop::create(b);
+    return b;
+}
+
+
+llvm::BasicBlock* Builder::createBasicBlock(std::string const& name) {
+    llvm::BasicBlock * b = llvm::BasicBlock::Create(m_->getContext(), name, c_->f);
+    // insert sentinel at the end of the basic block. And do not forget to remove when finalizing.
+    ir::Nop::create(b);
+    return b;
+}
+
+
 void Builder::openFunction(std::string const& name, SEXP ast, SEXP formals) {
     if (c_ != nullptr)
         contextStack_.push(c_);
@@ -76,12 +102,16 @@ void Builder::openFunction(std::string const& name, SEXP ast, SEXP formals) {
     c_->addConstantPoolObject(ast);
 }
 
+
+
 SEXP Builder::closeFunction() {
     assert((contextStack_.empty() or (contextStack_.top()->f != c_->f)) and
            "Not a function context");
 
     ClosureContext* cc = dynamic_cast<ClosureContext*>(c_);
     SEXP result = module()->getNativeSXP(cc->formals, c_->cp[0], c_->cp, c_->f);
+    // Remove sentinel NOPs at the end of each basic block
+    removeSentinels();
     // c_->f->dump();
     assert(ir::Verifier::check(c_->f));
     delete c_;
@@ -109,6 +139,20 @@ void Builder::openPromise(std::string const& name, SEXP ast) {
     c_ = new PromiseContext(name, m_);
     c_->addConstantPoolObject(ast);
 }
+
+void Builder::removeSentinels() {
+    // Remove sentinel NOPs at the end of each basic block
+    //std::cerr << "---------------------------------------------" << std::endl;
+    // c_->f->dump();
+    for (llvm::Function::iterator i = c_->f->begin(), e = c_->f->end(); i != e; ++i) {
+        Pattern * p = Pattern::get(&i->back());
+        assert(p->kind == Pattern::Kind::Nop and "All basic blocks in builder are assumed to be terminated by Nop sentinels");
+        p->ins_->eraseFromParent();
+        delete p;
+    }
+}
+
+
 
 } // namespace ir
 } // namespace rjit
