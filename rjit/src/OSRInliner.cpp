@@ -12,7 +12,7 @@ namespace osr {
 
 /*      Initialize static variables     */
 uint64_t OSRInliner::id = 0;
-std::map<uint64_t, SEXP> OSRInliner::exits;
+std::map<uint64_t, ExitEntry> OSRInliner::exits;
 /******************************************************************************/
 /*                  Public functions */
 /******************************************************************************/
@@ -81,8 +81,9 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
         Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineSexp));
 
         Function* toInstrument = OSRHandler::getToInstrument(toOpt);
-        // SEXP toInstr = OSRHandler::cloneSEXP(fSexp, toInstrument);
-        // Inst_Vector* compensation = createCompensation(toInstr, formals);
+        FunctionCall::fixIcStubs(toInstrument);
+        SEXP toInstr = OSRHandler::cloneSEXP(fSexp, toInstrument);
+        Inst_Vector* compensation = createCompensation(toInstr, f);
 
         auto newrho = createNewRho((*it));
 
@@ -91,7 +92,7 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
         prepareCodeToInline(toInline, *it, newrho, LENGTH(CDR(fSexp)), &ret);
         insertBody(toOpt, toInline, toInstrument, *it, &ret);
         OSRHandler::insertOSRExit(toOpt, toInstrument, (*it)->getConsts(),
-                                  getOSRCondition(*it) /*, compensation*/);
+                                  getOSRCondition(*it), compensation);
         // clean up
         ret.clear();
         // Set the constant pool.
@@ -296,14 +297,14 @@ CallInst* OSRInliner::createNewRho(FunctionCall* fc) {
     return res;
 }
 
-Inst_Vector* OSRInliner::createCompensation(SEXP fun, SEXP formals) {
-    c->getBuilder()->module()->getFunctionList().push_back(GET_LLVM(fun));
-    c->getBuilder()->module()->fixRelocations(formals, fun, GET_LLVM(fun));
+Inst_Vector* OSRInliner::createCompensation(SEXP fun, SEXP closure) {
+    c->getBuilder()->module()->fixRelocations(FORMALS(closure), fun,
+                                              GET_LLVM(fun));
     std::vector<Value*> args;
     args.push_back(ConstantInt::get(getGlobalContext(), APInt(64, ++id)));
     Inst_Vector* compensation = new Inst_Vector();
     compensation->push_back(CallInst::Create(fixClosure, args));
-    exits[id] = fun;
+    exits[id] = ExitEntry(closure, fun);
     return compensation;
 }
 } // namespace osr
