@@ -58,8 +58,6 @@ class Builder {
      */
     llvm::BasicBlock* block() { return c_->b; }
 
-    ir::Nop * blockSentinel();
-
     /** Returns the current break target.
      */
     llvm::BasicBlock* breakTarget() {
@@ -360,13 +358,6 @@ class Builder {
             return nullptr;
         }
     };
-
-    /** Removes the sentinels from all basic blocks in current context's function.
-
-      This is necessary because basic blocks with NOPs are not valid ones because there it means there are instructions after a basic block terminator.
-     */
-    void removeSentinels();
-
 
     /** The module into which we are currently building.
      */

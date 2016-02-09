@@ -16,7 +16,8 @@ class EndClosureContext : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::EndClosureContext) {}
 
     static EndClosureContext* create(Builder& b, ir::Value cntxt, ir::Value result) {
-        return insertBefore(b.blockSentinel(), cntxt, result);
+        Sentinel s(b);
+        return insertBefore(s, cntxt, result);
     }
 
     static EndClosureContext* insertBefore(llvm::Instruction * ins, ir::Value cntxt, ir::Value result) {
@@ -59,7 +60,8 @@ class ClosureQuickArgumentAdaptor : public PrimitiveCall {
 
     static ClosureQuickArgumentAdaptor* create(Builder& b, ir::Value op,
                                                ir::Value arglist) {
-        return insertBefore(b.blockSentinel()->first(), op, arglist);
+        Sentinel s(b);
+        return insertBefore(s, op, arglist);
     }
 
     static ClosureQuickArgumentAdaptor* insertBefore(llvm::Instruction * ins, ir::Value op,
@@ -98,7 +100,8 @@ class CallNative : public PrimitiveCall {
 
     static CallNative* create(Builder& b, ir::Value native,
                               ir::Value rho) {
-        return insertBefore(b.blockSentinel()->first(), native, rho);
+        Sentinel s(b);
+        return insertBefore(s, native, rho);
     }
 
     static CallNative* insertBefore(llvm::Instruction* ins, ir::Value native,
@@ -140,7 +143,8 @@ class ClosureNativeCallTrampoline : public PrimitiveCall {
                                                ir::Value native,
                                                ir::Value rh) {
 
-        return insertBefore(b.blockSentinel()->first(), cntxt, native, rh);
+        Sentinel s(b);
+        return insertBefore(s, cntxt, native, rh);
     }
 
     static ClosureNativeCallTrampoline* insertBefore(llvm::Instruction * ins, ir::Value cntxt,
@@ -190,7 +194,8 @@ class ConvertToLogicalNoNA : public PrimitiveCall {
 
     static ConvertToLogicalNoNA* create(Builder& b, ir::Value what,
                                         SEXP call) {
-        return insertBefore(b.blockSentinel()->first(), what, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, what, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static ConvertToLogicalNoNA * insertBefore (
@@ -240,7 +245,8 @@ class PrintValue : public PrimitiveCall {
     PrintValue(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::PrintValue) {}
 
     static PrintValue* create(Builder& b, ir::Value value) {
-        return insertBefore(b.blockSentinel()->first(), value);
+        Sentinel s(b);
+        return insertBefore(s, value);
     }
 
     static PrintValue * insertBefore (
@@ -287,7 +293,8 @@ class StartFor : public PrimitiveCall {
     StartFor(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::StartFor) {}
 
     static StartFor* create(Builder& b, ir::Value seq, ir::Value rho) {
-        return insertBefore(b.blockSentinel()->first(), seq, rho);
+        Sentinel s(b);
+        return insertBefore(s, seq, rho);
     }
 
     static StartFor * insertBefore (
@@ -346,7 +353,8 @@ class LoopSequenceLength : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::LoopSequenceLength) {}
 
     static LoopSequenceLength* create(Builder& b, ir::Value seq, SEXP call) {
-        return insertBefore(b.blockSentinel()->first(), seq, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, seq, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static LoopSequenceLength * insertBefore (
@@ -402,7 +410,8 @@ class GetForLoopValue : public PrimitiveCall {
 
     static GetForLoopValue* create(Builder& b, ir::Value seq,
                                    ir::Value index) {
-        return insertBefore(b.blockSentinel(), seq, index);
+        Sentinel s(b);
+        return insertBefore(s, seq, index);
     }
 
     static GetForLoopValue * insertBefore (
@@ -448,7 +457,8 @@ class MarkVisible : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::MarkVisible) {}
 
     static MarkVisible* create(Builder& b) {
-        return insertBefore(b.blockSentinel()->first());
+        Sentinel s(b);
+        return insertBefore(s);
     }
 
     static MarkVisible * insertBefore (
@@ -489,7 +499,8 @@ class MarkInvisible : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::MarkInvisible) {}
 
     static MarkInvisible* create(Builder& b) {
-        return insertBefore(b.blockSentinel()->first());
+        Sentinel s(b);
+        return insertBefore(s);
     }
 
     static MarkInvisible * insertBefore (
@@ -544,7 +555,8 @@ class UserLiteral : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::UserLiteral) {}
 
     static UserLiteral* create(Builder& b, SEXP index) {
-        return insertBefore(b.blockSentinel()->first(), b.consts(), Builder::integer(b.constantPoolIndex(index)));
+        Sentinel s(b);
+        return insertBefore(s, b.consts(), Builder::integer(b.constantPoolIndex(index)));
     }
 
     static UserLiteral * insertBefore (
@@ -588,9 +600,10 @@ class PatchIC : public PrimitiveCall {
   public:
     PatchIC(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::PatchIC) {}
 
-    static PatchIC* create(Builder& b, llvm::Value* addr,
-                           llvm::Value* stackmapId, llvm::Value* caller) {
-        return insertBefore(b.blockSentinel()->first(), addr, stackmapId, caller);
+    static PatchIC* create(Builder& b, ir::Value addr,
+                           ir::Value stackmapId, ir::Value caller) {
+        Sentinel s(b);
+        return insertBefore(s, addr, stackmapId, caller);
     }
 
     static PatchIC* insertBefore(llvm::Instruction * ins, ir::Value addr,
@@ -624,10 +637,11 @@ class CompileIC : public PrimitiveCall {
   public:
     CompileIC(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::CompileIC) {}
 
-    static CompileIC* create(Builder& b, llvm::Value* size, llvm::Value* call,
-                             llvm::Value* fun, llvm::Value* rho,
-                             llvm::Value* stackmapId) {
-        return insertBefore(b.blockSentinel()->first(), size, call, fun, rho, stackmapId);
+    static CompileIC* create(Builder& b, ir::Value size, ir::Value call,
+                             ir::Value fun, ir::Value rho,
+                             ir::Value stackmapId) {
+        Sentinel s(b);
+        return insertBefore(s, size, call, fun, rho, stackmapId);
     }
 
     static CompileIC * insertBefore(llvm::Instruction * ins, ir::Value size, ir::Value call, ir::Value fun, ir::Value rho, ir::Value stackmapId) {
@@ -662,11 +676,12 @@ class InitClosureContext : public PrimitiveCall {
     InitClosureContext(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::InitClosureContext) {}
 
-    static InitClosureContext* create(Builder& b, llvm::Value* context,
-                                      llvm::Value* call, llvm::Value* newrho,
-                                      llvm::Value* rho, llvm::Value* actuals,
-                                      llvm::Value* fun) {
-        return insertBefore(b.blockSentinel()->first(), context, call,newrho, rho, actuals, fun);
+    static InitClosureContext* create(Builder& b, ir::Value context,
+                                      ir::Value call, ir::Value newrho,
+                                      ir::Value rho, ir::Value actuals,
+                                      ir::Value fun) {
+        Sentinel s(b);
+        return insertBefore(s, context, call,newrho, rho, actuals, fun);
     }
 
     static InitClosureContext * insertBefore(llvm::Instruction * ins, ir::Value context, ir::Value call, ir::Value newrho, ir::Value rho, ir::Value actuals, ir::Value fun) {
@@ -704,9 +719,10 @@ class NewEnv : public PrimitiveCall {
   public:
     NewEnv(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::NewEnv) {}
 
-    static NewEnv* create(Builder& b, llvm::Value* names, llvm::Value* values,
-                          llvm::Value* parent) {
-        return insertBefore(b.blockSentinel()->first(), names, values, parent);
+    static NewEnv* create(Builder& b, ir::Value names, ir::Value values,
+                          ir::Value parent) {
+        Sentinel s(b);
+        return insertBefore(s, names, values, parent);
     }
 
     static NewEnv * insertBefore(llvm::Instruction * ins, ir::Value names, ir::Value values, ir::Value parent) {
@@ -740,8 +756,9 @@ class ConsNr : public PrimitiveCall {
   public:
     ConsNr(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::ConsNr) {}
 
-    static ConsNr* create(Builder& b, llvm::Value* car, llvm::Value* cdr) {
-        return insertBefore(b.blockSentinel()->first(), car, cdr);
+    static ConsNr* create(Builder& b, ir::Value car, ir::Value cdr) {
+        Sentinel s(b);
+        return insertBefore(s, car, cdr);
     }
 
     static ConsNr * insertBefore(llvm::Instruction * ins, ir::Value car, ir::Value cdr) {
@@ -782,7 +799,8 @@ class Constant : public PrimitiveCall {
     Constant(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::Constant) {}
 
     static Constant* create(Builder& b, SEXP index) {
-        return insertBefore(b.blockSentinel()->first(), b.consts(), Builder::integer(b.constantPoolIndex(index)));
+        Sentinel s(b);
+        return insertBefore(s, b.consts(), Builder::integer(b.constantPoolIndex(index)));
     }
 
     static Constant * insertBefore (
@@ -839,8 +857,9 @@ class GenericGetVar : public PrimitiveCall {
     GenericGetVar(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GenericGetVar) {}
 
-    static GenericGetVar* create(Builder& b, llvm::Value* rho, SEXP symbol) {
-        return insertBefore(b.blockSentinel()->first(), rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
+    static GenericGetVar* create(Builder& b, ir::Value rho, SEXP symbol) {
+        Sentinel s(b);
+        return insertBefore(s, rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GenericGetVar * insertBefore (
@@ -899,9 +918,10 @@ class GenericGetEllipsisArg : public PrimitiveCall {
     GenericGetEllipsisArg(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GenericGetEllipsisArg) {}
 
-    static GenericGetEllipsisArg* create(Builder& b, llvm::Value* rho,
+    static GenericGetEllipsisArg* create(Builder& b, ir::Value rho,
                                          SEXP symbol) {
-        return insertBefore(b.blockSentinel(), rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
+        Sentinel s(b);
+        return insertBefore(s, rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GenericGetEllipsisArg * insertBefore (
@@ -962,9 +982,10 @@ class GenericSetVar : public PrimitiveCall {
     GenericSetVar(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GenericSetVar) {}
 
-    static GenericSetVar* create(Builder& b, llvm::Value* value,
+    static GenericSetVar* create(Builder& b, ir::Value value,
                                  llvm::Value* rho, SEXP symbol) {
-        return insertBefore(b.blockSentinel()->first(), value, rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
+        Sentinel s(b);
+        return insertBefore(s, value, rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GenericSetVar * insertBefore (
@@ -1027,9 +1048,10 @@ class GenericSetVarParent : public PrimitiveCall {
     GenericSetVarParent(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GenericSetVarParent) {}
 
-    static GenericSetVarParent* create(Builder& b, llvm::Value* value,
+    static GenericSetVarParent* create(Builder& b, ir::Value value,
                                        llvm::Value* rho, SEXP symbol) {
-        return insertBefore(b.blockSentinel()->first(), value, rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
+        Sentinel s(b);
+        return insertBefore(s, value, rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GenericSetVarParent * insertBefore (
@@ -1092,8 +1114,9 @@ class GetFunction : public PrimitiveCall {
     GetFunction(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GetFunction) {}
 
-    static GetFunction* create(Builder& b, llvm::Value* rho, SEXP symbol) {
-        return insertBefore(b.blockSentinel(), rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
+    static GetFunction* create(Builder& b, ir::Value rho, SEXP symbol) {
+        Sentinel s(b);
+        return insertBefore(s, rho, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GetFunction * insertBefore (
@@ -1153,7 +1176,8 @@ class GetGlobalFunction : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::GetGlobalFunction) {}
 
     static GetGlobalFunction* create(Builder& b, SEXP symbol) {
-        return insertBefore(b.blockSentinel(), b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
+        Sentinel s(b);
+        return insertBefore(s, b.consts(), Builder::integer(b.constantPoolIndex(symbol)));
     }
 
     static GetGlobalFunction * insertBefore (
@@ -1209,7 +1233,8 @@ class GetSymFunction : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::GetSymFunction) {}
 
     static GetSymFunction* create(Builder& b, SEXP name) {
-        return insertBefore(b.blockSentinel(), b.consts(), Builder::integer(b.constantPoolIndex(name)));
+        Sentinel s(b);
+        return insertBefore(s, b.consts(), Builder::integer(b.constantPoolIndex(name)));
     }
 
     static GetSymFunction * insertBefore (
@@ -1265,7 +1290,8 @@ class GetBuiltinFunction : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::GetBuiltinFunction) {}
 
     static GetBuiltinFunction* create(Builder& b, SEXP name) {
-        return insertBefore(b.blockSentinel(), b.consts(), Builder::integer(b.constantPoolIndex(name)));
+        Sentinel s(b);
+        return insertBefore(s, b.consts(), Builder::integer(b.constantPoolIndex(name)));
     }
 
     static GetBuiltinFunction * insertBefore (
@@ -1321,7 +1347,8 @@ class GetInternalBuiltinFunction : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::GetInternalBuiltinFunction) {}
 
     static GetInternalBuiltinFunction* create(Builder& b, SEXP name) {
-        return insertBefore(b.blockSentinel()->first(), b.consts(), Builder::integer(b.constantPoolIndex(name)));
+        Sentinel s(b);
+        return insertBefore(s, b.consts(), Builder::integer(b.constantPoolIndex(name)));
     }
 
     static GetInternalBuiltinFunction * insertBefore (
@@ -1368,8 +1395,9 @@ class CheckFunction : public PrimitiveCall {
     CheckFunction(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::CheckFunction) {}
 
-    static CheckFunction* create(Builder& b, llvm::Value* f) {
-        return insertBefore(b.blockSentinel()->first(), f);
+    static CheckFunction* create(Builder& b, ir::Value f) {
+        Sentinel s(b);
+        return insertBefore(s, f);
     }
 
     static CheckFunction * insertBefore (
@@ -1415,9 +1443,10 @@ class CreatePromise : public PrimitiveCall {
     CreatePromise(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::CreatePromise) {}
 
-    static CreatePromise* create(Builder& b, llvm::Value* fun,
+    static CreatePromise* create(Builder& b, ir::Value fun,
                                  llvm::Value* rho) {
-        return insertBefore(b.blockSentinel()->first(), fun, rho);
+        Sentinel s(b);
+        return insertBefore(s, fun, rho);
     }
 
     static CreatePromise * insertBefore (
@@ -1464,8 +1493,9 @@ class SexpType : public PrimitiveCall {
 
     SexpType(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::SexpType) {}
 
-    static SexpType* create(Builder& b, llvm::Value* value) {
-        return insertBefore(b.blockSentinel()->first(), value);
+    static SexpType* create(Builder& b, ir::Value value) {
+        Sentinel s(b);
+        return insertBefore(s, value);
     }
 
     static SexpType * insertBefore (
@@ -1509,9 +1539,10 @@ class AddArgument : public PrimitiveCall {
     AddArgument(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::AddArgument) {}
 
-    static AddArgument* create(Builder& b, llvm::Value* args,
+    static AddArgument* create(Builder& b, ir::Value args,
                                llvm::Value* arg) {
-        return insertBefore(b.blockSentinel(), args, arg);
+        Sentinel s(b);
+        return insertBefore(s, args, arg);
     }
     static AddArgument * insertBefore (
             llvm::Instruction * ins,
@@ -1558,9 +1589,10 @@ class AddKeywordArgument : public PrimitiveCall {
     AddKeywordArgument(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::AddKeywordArgument) {}
 
-    static AddKeywordArgument* create(Builder& b, llvm::Value* args,
-                                      llvm::Value* arg, llvm::Value* name) {
-        return insertBefore(b.blockSentinel(), args, arg,name);
+    static AddKeywordArgument* create(Builder& b, ir::Value args,
+                                      llvm::Value* arg, ir::Value name) {
+        Sentinel s(b);
+        return insertBefore(s, args, arg,name);
     }
 
     static AddKeywordArgument * insertBefore (
@@ -1612,10 +1644,11 @@ class AddEllipsisArgumentHead : public PrimitiveCall {
     AddEllipsisArgumentHead(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::AddEllipsisArgumentHead) {}
 
-    static AddEllipsisArgumentHead* create(Builder& b, llvm::Value* args,
+    static AddEllipsisArgumentHead* create(Builder& b, ir::Value args,
                                            llvm::Value* rho,
                                            llvm::Value* eager) {
-        return insertBefore(b.blockSentinel(), args, rho, eager);
+        Sentinel s(b);
+        return insertBefore(s, args, rho, eager);
     }
 
     static AddEllipsisArgumentHead * insertBefore (
@@ -1667,10 +1700,11 @@ class AddEllipsisArgumentTail : public PrimitiveCall {
     AddEllipsisArgumentTail(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::AddEllipsisArgumentTail) {}
 
-    static AddEllipsisArgumentTail* create(Builder& b, llvm::Value* args,
+    static AddEllipsisArgumentTail* create(Builder& b, ir::Value args,
                                            llvm::Value* rho,
                                            llvm::Value* eager) {
-        return insertBefore(b.blockSentinel(), args, rho, eager);
+        Sentinel s(b);
+        return insertBefore(s, args, rho, eager);
     }
 
     static AddEllipsisArgumentTail * insertBefore (
@@ -1723,10 +1757,11 @@ class CallBuiltin : public PrimitiveCall {
     CallBuiltin(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::CallBuiltin) {}
 
-    static CallBuiltin* create(Builder& b, llvm::Value* call,
-                               llvm::Value* closure, llvm::Value* arguments,
+    static CallBuiltin* create(Builder& b, ir::Value call,
+                               llvm::Value* closure, ir::Value arguments,
                                llvm::Value* rho) {
-        return insertBefore(b.blockSentinel(), call, closure, arguments, rho);
+        Sentinel s(b);
+        return insertBefore(s, call, closure, arguments, rho);
     }
 
     static CallBuiltin * insertBefore (
@@ -1782,10 +1817,11 @@ class CallSpecial : public PrimitiveCall {
     CallSpecial(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::CallSpecial) {}
 
-    static CallSpecial* create(Builder& b, llvm::Value* call,
-                               llvm::Value* closure, llvm::Value* arguments,
+    static CallSpecial* create(Builder& b, ir::Value call,
+                               llvm::Value* closure, ir::Value arguments,
                                llvm::Value* rho) {
-        return insertBefore(b.blockSentinel(), call, closure, arguments, rho);
+        Sentinel s(b);
+        return insertBefore(s, call, closure, arguments, rho);
     }
 
     static CallSpecial * insertBefore (
@@ -1841,10 +1877,11 @@ class CallClosure : public PrimitiveCall {
     CallClosure(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::CallClosure) {}
 
-    static CallClosure* create(Builder& b, llvm::Value* call,
-                               llvm::Value* closure, llvm::Value* arguments,
+    static CallClosure* create(Builder& b, ir::Value call,
+                               llvm::Value* closure, ir::Value arguments,
                                llvm::Value* rho) {
-        return insertBefore(b.blockSentinel(), call, closure, arguments, rho);
+        Sentinel s(b);
+        return insertBefore(s, call, closure, arguments, rho);
     }
 
     static CallClosure * insertBefore (
@@ -1915,9 +1952,10 @@ class CreateClosure : public PrimitiveCall {
     CreateClosure(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::CreateClosure) {}
 
-    static CreateClosure* create(Builder& b, llvm::Value* rho, SEXP forms,
+    static CreateClosure* create(Builder& b, ir::Value rho, SEXP forms,
                                  SEXP body) {
-        return insertBefore(b.blockSentinel(), rho, b.consts(), Builder::integer(b.constantPoolIndex(forms)), Builder::integer(b.constantPoolIndex(body)));
+        Sentinel s(b);
+        return insertBefore(s, rho, b.consts(), Builder::integer(b.constantPoolIndex(forms)), Builder::integer(b.constantPoolIndex(body)));
     }
 
     static CreateClosure * insertBefore (
@@ -1980,9 +2018,10 @@ class GenericUnaryMinus : public PrimitiveCall {
     GenericUnaryMinus(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GenericUnaryMinus) {}
 
-    static GenericUnaryMinus* create(Builder& b, llvm::Value* op,
+    static GenericUnaryMinus* create(Builder& b, ir::Value op,
                                      llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericUnaryMinus * insertBefore (
@@ -2045,9 +2084,10 @@ class GenericUnaryPlus : public PrimitiveCall {
     GenericUnaryPlus(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GenericUnaryPlus) {}
 
-    static GenericUnaryPlus* create(Builder& b, llvm::Value* op,
+    static GenericUnaryPlus* create(Builder& b, ir::Value op,
                                     llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericUnaryPlus * insertBefore (
@@ -2110,9 +2150,10 @@ class GenericAdd : public PrimitiveCall {
 
     GenericAdd(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericAdd) {}
 
-    static GenericAdd* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericAdd* create(Builder& b, ir::Value lhs, ir::Value rhs,
                               llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericAdd * insertBefore (
@@ -2178,9 +2219,10 @@ class GenericSub : public PrimitiveCall {
 
     GenericSub(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericSub) {}
 
-    static GenericSub* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericSub* create(Builder& b, ir::Value lhs, ir::Value rhs,
                               llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericSub * insertBefore (
@@ -2247,9 +2289,10 @@ class GenericMul : public PrimitiveCall {
 
     GenericMul(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericMul) {}
 
-    static GenericMul* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericMul* create(Builder& b, ir::Value lhs, ir::Value rhs,
                               llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericMul * insertBefore (
@@ -2316,9 +2359,10 @@ class GenericDiv : public PrimitiveCall {
 
     GenericDiv(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericDiv) {}
 
-    static GenericDiv* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericDiv* create(Builder& b, ir::Value lhs, ir::Value rhs,
                               llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericDiv * insertBefore (
@@ -2385,9 +2429,10 @@ class GenericPow : public PrimitiveCall {
 
     GenericPow(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericPow) {}
 
-    static GenericPow* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericPow* create(Builder& b, ir::Value lhs, ir::Value rhs,
                               llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericPow * insertBefore (
@@ -2454,9 +2499,10 @@ class GenericSqrt : public PrimitiveCall {
     GenericSqrt(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GenericSqrt) {}
 
-    static GenericSqrt* create(Builder& b, llvm::Value* op, llvm::Value* rho,
+    static GenericSqrt* create(Builder& b, ir::Value op, ir::Value rho,
                                SEXP call) {
-        return insertBefore(b.blockSentinel(), op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericSqrt * insertBefore (
@@ -2518,9 +2564,10 @@ class GenericExp : public PrimitiveCall {
 
     GenericExp(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericExp) {}
 
-    static GenericExp* create(Builder& b, llvm::Value* op, llvm::Value* rho,
+    static GenericExp* create(Builder& b, ir::Value op, ir::Value rho,
                               SEXP call) {
-        return insertBefore(b.blockSentinel(), op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericExp * insertBefore (
@@ -2583,9 +2630,10 @@ class GenericEq : public PrimitiveCall {
 
     GenericEq(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericEq) {}
 
-    static GenericEq* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericEq* create(Builder& b, ir::Value lhs, ir::Value rhs,
                              llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static char const* intrinsicName() { return "genericEq"; }
@@ -2652,9 +2700,10 @@ class GenericNe : public PrimitiveCall {
 
     GenericNe(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericNe) {}
 
-    static GenericNe* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericNe* create(Builder& b, ir::Value lhs, ir::Value rhs,
                              llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericNe * insertBefore (
@@ -2721,9 +2770,10 @@ class GenericLt : public PrimitiveCall {
 
     GenericLt(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericLt) {}
 
-    static GenericLt* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericLt* create(Builder& b, ir::Value lhs, ir::Value rhs,
                              llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericLt * insertBefore (
@@ -2790,9 +2840,10 @@ class GenericLe : public PrimitiveCall {
 
     GenericLe(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericLe) {}
 
-    static GenericLe* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericLe* create(Builder& b, ir::Value lhs, ir::Value rhs,
                              llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericLe * insertBefore (
@@ -2859,9 +2910,10 @@ class GenericGe : public PrimitiveCall {
 
     GenericGe(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericGe) {}
 
-    static GenericGe* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericGe* create(Builder& b, ir::Value lhs, ir::Value rhs,
                              llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericGe * insertBefore (
@@ -2928,9 +2980,10 @@ class GenericGt : public PrimitiveCall {
 
     GenericGt(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericGt) {}
 
-    static GenericGt* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericGt* create(Builder& b, ir::Value lhs, ir::Value rhs,
                              llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericGt * insertBefore (
@@ -2998,9 +3051,10 @@ class GenericBitAnd : public PrimitiveCall {
     GenericBitAnd(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GenericBitAnd) {}
 
-    static GenericBitAnd* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericBitAnd* create(Builder& b, ir::Value lhs, ir::Value rhs,
                                  llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericBitAnd * insertBefore (
@@ -3068,9 +3122,10 @@ class GenericBitOr : public PrimitiveCall {
     GenericBitOr(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GenericBitOr) {}
 
-    static GenericBitOr* create(Builder& b, llvm::Value* lhs, llvm::Value* rhs,
+    static GenericBitOr* create(Builder& b, ir::Value lhs, ir::Value rhs,
                                 llvm::Value* rho, SEXP call) {
-        return insertBefore(b.blockSentinel(), lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericBitOr * insertBefore (
@@ -3136,9 +3191,10 @@ class GenericNot : public PrimitiveCall {
 
     GenericNot(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericNot) {}
 
-    static GenericNot* create(Builder& b, llvm::Value* op, llvm::Value* rho,
+    static GenericNot* create(Builder& b, ir::Value op, ir::Value rho,
                               SEXP call) {
-        return insertBefore(b.blockSentinel(), op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, op, rho, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static GenericNot * insertBefore (
@@ -3193,9 +3249,10 @@ class GenericGetVarMissOK : public PrimitiveCall {
     GenericGetVarMissOK(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::GenericGetVarMissOK) {}
 
-    static GenericGetVarMissOK* create(Builder& b, llvm::Value* symbol,
+    static GenericGetVarMissOK* create(Builder& b, ir::Value symbol,
                                        llvm::Value* rho) {
-        return insertBefore(b.blockSentinel(), symbol, rho);
+        Sentinel s(b);
+        return insertBefore(s, symbol, rho);
     }
 
     static GenericGetVarMissOK * insertBefore (
@@ -3244,8 +3301,9 @@ class GenericGetEllipsisValueMissOK : public PrimitiveCall {
         : PrimitiveCall(ins, Kind::GenericGetEllipsisValueMissOK) {}
 
     static GenericGetEllipsisValueMissOK*
-    create(Builder& b, llvm::Value* symbol, llvm::Value* rho) {
-        return insertBefore(b.blockSentinel(), symbol, rho);
+    create(Builder& b, ir::Value symbol, ir::Value rho) {
+        Sentinel s(b);
+        return insertBefore(s, symbol, rho);
     }
 
     static GenericGetEllipsisValueMissOK * insertBefore (
@@ -3302,9 +3360,10 @@ class CheckSwitchControl : public PrimitiveCall {
     CheckSwitchControl(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::CheckSwitchControl) {}
 
-    static CheckSwitchControl* create(Builder& b, llvm::Value* ctrl,
+    static CheckSwitchControl* create(Builder& b, ir::Value ctrl,
                                       SEXP call) {
-        return insertBefore(b.blockSentinel(), ctrl, b.consts(), Builder::integer(b.constantPoolIndex(call)));
+        Sentinel s(b);
+        return insertBefore(s, ctrl, b.consts(), Builder::integer(b.constantPoolIndex(call)));
     }
 
     static CheckSwitchControl * insertBefore (
@@ -3372,9 +3431,10 @@ class SwitchControlCharacter : public PrimitiveCall {
     SwitchControlCharacter(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::SwitchControlCharacter) {}
 
-    static SwitchControlCharacter* create(Builder& b, llvm::Value* ctrl,
+    static SwitchControlCharacter* create(Builder& b, ir::Value ctrl,
                                           SEXP call, SEXP cases) {
-        return insertBefore(b.blockSentinel(), ctrl, b.consts(), Builder::integer(b.constantPoolIndex(call)), Builder::integer(b.constantPoolIndex(cases)));
+        Sentinel s(b);
+        return insertBefore(s, ctrl, b.consts(), Builder::integer(b.constantPoolIndex(call)), Builder::integer(b.constantPoolIndex(cases)));
     }
 
     static SwitchControlCharacter * insertBefore (
@@ -3429,9 +3489,10 @@ class SwitchControlInteger : public PrimitiveCall {
     SwitchControlInteger(llvm::Instruction* ins)
         : PrimitiveCall(ins, Kind::SwitchControlInteger) {}
 
-    static SwitchControlInteger* create(Builder& b, llvm::Value* ctrl,
+    static SwitchControlInteger* create(Builder& b, ir::Value ctrl,
                                         int numCases) {
-        return insertBefore(b.blockSentinel(), ctrl, numCases);
+        Sentinel s(b);
+        return insertBefore(s, ctrl, numCases);
     }
 
     static SwitchControlInteger * insertBefore (
@@ -3477,9 +3538,10 @@ class ReturnJump : public PrimitiveCall {
 
     ReturnJump(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::ReturnJump) {}
 
-    static ReturnJump* create(Builder& b, llvm::Value* value,
+    static ReturnJump* create(Builder& b, ir::Value value,
                               llvm::Value* rho) {
-        return insertBefore(b.blockSentinel(), value, rho);
+        Sentinel s(b);
+        return insertBefore(s, value, rho);
     }
 
     static ReturnJump * insertBefore (

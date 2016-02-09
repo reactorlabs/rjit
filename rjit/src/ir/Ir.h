@@ -136,6 +136,29 @@ class Pattern {
      */
     llvm::Instruction* const ins_;
 
+
+    /** RAII class for automatic insertion and detachment of a sentinel to basic blocks when inserting patterns at the end.
+     */
+    class Sentinel {
+    public:
+        Sentinel(llvm::BasicBlock * b) {
+            b->getInstList().push_back(singleton);
+        }
+
+        ~Sentinel() {
+            singleton->removeFromParent();
+        }
+
+        operator llvm::Instruction * () {
+            return singleton;
+        }
+    private:
+        /** The NOP pattern used as sentinel for basic blocks when using a builder & create instructions.
+         */
+        static llvm::Instruction * const singleton;
+
+    };
+
     Pattern(llvm::Instruction* result, Kind kind) : kind(kind), ins_(result) {
         // attach the pattern to the result instruction
         attach(result);
@@ -201,17 +224,18 @@ static_assert(sizeof(ir::Value) == sizeof(llvm::Value*), "ir::Value must have th
 class Nop : public Pattern {
 public:
 
-    static Nop * create(BasicBlock * b) {
-        return new Nop(llvm::BinaryOperator::Create(
-            llvm::Instruction::Add, Builder::integer(0), Builder::integer(0), "nop", b));
-    }
-
     static bool classof(Pattern const * s) {
         return s->kind == Kind::Nop;
     }
 
 protected:
+   friend class Pattern;
+
    Nop(llvm::Instruction * ins) : Pattern(ins, Kind::Nop) {
+   }
+
+   Nop():
+       Pattern(llvm::BinaryOperator::Create(llvm::Instruction::Add, Builder::integer(0), Builder::integer(0), "nop"), Kind::Nop) {
    }
 
 };
@@ -222,7 +246,8 @@ class Return : public Pattern {
     llvm::Value* value() { return ins<llvm::ReturnInst>()->getOperand(0); }
 
     static Return* create(Builder& b, ir::Value value) {
-        return insertBefore(b.blockSentinel()->first(), value);
+        Sentinel s(b);
+        return insertBefore(s, value);
     }
 
     static Return * insertBefore(llvm::Instruction * ins, ir::Value value) {
@@ -251,7 +276,8 @@ class Branch : public Pattern {
     }
 
     static Branch* create(Builder& b, llvm::BasicBlock* target) {
-        return insertBefore(b.blockSentinel()->first(), target);
+        Sentinel s(b);
+        return insertBefore(s, target);
     }
 
     static Branch * insertBefore(llvm::Instruction * ins, llvm::BasicBlock * target) {
@@ -297,7 +323,8 @@ class IntegerLessThan : public IntegerComparison {
   public:
 
     static IntegerLessThan* create(Builder& b, ir::Value lhs, ir::Value rhs) {
-        return insertBefore(b.blockSentinel()->first(), lhs, rhs);
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs);
     }
 
     static IntegerLessThan * insertBefore(llvm::Instruction * ins, ir::Value lhs, ir::Value rhs) {
@@ -327,7 +354,8 @@ class IntegerEquals : public IntegerComparison {
 
     static IntegerEquals * create(Builder& b, ir::Value lhs,
                                   ir::Value rhs) {
-        return insertBefore(b.blockSentinel()->first(), lhs, rhs);
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs);
     }
 
     static IntegerEquals * insertBefore(llvm::Instruction * ins, ir::Value lhs, ir::Value rhs) {
@@ -356,7 +384,8 @@ class UnsignedIntegerLessThan : public IntegerComparison {
 
     static UnsignedIntegerLessThan *  create(Builder& b, ir::Value lhs,
                                   ir::Value rhs) {
-        return insertBefore(b.blockSentinel()->first(), lhs, rhs);
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs);
     }
 
     static UnsignedIntegerLessThan * insertBefore(llvm::Instruction * ins, ir::Value lhs, ir::Value rhs) {
@@ -394,7 +423,8 @@ class IntegerAdd : public BinaryOperator {
     llvm::Value* rhs() { return ins<llvm::ICmpInst>()->getOperand(1); }
 
     static IntegerAdd* create(Builder& b, ir::Value lhs, ir::Value rhs) {
-        return insertBefore(b.blockSentinel()->first(), lhs, rhs);
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs);
     }
 
     static IntegerAdd * insertBefore(llvm::Instruction * ins, ir::Value lhs, ir::Value rhs) {
@@ -450,7 +480,8 @@ class Cbr : public Pattern {
     static Cbr * create(Builder& b, ir::Value cond,
                        llvm::BasicBlock* trueCase,
                        llvm::BasicBlock* falseCase) {
-        return insertBefore(b.blockSentinel()->first(), cond, trueCase, falseCase);
+        Sentinel s(b);
+        return insertBefore(s, cond, trueCase, falseCase);
     }
 
     static Cbr * insertBefore(llvm::Instruction * ins, ir::Value cond, llvm::BasicBlock * trueCase, llvm::BasicBlock * falseCase) {
@@ -477,7 +508,8 @@ class MarkNotMutable : public Pattern {
   public:
     static MarkNotMutable * create(Builder & b,
                        ir::Value val) {
-        return insertBefore(b.blockSentinel(), val);
+        Sentinel s(b);
+        return insertBefore(s, val);
     }
 
     static MarkNotMutable * insertBefore(llvm::Instruction * ins, ir::Value val) {
@@ -533,7 +565,8 @@ class Car : public Pattern {
   public:
 
     static Car* create(Builder& b, ir::Value sexp) {
-        return insertBefore(b.blockSentinel()->first(), sexp);
+        Sentinel s(b);
+        return insertBefore(s, sexp);
     }
 
     static Car * insertBefore(llvm::Instruction * ins, ir::Value sexp) {
@@ -579,7 +612,8 @@ class Cdr : public Pattern {
   public:
 
     static Cdr* create(Builder& b, ir::Value sexp) {
-        return insertBefore(b.blockSentinel()->first(), sexp);
+        Sentinel s(b);
+        return insertBefore(s, sexp);
     }
 
     static Cdr * insertBefore(llvm::Instruction * ins, ir::Value sexp) {
@@ -643,7 +677,8 @@ class Tag : public Pattern {
   public:
 
     static Tag* create(Builder& b, ir::Value sexp) {
-        return insertBefore(b.blockSentinel()->first(), sexp);
+        Sentinel s(b);
+        return insertBefore(s, sexp);
     }
 
     static Tag * insertBefore(llvm::Instruction * ins, ir::Value sexp) {
@@ -705,7 +740,8 @@ protected:
 class VectorGetElement : public Pattern {
   public:
     static VectorGetElement* create(Builder & b, ir::Value vector, ir::Value index) {
-        return insertBefore(b.blockSentinel()->first(), vector, index);
+        Sentinel s(b);
+        return insertBefore(s, vector, index);
     }
 
     static VectorGetElement * insertBefore(llvm::Instruction * ins, ir::Value vector, ir::Value index) {
@@ -774,7 +810,8 @@ class Switch : public Pattern {
 
     static Switch* create(Builder& b, ir::Value cond,
                           llvm::BasicBlock* defaultTarget, int numCases) {
-        return insertBefore(b.blockSentinel(), cond, defaultTarget, numCases);
+        Sentinel s(b);
+        return insertBefore(s, cond, defaultTarget, numCases);
     }
 
     static Switch * insertBefore(llvm::Instruction * ins, ir::Value cond, llvm::BasicBlock * defaultTarget, int numCases) {
@@ -811,7 +848,7 @@ class CallToAddress : public Pattern {
     static CallToAddress* create(Builder& b, llvm::Value* fun,
                                  std::vector<llvm::Value*> args) {
         return new CallToAddress(
-            llvm::CallInst::Create(fun, *reinterpret_cast<std::vector<llvm::Value *>*>(&args), "", b.blockSentinel()->first()));
+            llvm::CallInst::Create(fun, *reinterpret_cast<std::vector<llvm::Value *>*>(&args), "", b));
     }
 
     static CallToAddress* create(Builder& b, llvm::Value* fun,

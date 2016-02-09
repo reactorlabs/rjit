@@ -123,11 +123,11 @@ Function* ICCompiler::compileCallStub() {
     // create new intrinics function for patchIC (maybe?)
 
     // TODO adding llvm instruction directly w/o builder is not such a good idea
-    Value* ic = new BitCastInst(icAddr, PointerType::get(ic_t, 0), "", b.blockSentinel()->first());
+    Value* ic = new BitCastInst(icAddr, PointerType::get(ic_t, 0), "", b);
 
     auto res = ir::CallToAddress::create(b, ic, b.args())->result();
     // TODO adding llvm instruction directly w/o builder is not such a good idea
-    ReturnInst::Create(getGlobalContext(), res, b.blockSentinel()->first());
+    ReturnInst::Create(getGlobalContext(), res, b);
 
     auto stub = b.f();
     b.closeIC();
@@ -215,9 +215,9 @@ bool ICCompiler::compileIc(SEXP inCall, SEXP inFun) {
             // the one we got this time
             Value* nativeFun = ir::Cdr::create(b, fun())->result();
             ICmpInst* test = new ICmpInst(
-                b.blockSentinel()->first(), ICmpInst::ICMP_EQ, nativeFun,
+                *b.block(), ICmpInst::ICMP_EQ, nativeFun,
                 ir::Builder::convertToPointer(BODY(inFun)), "guard");
-            BranchInst::Create(icMatch, icMiss, test, b.blockSentinel()->first());
+            BranchInst::Create(icMatch, icMiss, test, b);
             b.setBlock(icMatch);
 
             // This is an inlined version of applyNativeClosure
@@ -238,7 +238,7 @@ bool ICCompiler::compileIc(SEXP inCall, SEXP inFun) {
                                    actuals, ir::Tag::create(b, fun())->result())
                     ->result();
 
-            Value* cntxt = new AllocaInst(t::cntxt, "", b.blockSentinel()->first());
+            Value* cntxt = new AllocaInst(t::cntxt, "", b);
 
             ir::InitClosureContext::create(b, cntxt, call(), newrho, rho(),
                                            actuals, fun());
@@ -281,10 +281,10 @@ void ICCompiler::compileSpecialIC() {
     // Specials only care about the ast, so we can call any special through
     // this ic
     Value* ftype = ir::SexpType::create(b, fun())->result();
-    Value* test = new ICmpInst(b.blockSentinel()->first(), ICmpInst::ICMP_EQ, ftype,
+    Value* test = new ICmpInst(*b.block(), ICmpInst::ICMP_EQ, ftype,
                                b.integer(SPECIALSXP), "guard");
 
-    BranchInst::Create(icMatch, icMiss, test, b.blockSentinel()->first());
+    BranchInst::Create(icMatch, icMiss, test, b);
     b.setBlock(icMatch);
 
     Value* res = ir::CallSpecial::create(b, call(), fun(), b.convertToPointer(R_NilValue), b.rho())
@@ -302,10 +302,10 @@ bool ICCompiler::compileGenericIc(SEXP inCall, SEXP inFun) {
 
     Value* body = ir::Cdr::create(b, fun())->result();
     Value* test =
-        new ICmpInst(b.blockSentinel()->first(), ICmpInst::ICMP_EQ, body,
+        new ICmpInst(*b.block(), ICmpInst::ICMP_EQ, body,
                      ir::Builder::convertToPointer(BODY(inFun)), "guard");
 
-    BranchInst::Create(icMatch, icMiss, test, b.blockSentinel()->first());
+    BranchInst::Create(icMatch, icMiss, test, b);
     b.setBlock(icMatch);
 
     Value* res;
