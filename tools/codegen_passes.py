@@ -411,7 +411,7 @@ class CppClass:
         # check that the arguments are of same types
         for i in range(len(mm.args)-1):
             if (self.matchMethod.args[i + 1] != mm.args[i]):
-                error("Predicate {0} matches different set of instructions than matcher {1} (index {2}, expected {3}, got {4})".format(self.name, mm.name, i + 1, mm.args[i], self.matchMethod.args[i + 1]))
+                error(self.file, self.line, "Predicate {0} matches different set of instructions than matcher {1} (index {2}, expected {3}, got {4})".format(self.name, mm.name, i + 1, mm.args[i], self.matchMethod.args[i + 1]))
         # all is fine
 
 
