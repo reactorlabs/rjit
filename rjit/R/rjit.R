@@ -1,8 +1,10 @@
 
 jit.compile <- function(what, env = environment(what)) {
     if (typeof(what) == "closure") {
-        bc = .Internal(bodyCode(what))
-        native = .Call("jitAst", bc, formals(what), env)
+
+        #bc = .Internal(bodyCode(what))
+        #native = .Call("jitAst", bc, formals(what), env)
+        native = .Call("osrInline", what)
         f = .Internal(bcClose(formals(what), native, env))
         attrs = attributes(what)
         if (!is.null(attrs))
