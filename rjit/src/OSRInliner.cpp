@@ -100,7 +100,7 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
         setCP(fSexp, toInlineFunc);
     }
     FunctionCall::fixIcStubs(toOpt);
-    OSRHandler::addIRToModule(fSexp, c);
+    // OSRHandler::addIRToModule(fSexp, c);
     SETCDR(f, fSexp);
     return f;
 }

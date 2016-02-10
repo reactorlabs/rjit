@@ -9,6 +9,10 @@
 
 using namespace llvm;
 namespace osr {
+#define ICSTUB_NAME "icStub"
+#define NAME_CONTAINS(x, y)                                                    \
+    ((((x)->getName().str()).find((y))) != std::string::npos)
+#define IS_STUB(x) NAME_CONTAINS((x)->getCalledFunction(), ICSTUB_NAME)
 
 #define GET_LLVM(sexp) (reinterpret_cast<llvm::Function*>(TAG(sexp)))
 typedef std::vector<Instruction*> Inst_Vector;
@@ -70,8 +74,10 @@ class OSRHandler : public OSRLibrary {
     static SEXP getFreshIR(SEXP closure, rjit::Compiler* c,
                            bool compile = true);
 
-    static SEXP addIRToModule(SEXP func, rjit::Compiler* c);
     static SEXP cloneSEXP(SEXP func, Function* llvm);
+
+    static void addSexpToModule(SEXP f, Module* m);
+    static SEXP resetSafepoints(SEXP func, rjit::Compiler* c);
 
   private:
     static OSRHandler instance;
@@ -81,7 +87,7 @@ class OSRHandler : public OSRLibrary {
     // static bool existInstrument(Function* f);
     static bool transContains(std::pair<Function*, Function*> key);
     static bool baseVersionContains(SEXP key);
-    static void setAttributes(CallInst* call, uint64_t smid);
+    static void setAttributes(CallInst* call, uint64_t smid, bool stub);
 };
 
 } // namespace osr
