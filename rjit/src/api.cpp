@@ -41,7 +41,7 @@ REXPORT SEXP osrInline(SEXP f) {
         osr::OSRInliner inliner(&c);
         SEXP result = inliner.inlineCalls(f);
         c.jitAll();
-        return result;
+        return CDR(result);
     } else {
         return jitAst(BODY(f), FORMALS(f), TAG(f));
     }

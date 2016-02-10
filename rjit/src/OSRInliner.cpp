@@ -158,7 +158,7 @@ SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
             return nullptr;
         formals = CDR(formals);
     }
-    // printf("\n\n\nWE INLINE %s\n\n\n", name.c_str());
+    printf("\n\n\nWE INLINE %s\n\n\n", name.c_str());
     return fSexp;
 }
 
