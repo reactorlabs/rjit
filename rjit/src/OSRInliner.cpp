@@ -5,6 +5,7 @@
 #include <string>
 #include "api.h"
 #include "ir/Builder.h"
+#include <llvm/IR/Verifier.h>
 
 using namespace llvm;
 
@@ -13,6 +14,10 @@ namespace osr {
 /*      Initialize static variables     */
 uint64_t OSRInliner::id = 0;
 std::map<uint64_t, ExitEntry> OSRInliner::exits;
+
+#define VERIFYFUN2(F)                                                          \
+    assert((!verifyFunction(*F, &outs()) ? true : (F->dump(), false)) &&       \
+           "ill-formed function")
 /******************************************************************************/
 /*                  Public functions */
 /******************************************************************************/
@@ -40,14 +45,11 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
     SEXP env = TAG(f);
     assert(TYPEOF(env) == ENVSXP && "Cannot extract environment.");
 
-    /*Get the compiled version*/
-    SEXP fSexp = c->compile("outer", BODY(f), formals);
-    Function* fLLVM = GET_LLVM(fSexp);
-    assert(fLLVM && "Could not extract the LLVM function.");
+    SEXP fSexp = OSRHandler::getFreshIR(f, c, false);
+    OSRHandler::addSexpToModule(fSexp, c->getBuilder()->module());
 
-    /*Set up the working copy*/
-    Function* toOpt = OSRHandler::setupOpt(fLLVM);
-    SET_TAG(fSexp, reinterpret_cast<SEXP>(toOpt));
+    Function* toOpt = GET_LLVM(fSexp);
+    c->getBuilder()->module()->fixRelocations(formals, fSexp, toOpt);
 
     /*Get the function calls inside f*/
     FunctionCalls* calls = FunctionCall::getFunctionCalls(toOpt);
@@ -73,34 +75,43 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
         // Get the LLVM IR for the function to Inline.
         SEXP toInlineFunc = R_NilValue;
         if (!INLINE_ALL) {
-            toInlineFunc = OSRHandler::getFreshIR(toInlineClosure, c, true);
+            toInlineFunc = OSRHandler::getFreshIR(toInlineClosure, c, false);
         } else {
             toInlineClosure = inlineCalls(toInlineClosure);
-            toInlineFunc = CDR(toInlineClosure);
+            toInlineFunc = OSRHandler::getFreshIR(toInlineClosure, c, false);
         }
+        // TODO because of verifier
+        /*OSRHandler::addSexpToModule(toInlineFunc, c->getBuilder()->module());
+        OSRHandler::resetSafepoints(toInlineFunc, c);*/
 
-        Function* toInline = Utils::cloneFunction(GET_LLVM(toInlineFunc));
+        Function* toInline = GET_LLVM(toInlineFunc);
 
         Function* toInstrument = OSRHandler::getToInstrument(toOpt);
-        FunctionCall::fixIcStubs(toInstrument);
-        SEXP toInstr = OSRHandler::cloneSEXP(fSexp, toInstrument);
-        Inst_Vector* compensation = createCompensation(toInstr, f);
+        SEXP toInstrSexp = OSRHandler::cloneSEXP(fSexp, toInstrument);
+        OSRHandler::resetSafepoints(toInstrSexp, c);
+        c->getBuilder()->module()->fixRelocations(formals, toInstrSexp,
+                                                  toInstrument);
+        Inst_Vector* compensation = createCompensation(toInstrSexp, f);
 
         auto newrho = createNewRho((*it));
 
         // Replace constant pool accesses and argument uses.
         Return_List ret;
         prepareCodeToInline(toInline, *it, newrho, LENGTH(CDR(fSexp)), &ret);
+        // TODO because of verifier
+        // OSRHandler::resetSafepoints(fSexp, c);
         insertBody(toOpt, toInline, toInstrument, *it, &ret);
-        OSRHandler::insertOSRExit(toOpt, toInstrument, (*it)->getConsts(),
-                                  getOSRCondition(*it), compensation);
+        auto res =
+            OSRHandler::insertOSRExit(toOpt, toInstrument, (*it)->getConsts(),
+                                      getOSRCondition(*it), compensation);
         // clean up
+        VERIFYFUN2(res.second);
         ret.clear();
         // Set the constant pool.
         setCP(fSexp, toInlineFunc);
     }
-    FunctionCall::fixIcStubs(toOpt);
-    // OSRHandler::addIRToModule(fSexp, c);
+    OSRHandler::resetSafepoints(fSexp, c);
+    VERIFYFUN2(GET_LLVM(fSexp));
     SETCDR(f, fSexp);
     return f;
 }
@@ -247,7 +258,7 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     // Remove the icStub from the StateMap.
     OSRHandler::removeEntry(toOpt, toInstrument, fc->getIcStub());
     deadBlock->removeFromParent();
-    toInline->removeFromParent();
+    // toInline->removeFromParent();
     delete deadBlock;
     delete toInline;
 
