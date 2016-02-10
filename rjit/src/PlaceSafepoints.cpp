@@ -53,9 +53,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "GCPassApi.h"
-#include "JITGCStrategy.h"
-
 #include "llvm/Pass.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/ADT/SetOperations.h"
@@ -88,6 +85,11 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
+
+#include "GCPassApi.h"
+#include "JITGCStrategy.h"
+#include "JITCompileLayer.h"
+#include "Runtime.h"
 
 #define DEBUG_TYPE "safepoint-placement"
 STATISTIC(NumCallSafepoints, "Number of call safepoints inserted");
@@ -143,7 +145,24 @@ static bool needsStatepoint(const CallSite& CS) {
     if (isStatepoint(CS) || isGCRelocate(CS) || isGCResult(CS)) {
         return false;
     }
-    return true;
+    auto attrs = CS.getAttributes();
+
+    Attribute attr_id =
+        attrs.getAttribute(AttributeSet::FunctionIndex, "statepoint-id");
+    if (attr_id.isStringAttribute())
+        return true;
+
+    attr_id =
+        attrs.getAttribute(AttributeSet::FunctionIndex, "needs-statepoint");
+    if (attr_id.isStringAttribute())
+        return true;
+
+    attr_id =
+        attrs.getAttribute(AttributeSet::FunctionIndex, "needs-patchpoint");
+    if (attr_id.isStringAttribute())
+        return true;
+
+    return false;
 }
 
 static Value* ReplaceWithStatepoint(const CallSite& CS, Pass* P);
@@ -236,20 +255,8 @@ bool PlaceSafepoints::runOnFunction(Function& F) {
 
     std::vector<CallSite> ParsePointNeeded;
 
-    std::vector<CallSite> Calls;
-    findCallSafepoints(F, Calls);
-    NumCallSafepoints += Calls.size();
-    for (auto c : Calls) {
-        // Calls not tagged with id do not need to be parseable
-        uint64_t id = -1;
-        auto attrs = c.getAttributes();
-        Attribute attr_id =
-            attrs.getAttribute(AttributeSet::FunctionIndex, "statepoint-id");
-        bool has_id = attr_id.isStringAttribute() &&
-                      !attr_id.getValueAsString().getAsInteger(10, id);
-        if (has_id)
-            ParsePointNeeded.push_back(c);
-    }
+    findCallSafepoints(F, ParsePointNeeded);
+    NumCallSafepoints += ParsePointNeeded.size();
 
     // Unique the vectors since we can end up with duplicates if we scan the
     // call
@@ -362,29 +369,42 @@ static Value* ReplaceWithStatepoint(const CallSite& CS, /* to replace */
     // Create the statepoint given all the arguments
     Instruction* Token = nullptr;
 
-    uint64_t ID;
-    uint32_t NumPatchBytes;
+    uint64_t ID = -1;
+    uint32_t NumPatchBytes = 0;
 
     AttributeSet OriginalAttrs = CS.getAttributes();
-    Attribute AttrID = OriginalAttrs.getAttribute(AttributeSet::FunctionIndex,
-                                                  "statepoint-id");
-    Attribute AttrNumPatchBytes = OriginalAttrs.getAttribute(
-        AttributeSet::FunctionIndex, "statepoint-num-patch-bytes");
-
     AttrBuilder AttrsToRemove;
-    bool HasID = AttrID.isStringAttribute() &&
-                 !AttrID.getValueAsString().getAsInteger(10, ID);
 
-    assert(HasID && ID != (uint64_t)-1);
+    Attribute AttrStatepoint = OriginalAttrs.getAttribute(
+        AttributeSet::FunctionIndex, "needs-statepoint");
+    if (AttrStatepoint.isStringAttribute()) {
+        ID = rjit::JITCompileLayer::singleton.getSafepointId(
+            CS->getParent()->getParent());
+        AttrsToRemove.addAttribute("needs-statepoint");
+    }
 
-    bool HasNumPatchBytes =
-        AttrNumPatchBytes.isStringAttribute() &&
-        !AttrNumPatchBytes.getValueAsString().getAsInteger(10, NumPatchBytes);
+    uint64_t stubSize = -1;
+    Attribute AttrPatchpoint = OriginalAttrs.getAttribute(
+        AttributeSet::FunctionIndex, "needs-patchpoint");
+    if (AttrPatchpoint.isStringAttribute() &&
+        !AttrPatchpoint.getValueAsString().getAsInteger(10, stubSize)) {
 
-    if (HasNumPatchBytes)
-        AttrsToRemove.addAttribute("statepoint-num-patch-bytes");
-    else
-        NumPatchBytes = 0;
+        ID = rjit::JITCompileLayer::singleton.getSafepointId(
+            CS->getParent()->getParent());
+        rjit::JITCompileLayer::singleton.setPatchpoint(ID, stubSize);
+        NumPatchBytes = rjit::patchpointSize;
+
+        CallInst* i = cast<CallInst>(CS.getInstruction());
+        assert(i);
+        i->setArgOperand(
+            i->getNumArgOperands() - 1,
+            ConstantInt::get(CS->getParent()->getParent()->getContext(),
+                             APInt(64, ID)));
+
+        AttrsToRemove.addAttribute("needs-patchpoint");
+    }
+
+    assert(ID != (uint64_t)-1);
 
     OriginalAttrs = OriginalAttrs.removeAttributes(
         CS.getInstruction()->getContext(), AttributeSet::FunctionIndex,
@@ -395,7 +415,6 @@ static Value* ReplaceWithStatepoint(const CallSite& CS, /* to replace */
                                   : ConstantPointerNull::get(cast<PointerType>(
                                         CS.getCalledValue()->getType()));
 
-    assert(CS.isCall());
     CallInst* ToReplace = cast<CallInst>(CS.getInstruction());
     CallInst* Call = Builder.CreateGCStatepointCall(
         ID, NumPatchBytes, StatepointTarget,
