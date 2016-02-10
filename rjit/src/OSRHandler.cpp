@@ -87,40 +87,34 @@ SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
     SEXP body = BODY(closure);
     SEXP func = R_NilValue;
 
-    if (TYPEOF(body) == NATIVESXP &&
-        GET_LLVM(body)->getParent() == c->getBuilder()->module())
-        func = body; // TODO that's wrong
-    else {
-        if (!baseVersionContains(closure)) {
-            // Setup the copy.
+    if (!baseVersionContains(closure)) {
+        if (TYPEOF(body) == NATIVESXP &&
+            GET_LLVM(body)->getParent() == c->getBuilder()->module()) {
+            func = body;
+        } else {
             func = c->compile("rfunction", body, FORMALS(closure));
-
-            // TODO remove
-            printf("Original compile result\n");
-            GET_LLVM(func)->dump();
-
-            Function* clone =
-                StateMap::generateIdentityMapping(GET_LLVM(func)).first;
-            baseVersions[closure] = cloneSEXP(func, clone);
-            assert(baseVersionContains(closure));
+            SETCDR(closure, func);
         }
 
-        SEXP entry = baseVersions[closure];
-        Function* workingCopy =
-            StateMap::generateIdentityMapping(GET_LLVM(entry)).first;
-
-        func = cloneSEXP(entry, workingCopy);
-        // Adding the result to the relocations.
-        if (compile) {
-            c->getBuilder()->module()->getFunctionList().push_back(workingCopy);
-            c->getBuilder()->module()->fixRelocations(FORMALS(closure), func,
-                                                      workingCopy);
-            // TODO remove
-            printf("The working copy\n");
-            workingCopy->dump();
-            addIRToModule(func, c);
-        }
+        Function* clone =
+            StateMap::generateIdentityMapping(GET_LLVM(func)).first;
+        baseVersions[closure] = cloneSEXP(func, clone);
+        assert(baseVersionContains(closure));
     }
+
+    SEXP entry = baseVersions[closure];
+    Function* workingCopy =
+        StateMap::generateIdentityMapping(GET_LLVM(entry)).first;
+
+    func = cloneSEXP(entry, workingCopy);
+    // Adding the result to the relocations.
+    if (compile) {
+        c->getBuilder()->module()->getFunctionList().push_back(workingCopy);
+        c->getBuilder()->module()->fixRelocations(FORMALS(closure), func,
+                                                  workingCopy);
+        resetSafepoints(func, c);
+    }
+
     return func;
 }
 SEXP OSRHandler::cloneSEXP(SEXP func, Function* llvm) {
@@ -130,22 +124,43 @@ SEXP OSRHandler::cloneSEXP(SEXP func, Function* llvm) {
     return result;
 }
 
-SEXP OSRHandler::addIRToModule(SEXP func, rjit::Compiler* c) {
+void OSRHandler::addSexpToModule(SEXP f, Module* m) {
+    assert(GET_LLVM(f) && "Trying to add a null function to the module.");
+    m->getFunctionList().push_back(GET_LLVM(f));
+}
+// TODO rename
+SEXP OSRHandler::resetSafepoints(SEXP func, rjit::Compiler* c) {
     assert(TYPEOF(func) == NATIVESXP && GET_LLVM(func) && "Invalid function.");
     Function* f = GET_LLVM(func);
     Module* m = c->getBuilder()->module();
     for (inst_iterator it = inst_begin(f), e = inst_end(f); it != e; ++it) {
         CallInst* call = dynamic_cast<CallInst*>(&(*it));
-        if (call && call->getCalledFunction()->getParent() != m) {
-            Function* target = call->getCalledFunction();
-            Function* resolve = m->getFunction(target->getName());
-            if (!resolve)
-                resolve = Function::Create(target->getFunctionType(),
-                                           Function::ExternalLinkage,
-                                           target->getName(), m);
-            call->setCalledFunction(resolve);
+        if (call) {
+            if (call->getCalledFunction()->getParent() != m) {
+                Function* target = call->getCalledFunction();
+                Function* resolve = m->getFunction(target->getName());
+                if (!resolve)
+                    resolve = Function::Create(target->getFunctionType(),
+                                               Function::ExternalLinkage,
+                                               target->getName(), m);
+                call->setCalledFunction(resolve);
+            }
+
             auto id = rjit::JITCompileLayer::singleton.getSafepointId(f);
-            setAttributes(call, id);
+            setAttributes(call, id, IS_STUB(call));
+
+            // Fix the ic stub
+            if (IS_STUB(call)) {
+                unsigned index = call->getNumArgOperands() - 2;
+                if (call->getArgOperand(index) != f) {
+                    call->setArgOperand(index, f);
+                    call->setArgOperand(
+                        index + 1,
+                        ConstantInt::get(getGlobalContext(), APInt(64, id)));
+                    unsigned size = call->getNumArgOperands() - 5;
+                    rjit::JITCompileLayer::singleton.setPatchpoint(id, size);
+                }
+            }
         }
     }
     return func;
@@ -162,7 +177,7 @@ bool OSRHandler::baseVersionContains(SEXP key) {
     return baseVersions.find(key) != baseVersions.end();
 }
 
-void OSRHandler::setAttributes(CallInst* call, uint64_t smid) {
+void OSRHandler::setAttributes(CallInst* call, uint64_t smid, bool stub) {
     Module* m = call->getParent()->getParent()->getParent();
     assert(m && "Module not set for call instruction.");
     llvm::AttributeSet PAL;
@@ -172,6 +187,9 @@ void OSRHandler::setAttributes(CallInst* call, uint64_t smid) {
         {
             llvm::AttrBuilder B;
             B.addAttribute("statepoint-id", std::to_string(smid));
+            if (stub)
+                B.addAttribute("statepoint-num-patch-bytes",
+                               std::to_string(rjit::patchpointSize));
             PAS = llvm::AttributeSet::get(m->getContext(), ~0U, B);
         }
         Attrs.push_back(PAS);
