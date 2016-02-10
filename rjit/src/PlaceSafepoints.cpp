@@ -145,22 +145,24 @@ static bool needsStatepoint(const CallSite& CS) {
     if (isStatepoint(CS) || isGCRelocate(CS) || isGCResult(CS)) {
         return false;
     }
+
+    // Functions which need to be parsable have to be tagged by either
+    // "needs-statepoint" or "ic-stub". Every other call is discarded
+
     auto attrs = CS.getAttributes();
-
-    Attribute attr_id =
-        attrs.getAttribute(AttributeSet::FunctionIndex, "statepoint-id");
-    if (attr_id.isStringAttribute())
+    if (attrs.getAttribute(AttributeSet::FunctionIndex, "needs-statepoint")
+            .isStringAttribute()) {
+        // Later phases of this pass can currently only deal with calls, not
+        // with invoke.
+        assert(CS.isCall());
         return true;
+    }
 
-    attr_id =
-        attrs.getAttribute(AttributeSet::FunctionIndex, "needs-statepoint");
-    if (attr_id.isStringAttribute())
+    if (attrs.getAttribute(AttributeSet::FunctionIndex, "ic-stub")
+            .isStringAttribute()) {
+        assert(CS.isCall());
         return true;
-
-    attr_id =
-        attrs.getAttribute(AttributeSet::FunctionIndex, "needs-patchpoint");
-    if (attr_id.isStringAttribute())
-        return true;
+    }
 
     return false;
 }
@@ -369,55 +371,61 @@ static Value* ReplaceWithStatepoint(const CallSite& CS, /* to replace */
     // Create the statepoint given all the arguments
     Instruction* Token = nullptr;
 
-    uint64_t ID = -1;
-    uint32_t NumPatchBytes = 0;
-
     AttributeSet OriginalAttrs = CS.getAttributes();
-    AttrBuilder AttrsToRemove;
 
-    Attribute AttrStatepoint = OriginalAttrs.getAttribute(
-        AttributeSet::FunctionIndex, "needs-statepoint");
-    if (AttrStatepoint.isStringAttribute()) {
-        ID = rjit::JITCompileLayer::singleton.getSafepointId(
-            CS->getParent()->getParent());
-        AttrsToRemove.addAttribute("needs-statepoint");
-    }
+    bool isStatepoint = OriginalAttrs.getAttribute(AttributeSet::FunctionIndex,
+                                                   "needs-statepoint")
+                            .isStringAttribute();
 
     uint64_t stubSize = -1;
-    Attribute AttrPatchpoint = OriginalAttrs.getAttribute(
-        AttributeSet::FunctionIndex, "needs-patchpoint");
-    if (AttrPatchpoint.isStringAttribute() &&
-        !AttrPatchpoint.getValueAsString().getAsInteger(10, stubSize)) {
+    OriginalAttrs.getAttribute(AttributeSet::FunctionIndex, "ic-stub")
+        .getValueAsString()
+        .getAsInteger(10, stubSize);
+    bool isIcStubCall = stubSize != (uint64_t)-1;
 
-        ID = rjit::JITCompileLayer::singleton.getSafepointId(
-            CS->getParent()->getParent());
+    // If its neither of those it should never have been added to the list
+    assert(isIcStubCall || isStatepoint);
+
+    uint64_t ID = rjit::JITCompileLayer::singleton.getSafepointId(
+        CS->getParent()->getParent());
+
+    AttrBuilder AttrsToRemove;
+
+    if (isStatepoint)
+        AttrsToRemove.addAttribute("needs-statepoint");
+
+    if (isIcStubCall) {
+        assert(stubSize != (uint64_t)-1);
+
+        // Register this stackmap id to be a patchpoint, such that later phases
+        // (i.e. the compile layer) can patch in initial stub calls.
         rjit::JITCompileLayer::singleton.setPatchpoint(ID, stubSize);
-        NumPatchBytes = rjit::patchpointSize;
 
         CallInst* i = cast<CallInst>(CS.getInstruction());
         assert(i);
+
+        // The patchpoints (i.e. call stubs) expect the last argument to
+        // be the stackmap id.
         i->setArgOperand(
             i->getNumArgOperands() - 1,
             ConstantInt::get(CS->getParent()->getParent()->getContext(),
                              APInt(64, ID)));
 
-        AttrsToRemove.addAttribute("needs-patchpoint");
+        AttrsToRemove.addAttribute("icStub");
     }
-
-    assert(ID != (uint64_t)-1);
 
     OriginalAttrs = OriginalAttrs.removeAttributes(
         CS.getInstruction()->getContext(), AttributeSet::FunctionIndex,
         AttrsToRemove);
 
-    Value* StatepointTarget = NumPatchBytes == 0
-                                  ? CS.getCalledValue()
-                                  : ConstantPointerNull::get(cast<PointerType>(
-                                        CS.getCalledValue()->getType()));
+    Value* StatepointTarget =
+        isIcStubCall ? ConstantPointerNull::get(
+                           cast<PointerType>(CS.getCalledValue()->getType()))
+                     : CS.getCalledValue();
 
     CallInst* ToReplace = cast<CallInst>(CS.getInstruction());
     CallInst* Call = Builder.CreateGCStatepointCall(
-        ID, NumPatchBytes, StatepointTarget,
+        ID, isIcStubCall ? rjit::patchpointSize : 0, StatepointTarget,
         makeArrayRef(CS.arg_begin(), CS.arg_end()), None, None,
         "safepoint_token");
     Call->setTailCall(ToReplace->isTailCall());

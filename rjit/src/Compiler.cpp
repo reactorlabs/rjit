@@ -147,7 +147,7 @@ Value* Compiler::compileICCallStub(Value* call, Value* op,
         AttributeSet PAS;
         {
             AttrBuilder B;
-            B.addAttribute("needs-patchpoint", std::to_string(size));
+            B.addAttribute("ic-stub", std::to_string(size));
             PAS = AttributeSet::get(b.getContext(), ~0U, B);
         }
         Attrs.push_back(PAS);
