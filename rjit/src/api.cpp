@@ -14,10 +14,9 @@
 #include "ir/Ir.h"
 #include "ir/Builder.h"
 #include "ir/primitive_calls.h"
-#include "ir/Intrinsics.h"
+#include "ir/primitive_calls.h"
 #include "OSRInliner.h"
 #include "OSRHandler.h"
-
 
 using namespace rjit;
 

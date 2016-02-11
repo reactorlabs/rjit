@@ -2,7 +2,7 @@
 
 #include "FunctionCall.h"
 #include "Utils.h"
-#include "ir/Intrinsics.h"
+#include "ir/primitive_calls.h"
 #include "JITCompileLayer.h"
 #include "Runtime.h"
 
