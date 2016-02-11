@@ -86,3 +86,4 @@ execute <- function(n = "shootout/fasta/fasta3000.txt") {
     knucleotide(n)
 }
 
+execute("../benchmarks/shootout/fasta/fasta3000.txt")

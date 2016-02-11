@@ -1,13 +1,13 @@
 #include "Builder.h"
-#include "intrinsics.h"
+#include "Intrinsics.h"
 
 using namespace llvm;
 
 namespace rjit {
 namespace ir {
 
-Builder::Context::Context(std::string const& name, Module* m, FunctionType* ty,
-                          bool isReturnJumpNeeded)
+Builder::Context::Context(std::string const& name, JITModule* m,
+                          FunctionType* ty, bool isReturnJumpNeeded)
     : isReturnJumpNeeded(isReturnJumpNeeded) {
     // TODO the type is ugly
     f = Function::Create(ty, Function::ExternalLinkage, name, m);
@@ -22,9 +22,10 @@ Builder::Context::Context(std::string const& name, Module* m, FunctionType* ty,
     b = llvm::BasicBlock::Create(llvm::getGlobalContext(), "start", f, nullptr);
 }
 
-Builder::ClosureContext::ClosureContext(std::string name, llvm::Module* m,
-                                        bool isReturnJumpNeeded)
-    : Builder::Context(name, m, t::sexp_sexpsexpint, isReturnJumpNeeded) {
+Builder::ClosureContext::ClosureContext(std::string name, JITModule* m,
+                                        SEXP formals, bool isReturnJumpNeeded)
+    : Builder::Context(name, m, t::sexp_sexpsexpint, isReturnJumpNeeded),
+      formals(formals) {
     // get rho value into context->rho for easier access
     llvm::Function::arg_iterator args = f->arg_begin();
     llvm::Value* consts = args++;
@@ -38,7 +39,7 @@ Builder::ClosureContext::ClosureContext(std::string name, llvm::Module* m,
     args_.push_back(useCache);
 }
 
-Builder::ICContext::ICContext(std::string name, llvm::Module* m,
+Builder::ICContext::ICContext(std::string name, JITModule* m,
                               llvm::FunctionType* ty)
     : Builder::Context(name, m, ty, false) {
     auto size = ty->getNumParams() - 5;
@@ -66,29 +67,18 @@ Builder::ICContext::ICContext(std::string name, llvm::Module* m,
     args_.push_back(stackmapId);
 }
 
-void Builder::openFunction(std::string const& name, SEXP ast, bool isPromise) {
+void Builder::openFunction(std::string const& name, SEXP ast, SEXP formals) {
     if (c_ != nullptr)
         contextStack_.push(c_);
-    if (isPromise)
-        c_ = new PromiseContext(name, m_);
-    else
-        c_ = new ClosureContext(name, m_);
+    c_ = new ClosureContext(name, m_, formals);
     c_->addConstantPoolObject(ast);
 }
 
-SEXP Builder::createNativeSXP(RFunctionPtr fptr, SEXP ast,
-                              std::vector<SEXP> const& objects, Function* f) {
-
-    SEXP objs = allocVector(VECSXP, objects.size());
-    PROTECT(objs);
-    for (size_t i = 0; i < objects.size(); ++i)
-        SET_VECTOR_ELT(objs, i, objects[i]);
-    SEXP result = CONS(reinterpret_cast<SEXP>(fptr), objs);
-    // all objects in objects + objs itself (now part of result)
-    UNPROTECT(objects.size() + 1);
-    SET_TAG(result, reinterpret_cast<SEXP>(f));
-    SET_TYPEOF(result, NATIVESXP);
-    return result;
+void Builder::openPromise(std::string const& name, SEXP ast) {
+    if (c_ != nullptr)
+        contextStack_.push(c_);
+    c_ = new PromiseContext(name, m_);
+    c_->addConstantPoolObject(ast);
 }
 
 } // namespace ir

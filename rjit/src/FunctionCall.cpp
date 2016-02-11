@@ -2,9 +2,12 @@
 
 #include "FunctionCall.h"
 #include "Utils.h"
-#include "ir/intrinsics.h"
+#include "ir/Intrinsics.h"
+#include "JITCompileLayer.h"
+#include "Runtime.h"
 
 using namespace llvm;
+using namespace rjit;
 namespace osr {
 
 FunctionCall::FunctionCall(CallInst* icStub) : icStub(icStub) {
@@ -39,7 +42,8 @@ FunctionCalls* FunctionCall::getFunctionCalls(Function* f) {
 
 unsigned int FunctionCall::getNumbArguments() {
     std::string name = icStub->getCalledFunction()->getName().str();
-    return ((unsigned int)name.back() - '0');
+    return (atoi(name.substr(name.find_last_of("_") + 1).c_str()));
+    // return ((unsigned int)name.back() - '0');
 }
 
 Function* FunctionCall::getFunction() {
@@ -123,5 +127,37 @@ void FunctionCall::setInPtr(rjit::Compiler* c, SEXP addr) {
 Value* FunctionCall::getInPtr() { return inPtr; }
 
 Instruction* FunctionCall::getArg_back() { return args.back(); }
+
+void FunctionCall::fixIcStubs(Function* f) {
+    FunctionCalls* calls = getFunctionCalls(f);
+    for (auto it = calls->begin(); it != (calls->end()); ++it) {
+        unsigned index = (*it)->getIcStub()->getNumArgOperands() - 2;
+        if ((*it)->getIcStub()->getArgOperand(index) != f) {
+            (*it)->getIcStub()->setArgOperand(index, f);
+            uint64_t smid = JITCompileLayer::singleton.getSafepointId(f);
+            (*it)->getIcStub()->setArgOperand(
+                index + 1,
+                ConstantInt::get(getGlobalContext(), APInt(64, smid)));
+            unsigned size = (*it)->getArgs()->size();
+            JITCompileLayer::singleton.setPatchpoint(smid, size);
+            AttributeSet PAL;
+            {
+                SmallVector<AttributeSet, 4> Attrs;
+                AttributeSet PAS;
+                {
+                    AttrBuilder B;
+                    B.addAttribute("statepoint-id", std::to_string(smid));
+                    B.addAttribute("statepoint-num-patch-bytes",
+                                   std::to_string(patchpointSize));
+                    PAS = AttributeSet::get(f->getContext(), ~0U, B);
+                }
+                Attrs.push_back(PAS);
+                PAL = AttributeSet::get(f->getContext(), Attrs);
+            }
+
+            (*it)->getIcStub()->setAttributes(PAL);
+        }
+    }
+}
 
 } // namespace osr

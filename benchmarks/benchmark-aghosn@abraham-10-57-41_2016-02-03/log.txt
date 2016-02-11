@@ -1,0 +1,10 @@
+rjitInlining , /home/aghosn/Documents/Programs/Thesis/rjit/benchmarks/shootout/knucleotide/knucleotide.r , 15113 , 1867
+rjit , /home/aghosn/Documents/Programs/Thesis/rjit/benchmarks/shootout/knucleotide/knucleotide.r , 16284 , 1898
+rjitInlining , /home/aghosn/Documents/Programs/Thesis/rjit/benchmarks/shootout/knucleotide/knucleotide-brute3.r , 58009 , 39113
+rjit , /home/aghosn/Documents/Programs/Thesis/rjit/benchmarks/shootout/knucleotide/knucleotide-brute3.r , 48204 , 39077
+rjitInlining , /home/aghosn/Documents/Programs/Thesis/rjit/benchmarks/shootout/knucleotide/knucleotide-brute.r , 29358 , 41271
+rjit , /home/aghosn/Documents/Programs/Thesis/rjit/benchmarks/shootout/knucleotide/knucleotide-brute.r , 53519 , 42043
+rjitInlining , /home/aghosn/Documents/Programs/Thesis/rjit/benchmarks/shootout/knucleotide/knucleotide-brute2.r , 35667 , 25351
+rjit , /home/aghosn/Documents/Programs/Thesis/rjit/benchmarks/shootout/knucleotide/knucleotide-brute2.r , 37217 , 29095
+rjitInlining , /home/aghosn/Documents/Programs/Thesis/rjit/benchmarks/shootout/reversecomplement/reversecomplement.r , 4861 , 2827
+rjit , /home/aghosn/Documents/Programs/Thesis/rjit/benchmarks/shootout/reversecomplement/reversecomplement.r , 4929 , 2956

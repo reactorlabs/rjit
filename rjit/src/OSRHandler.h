@@ -4,25 +4,24 @@
 #include "llvm.h"
 #include <list>
 #include "OSRLibrary.hpp"
+#include "Compiler.h"
+#include <Rinternals.h>
 
 using namespace llvm;
 namespace osr {
+#define ICSTUB_NAME "icStub"
+#define NAME_CONTAINS(x, y)                                                    \
+    ((((x)->getName().str()).find((y))) != std::string::npos)
+#define IS_STUB(x) NAME_CONTAINS((x)->getCalledFunction(), ICSTUB_NAME)
 
 #define GET_LLVM(sexp) (reinterpret_cast<llvm::Function*>(TAG(sexp)))
 typedef std::vector<Instruction*> Inst_Vector;
+typedef std::pair<Function*, Function*> OSRPair;
+typedef std::pair<SEXP, Function*> SEXPFunc;
 
 class OSRHandler : public OSRLibrary {
   public:
-    /**
-     * Map from base function to instrumented
-     */
-    static std::map<Function*, std::list<Function*>> instruments;
-
-    /**
-     * Map from version to base.
-     */
-    static std::map<Function*, Function*> toBase;
-
+    static std::map<SEXP, SEXP> baseVersions;
     /**
      * Map from a function pair <toOpt, toInstrument> to their statemaps.
      */
@@ -53,18 +52,11 @@ class OSRHandler : public OSRLibrary {
      */
     static Function* getToInstrument(Function* base);
 
-    /**
-     * @brief      Inserts an osr exit in opt to instrument.
-     *
-     * @param      opt         Optimized function (e.g., source).
-     * @param      instrument  Continuation function.
-     * @param      src         Where to put the exit condition.
-     * @param      pad         Point in opt that corresponds to landing pad in
-     * instrument.
-     * @param      cond        OSR condition.
-     */
-    static void insertOSR(Function* opt, Function* instrument, Instruction* src,
-                          Instruction* pad, Inst_Vector* cond);
+    static std::pair<Function*, Function*>
+    insertOSRExit(Function* opt, Function* instrument, Instruction* src,
+                  Inst_Vector* cond, Inst_Vector* compensation = nullptr);
+
+    static uint64_t getId();
 
     /**
      * @brief      Removes a bidirectional mapping in the stateMap registered
@@ -79,12 +71,23 @@ class OSRHandler : public OSRLibrary {
      */
     static void removeEntry(Function* opt, Function* instrument, Value* val);
 
+    static SEXP getFreshIR(SEXP closure, rjit::Compiler* c,
+                           bool compile = true);
+
+    static SEXP cloneSEXP(SEXP func, Function* llvm);
+
+    static void addSexpToModule(SEXP f, Module* m);
+    static SEXP resetSafepoints(SEXP func, rjit::Compiler* c);
+
   private:
     static OSRHandler instance;
+    static uint64_t id;
 
     OSRHandler() {}
     // static bool existInstrument(Function* f);
     static bool transContains(std::pair<Function*, Function*> key);
+    static bool baseVersionContains(SEXP key);
+    static void setAttributes(CallInst* call, uint64_t smid, bool stub);
 };
 
 } // namespace osr

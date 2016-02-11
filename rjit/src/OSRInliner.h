@@ -13,24 +13,22 @@ using namespace llvm;
 namespace osr {
 typedef std::vector<llvm::Instruction*> Inst_Vector;
 typedef std::list<llvm::ReturnInst*> Return_List;
+typedef std::pair<SEXP, SEXP> ExitEntry;
 
 class OSRInliner {
   public:
     OSRInliner(rjit::Compiler* c);
-    /**
-     * @brief      Inlines calls inside outer
-     *
-     * @param[in]  f  the outer function.
-     * @param[in]  env    the environment associated with f.
-     *
-     * @return     a SEXP with a compiled version of f, where calls are inlined.
-     */
-    SEXP inlineCalls(SEXP f, SEXP env);
+
+    SEXP inlineCalls(SEXP f);
+
+    static std::map<uint64_t, ExitEntry> exits;
 
   private:
     rjit::Compiler* c;
     Function* closureQuickArgumentAdaptor;
     Function* CONS_NR;
+    Function* fixClosure;
+    static uint64_t id;
 
     static void setCP(SEXP firstP, SEXP secondP);
 
@@ -44,6 +42,8 @@ class OSRInliner {
 
     static SEXP getFunction(SEXP cp, int symbol, SEXP env);
 
+    static bool isMissingArgs(SEXP formals, FunctionCall* fc);
+
     static void prepareCodeToInline(Function* toInline, FunctionCall* fc,
                                     CallInst* newrho, int cpOffset,
                                     Return_List* ret);
@@ -54,6 +54,7 @@ class OSRInliner {
     static Inst_Vector* getTrueCondition();
     static Inst_Vector* getOSRCondition(FunctionCall* fc);
     CallInst* createNewRho(FunctionCall* fc);
+    Inst_Vector* createCompensation(SEXP fun, SEXP formals);
 };
 
 } // namespace osr

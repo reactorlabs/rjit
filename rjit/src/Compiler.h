@@ -13,22 +13,20 @@ class Compiler {
   public:
     Compiler(std::string const& moduleName) : b(moduleName) {}
 
-    SEXP compile(std::string const& name, SEXP bytecode) {
-        SEXP result = compileFunction(name, bytecode);
+    SEXP compile(std::string const& name, SEXP bytecode, SEXP formals) {
+        SEXP result = compileFunction(name, bytecode, formals);
         return result;
     }
 
-    SEXP compileFunction(std::string const& name, SEXP ast,
-                         bool isPromise = false);
+    SEXP compilePromise(std::string const& name, SEXP ast);
+    SEXP compileFunction(std::string const& name, SEXP ast, SEXP formals);
+
+    SEXP finalizeCompile(SEXP ast);
 
     void jitAll();
 
-    void removeFromRelocations(SEXP f);
-
-    ir::Builder* getBuilder() { return &b; }
-
     // TODO aghosn
-    llvm::ExecutionEngine* getEngine();
+    ir::Builder* getBuilder() { return &b; }
 
   private:
     /** Compiles an expression.
@@ -217,35 +215,24 @@ class Compiler {
         llvm::Value* lhs = compileExpression(CAR(CDR(call)));
         if (CDR(CDR(call)) != R_NilValue) {
             llvm::Value* rhs = compileExpression(CAR(CDR(CDR(call))));
-            return B::create(b, lhs, rhs, b.rho(), call);
+            return B::create(b, lhs, rhs, b.rho(), call)->r();
         } else {
-            return U::create(b, lhs, b.rho(), call);
+            return U::create(b, lhs, b.rho(), call)->r();
         }
     }
 
     template <typename B> llvm::Value* compileBinary(SEXP call) {
         llvm::Value* lhs = compileExpression(CAR(CDR(call)));
         llvm::Value* rhs = compileExpression(CAR(CDR(CDR(call))));
-        return B::create(b, lhs, rhs, b.rho(), call);
+        return B::create(b, lhs, rhs, b.rho(), call)->r();
     }
 
     template <typename U> llvm::Value* compileUnary(SEXP call) {
         llvm::Value* op = compileExpression(CAR(CDR(call)));
-        return U::create(b, op, b.rho(), call);
+        return U::create(b, op, b.rho(), call)->r();
     }
 
     ir::Builder b;
-
-    /** List of relocations to be done when compiling.
-
-      When a function is compiled, it is first translated to bitcode and a
-      native SXP is created for it using nullptr for the native code. The
-      function's SXP is added to the list of relocations here. When the
-      compilation is done, the module is finalized and all SEXPs in the
-      relocation lists are patched so that they point to correct native
-      functions.
-      */
-    std::vector<SEXP> relocations;
 };
 
 } // namespace rjit

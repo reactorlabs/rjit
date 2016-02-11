@@ -13,11 +13,13 @@ namespace rjit {
 namespace t {
 
 extern llvm::PointerType* SEXP;
+extern llvm::StructType* SEXP_u1;
 extern llvm::Type* Int;
 extern llvm::Type* Void;
 extern llvm::Type* Bool;
 
 extern llvm::StructType* SEXPREC;
+extern llvm::StructType* VECTOR_SEXPREC;
 
 extern llvm::StructType* cntxt;
 extern llvm::PointerType* cntxtPtr;
@@ -60,6 +62,8 @@ extern llvm::Type* nativeFunctionPtr_t;
 
 extern llvm::FunctionType* patchpoint_t;
 extern llvm::FunctionType* stackmap_t;
+// TODO aghosn
+extern llvm::FunctionType* fixclosure_t;
 
 } // namespace t
 

@@ -29,12 +29,22 @@ PointerType* initializeTypes() {
     // Addrspace == 1 -> GC managed pointer
     t::SEXP = PointerType::get(t::SEXPREC, 1);
     // SEXPREC, first the union
-    StructType* u1 = StructType::create(context, "union.SEXP_SEXP_SEXP");
+    t::SEXP_u1 = StructType::create(context, "union.SEXP_SEXP_SEXP");
     fields = {t::SEXP, t::SEXP, t::SEXP};
-    u1->setBody(fields, false);
+    t::SEXP_u1->setBody(fields, false);
     // now the real SEXPREC
-    fields = {t_sxpinfo_struct, t::SEXP, t::SEXP, t::SEXP, u1};
+    fields = {t_sxpinfo_struct, t::SEXP, t::SEXP, t::SEXP, t::SEXP_u1};
     t::SEXPREC->setBody(fields, false);
+
+    StructType* t_vecsxp_struct =
+        StructType::create(context, "struct.vecsxp_struct");
+    fields = {t::Int, t::Int};
+    t_vecsxp_struct->setBody(fields, false);
+
+    fields = {t_sxpinfo_struct, t_vecsxp_struct, t::SEXP, t::SEXP, t::SEXP};
+    t::VECTOR_SEXPREC = StructType::create(context, "struct.VECTOR_SEXPREC");
+    t::VECTOR_SEXPREC->setBody(fields, false);
+
     // API function types
     Type* t_void = Type::getVoidTy(context);
     t::t_void = t_void;
@@ -93,6 +103,8 @@ PointerType* initializeTypes() {
     DECLARE(patchIC_t, t::t_void, t::voidPtr, t::t_i64, t::nativeFunctionPtr_t);
     DECLARE(compileIC_t, t::voidPtr, t::t_i64, t::SEXP, t::SEXP, t::SEXP,
             t::t_i64);
+    // TODO aghosn
+    DECLARE(fixclosure_t, t::t_void, t::t_i64);
 #undef DECLARE
 
     // initialize LLVM backend
@@ -117,7 +129,9 @@ Type* Bool;
 
 PointerType* SEXP = initializeTypes();
 
+StructType* SEXP_u1;
 StructType* SEXPREC;
+StructType* VECTOR_SEXPREC;
 
 StructType* cntxt;
 PointerType* cntxtPtr;
@@ -160,6 +174,8 @@ Type* nativeFunctionPtr_t;
 
 FunctionType* patchpoint_t;
 FunctionType* stackmap_t;
+
+FunctionType* fixclosure_t;
 
 } // namespace t
 

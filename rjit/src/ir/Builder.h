@@ -8,6 +8,7 @@
 #include "Types.h"
 #include "StackMap.h"
 #include "JITCompileLayer.h"
+#include "JITModule.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/Support/TargetSelect.h"
@@ -26,24 +27,14 @@ class Builder {
   public:
     Builder(const Builder&) = delete;
 
-    llvm::Function* patchpoint;
-    llvm::Function* stackmap;
+    explicit Builder(std::string const& moduleName)
+        : Builder(new JITModule(moduleName, llvm::getGlobalContext())) {}
 
-    Builder(std::string const& moduleName)
-        : Builder(new llvm::Module(moduleName, llvm::getGlobalContext())) {
-        stackmap = Function::Create(t::stackmap_t, GlobalValue::ExternalLinkage,
-                                    "llvm.experimental.stackmap", m_);
-
-        patchpoint =
-            Function::Create(t::patchpoint_t, GlobalValue::ExternalLinkage,
-                             "llvm.experimental.patchpoint.void", m_);
-    }
-
-    Builder(llvm::Module* m) : m_(m) {}
+    explicit Builder(JITModule* m) : m_(m) {}
 
     /** Builder can typecast to the current module.
      */
-    operator llvm::Module*() { return m_; }
+    operator JITModule*() { return m_; }
 
     /** Builder can typecast to the current function.
      */
@@ -100,7 +91,8 @@ class Builder {
       Adds the ast of the function as first argument to the function's constant
       pool.
      */
-    void openFunction(std::string const& name, SEXP ast, bool isPromise);
+    void openPromise(std::string const& name, SEXP ast);
+    void openFunction(std::string const& name, SEXP ast, SEXP formals);
 
     void openIC(std::string const& name, FunctionType* ty) {
         if (c_ != nullptr)
@@ -146,11 +138,12 @@ class Builder {
     SEXP closeFunction() {
         assert((contextStack_.empty() or (contextStack_.top()->f != c_->f)) and
                "Not a function context");
-        SEXP result = createNativeSXP(nullptr, c_->cp[0], c_->cp, c_->f);
-        relocations_.push_back(result);
+
+        ClosureContext* cc = dynamic_cast<ClosureContext*>(c_);
+        SEXP result =
+            module()->getNativeSXP(cc->formals, c_->cp[0], c_->cp, c_->f);
         // c_->f->dump();
         delete c_;
-
         if (contextStack_.empty()) {
             c_ = nullptr;
         } else {
@@ -233,11 +226,9 @@ class Builder {
      */
     void setNextTarget(llvm::BasicBlock* block) { c_->nextTarget = block; }
 
-    llvm::Module* module() { return m_; }
+    JITModule* module() { return m_; }
 
     llvm::LLVMContext& getContext() { return m_->getContext(); }
-
-    llvm::Function* getStackmap() { return stackmap; }
 
     /** Takes the given SEXP, stores it to the constant pool and returns the
       index under which it is stored.
@@ -321,13 +312,13 @@ class Builder {
               breakTarget(from->breakTarget), nextTarget(from->nextTarget),
               cp(std::move(from->cp)), args_(from->args_) {}
 
-        Context(std::string const& name, llvm::Module* m,
-                llvm::FunctionType* ty, bool isReturnJumpNeeded);
+        Context(std::string const& name, JITModule* m, llvm::FunctionType* ty,
+                bool isReturnJumpNeeded);
     };
 
     class ClosureContext : public Context {
       public:
-        ClosureContext(std::string name, llvm::Module* m,
+        ClosureContext(std::string name, JITModule* m, SEXP formals,
                        bool isReturnJumpNeeded = false);
 
         llvm::Value* rho() override {
@@ -345,12 +336,14 @@ class Builder {
         ClosureContext(Context* from) : Context(from) {}
 
         Context* clone() override { return new ClosureContext(this); }
+
+        SEXP formals;
     };
 
     class PromiseContext : public ClosureContext {
       public:
-        PromiseContext(std::string name, llvm::Module* m)
-            : ClosureContext(name, m, true) {}
+        PromiseContext(std::string name, JITModule* m)
+            : ClosureContext(name, m, R_NilValue, true) {}
         PromiseContext(Context* from) : ClosureContext(from) {}
 
         Context* clone() override { return new PromiseContext(this); }
@@ -358,7 +351,7 @@ class Builder {
 
     class ICContext : public Context {
       public:
-        ICContext(std::string name, llvm::Module* m, llvm::FunctionType* ty);
+        ICContext(std::string name, JITModule* m, llvm::FunctionType* ty);
         ICContext(Context* from) = delete;
         llvm::Value* rho() override {
             // TODO why is this size() - 3??
@@ -371,12 +364,9 @@ class Builder {
         }
     };
 
-    SEXP createNativeSXP(RFunctionPtr fptr, SEXP ast,
-                         std::vector<SEXP> const& objects, llvm::Function* f);
-
     /** The module into which we are currently building.
      */
-    llvm::Module* m_;
+    JITModule* m_;
 
     /** Current context.
      */

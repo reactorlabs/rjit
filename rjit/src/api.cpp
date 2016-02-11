@@ -6,20 +6,45 @@
 
 #include "RIntlns.h"
 
-#include "ir/ir.h"
+#include "ir/Ir.h"
 #include "ir/Builder.h"
-#include "ir/intrinsics.h"
-#include "ir/Handler.h"
+#include "ir/Intrinsics.h"
+#include "OSRInliner.h"
+#include "OSRHandler.h"
 
 using namespace rjit;
 
 /** Compiles given ast and returns the NATIVESXP for it.
  */
-REXPORT SEXP jitAst(SEXP ast) {
+REXPORT SEXP jitAst(SEXP ast, SEXP formals, SEXP rho) {
     Compiler c("module");
-    SEXP result = c.compile("rfunction", ast);
+    SEXP result = c.compile("rfunction", ast, formals);
     c.jitAll();
     return result;
+}
+
+// TODO aghosn
+REXPORT SEXP testOSR(SEXP outer, SEXP env) {
+    Compiler c("module");
+    OSR_INLINE = 1;
+    // return jitAst(BODY(outer), FORMALS(outer), env);
+    osr::OSRInliner inliner(&c);
+    SEXP res = inliner.inlineCalls(outer);
+    c.jitAll();
+    return res;
+}
+
+REXPORT SEXP osrInline(SEXP f) {
+    assert(TYPEOF(f) == CLOSXP);
+    if (OSR_INLINE) {
+        Compiler c("module");
+        osr::OSRInliner inliner(&c);
+        SEXP result = inliner.inlineCalls(f);
+        c.jitAll();
+        return CDR(result);
+    } else {
+        return jitAst(BODY(f), FORMALS(f), TAG(f));
+    }
 }
 
 /** More complex compilation method that compiles multiple functions into a
@@ -36,15 +61,14 @@ REXPORT SEXP jitFunctions(SEXP moduleName, SEXP functions) {
         SEXP f = CAR(functions);
         // get the function ast
         SEXP body = BODY(f);
+        SEXP formals = FORMALS(f);
         SEXP name = TAG(functions);
         char const* fName =
             (name == R_NilValue) ? "unnamed function" : CHAR(PRINTNAME(name));
-        if (TYPEOF(body) == BCODESXP)
-            warning("Ignoring %s because it is in bytecode", fName);
-        else if (TYPEOF(body) == NATIVESXP)
+        if (TYPEOF(body) == NATIVESXP)
             warning("Ignoring %s because it is already compiled", fName);
         else
-            SET_BODY(f, c.compileFunction(fName, body));
+            SET_BODY(f, c.compileFunction(fName, body, formals));
         // move to next function
         functions = CDR(functions);
     }
@@ -77,6 +101,11 @@ int R_ENABLE_JIT = getenv("R_ENABLE_JIT") ? atoi(getenv("R_ENABLE_JIT")) : 0;
 
 int RJIT_DEBUG = getenv("RJIT_DEBUG") ? atoi(getenv("RJIT_DEBUG")) : 0;
 
+// TODO aghosn
+int OSR_INLINE = getenv("OSR_INLINE") ? atoi(getenv("OSR_INLINE")) : 0;
+int INLINE_ALL = getenv("INLINE_ALL") ? atoi(getenv("INLINE_ALL")) : 0;
+int ONLY_GLOBAL = getenv("ONLY_GLOBAL") ? atoi(getenv("ONLY_GLOBAL")) : 0;
+
 REXPORT SEXP jitDisable(SEXP expression) {
     RJIT_COMPILE = false;
     return R_NilValue;
@@ -85,4 +114,12 @@ REXPORT SEXP jitDisable(SEXP expression) {
 REXPORT SEXP jitEnable(SEXP expression) {
     RJIT_COMPILE = true;
     return R_NilValue;
+}
+
+// TODO aghosn
+REXPORT void fixClosure(uint64_t bim) {
+    printf("I'am here %d\n", (int)bim);
+    auto f = osr::OSRInliner::exits[bim];
+    // GET_LLVM(f.second)->dump();
+    SETCDR(f.first, f.second);
 }

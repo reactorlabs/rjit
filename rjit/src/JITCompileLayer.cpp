@@ -21,12 +21,14 @@
 
 #include "llvm/Support/DynamicLibrary.h"
 
+#include "ir/Analysis/VariableAnalysis.h"
+#include "ir/Optimization/ConstantLoad.h"
+
 using namespace llvm;
 
 namespace rjit {
 
-ExecutionEngine* JITCompileLayer::getEngine(Module* m) {
-
+ExecutionEngine* JITCompileLayer::getEngine(JITModule* m) {
     // to the function tells DynamicLibrary to load the program, not a library.
     auto mm = new JITMemoryManager();
 
@@ -34,8 +36,6 @@ ExecutionEngine* JITCompileLayer::getEngine(Module* m) {
     std::string err;
 
     TargetOptions opts;
-    // TODO: breaks gcstatepoint
-    // opts.EnableFastISel = true;
     ExecutionEngine* engine =
         EngineBuilder(std::unique_ptr<Module>(m))
             .setErrorStr(&err)
@@ -52,20 +52,24 @@ ExecutionEngine* JITCompileLayer::getEngine(Module* m) {
     // Make sure we can resolve symbols in the program as well. The zero arg
     legacy::PassManager pm;
 
+    // pm.add(new ir::VariableAnalysis());
+
+    // pm.add(new ir::ConstantLoadOptimization());
+
     pm.add(createTargetTransformInfoWrapperPass(TargetIRAnalysis()));
 
-    pm.add(rjit::createPlaceRJITSafepointsPass());
-
     PassManagerBuilder PMBuilder;
-    PMBuilder.OptLevel = 0;  // Set optimization level to -O0
-    PMBuilder.SizeLevel = 0; // so that no additional phases are run.
+    PMBuilder.OptLevel = 1;  // Set optimization level to -O0
+    PMBuilder.SizeLevel = 1; // so that no additional phases are run.
     PMBuilder.populateModulePassManager(pm);
 
-    // TODO: maybe have our own version which is not relocating?
+    pm.add(rjit::createPlaceRJITSafepointsPass());
     pm.add(rjit::createRJITRewriteStatepointsForGCPass());
+
     pm.run(*m);
 
     engine->finalizeObject();
+    m->finalizeNativeSEXPs(engine);
 
     // Fill in addresses for cached code
     for (llvm::Function& f : m->getFunctionList()) {
