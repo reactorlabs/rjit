@@ -391,6 +391,7 @@ class UnsignedIntegerLessThan : public IntegerComparison {
 };
 
 // TODO the hierarchy of this is wrong, but actual thought is required to fix it
+// TODO Binop should be property
 class BinaryOperator : public Pattern {
   protected:
     BinaryOperator(llvm::Instruction* ins, Kind kind) : Pattern(ins, kind) {}
@@ -841,6 +842,58 @@ class VectorGetElement : public Pattern {
         attach(payloadPtr);
         attach(el_ptr);
     }
+};
+
+/** Sets index-th element of R's vector.
+
+ Assumes vector is SEXP, index is int64 and value is underlying vector type.
+ */
+class VectorSetElement : public ir::Pattern {
+public:
+
+    static VectorSetElement * create(Builder & b, ir::Value vector, ir::Value index, ir::Value value) {
+        Sentinel s(b);
+        return insertBefore(s, vector, index, value);
+    }
+
+    static VectorSetElement * insertBefore(llvm::Instruction * ins, ir::Value vector, ir::Value index, ir::Value value) {
+        LLVMContext & c = ins->getContext();
+        ConstantInt* int64_1 = ConstantInt::get(c, APInt(64, 1));
+        auto realVector = new BitCastInst(vector, PointerType::get(t::VECTOR_SEXPREC, 1), "", ins);
+        auto payload = GetElementPtrInst::Create(t::VECTOR_SEXPREC, realVector, std::vector<llvm::Value*>({int64_1}), "", ins);
+        auto payloadPtr = new BitCastInst(payload, PointerType::get(t::SEXP, 1), "", ins);
+        GetElementPtrInst* el_ptr = GetElementPtrInst::Create(t::SEXP, payloadPtr, {index}, "", ins);
+        auto store = new StoreInst(value, el_ptr, ins);
+        store->setAlignment(8);
+        return new VectorSetElement(realVector, payload, payloadPtr, el_ptr, store);
+    }
+
+    static VectorSetElement * create(Pattern * p, ir::Value vector, ir::Value index, ir::Value value) {
+        return insertBefore(p->first(), vector, index, value);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->kind == Kind::VectorSetElement;
+    }
+
+    llvm::Instruction * result() const override {
+        assert(false and "VectorSetElement result is not expected to be used");
+        return nullptr;
+    }
+
+    size_t length() const override { return 5; }
+
+protected:
+  VectorSetElement(llvm::Instruction* realVector, llvm::Instruction* payload,
+                   llvm::Instruction* payloadPtr, llvm::Instruction* el_ptr,
+                   llvm::Instruction* store)
+      : Pattern(store, Kind::VectorSetElement) {
+      attach(realVector);
+      attach(payload);
+      attach(payloadPtr);
+      attach(store);
+  }
+
 };
 
 /** Interface to llvm's switch instruction

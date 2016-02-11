@@ -601,12 +601,8 @@ def buildDispatchTables():
         h.createDispatchTable()
     pass
 
-def emit():
-    D("emitting code for dispatch methods")
-    for h in passes.values():
-        h.emit()
-
 def emitPatternKinds():
+    global force
     D("emitting pattern kinds")
     filename = cppRoot + "/ir/pattern_kinds.inc"
     pks = set([ i.split("::")[-1] for i in patterns ])
@@ -625,10 +621,18 @@ def emitPatternKinds():
             D("  skipping")
             return
     # emit
+    # set force to true because we might need to redo all matches as they might have used the changed Pattern kind names
+    force = True
     with open(filename, "w") as f:
         print("/* This file has been automatically generated. Do not hand-edit. */", file = f)
         for pk in pks:
             print("{0},".format(pk), file = f)
+
+def emit():
+    D("emitting code for dispatch methods")
+    for h in passes.values():
+        h.emit()
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 
@@ -691,8 +695,8 @@ def main():
     # for each pass, we need to build a match table and error if the match table is ambiguous
     buildDispatchTables()
     # emit the generated code
-    emit()
     emitPatternKinds()
+    emit()
 
     D("DONE")
 
