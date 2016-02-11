@@ -56,8 +56,6 @@ class OSRHandler : public OSRLibrary {
     insertOSRExit(Function* opt, Function* instrument, Instruction* src,
                   Inst_Vector* cond, Inst_Vector* compensation = nullptr);
 
-    static uint64_t getId();
-
     /**
      * @brief      Removes a bidirectional mapping in the stateMap registered
      * under the key <otp, instrument>.
@@ -81,7 +79,6 @@ class OSRHandler : public OSRLibrary {
 
   private:
     static OSRHandler instance;
-    static uint64_t id;
 
     OSRHandler() {}
     // static bool existInstrument(Function* f);

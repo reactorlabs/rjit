@@ -132,6 +132,7 @@ void OSRHandler::addSexpToModule(SEXP f, Module* m) {
 SEXP OSRHandler::resetSafepoints(SEXP func, rjit::Compiler* c) {
     assert(TYPEOF(func) == NATIVESXP && GET_LLVM(func) && "Invalid function.");
     Function* f = GET_LLVM(func);
+    f->setGC("rjit");
     Module* m = c->getBuilder()->module();
     for (inst_iterator it = inst_begin(f), e = inst_end(f); it != e; ++it) {
         CallInst* call = dynamic_cast<CallInst*>(&(*it));
@@ -146,19 +147,16 @@ SEXP OSRHandler::resetSafepoints(SEXP func, rjit::Compiler* c) {
                 call->setCalledFunction(resolve);
             }
 
-            auto id = rjit::JITCompileLayer::singleton.getSafepointId(f);
-            setAttributes(call, id, IS_STUB(call));
+            // auto id = rjit::JITCompileLayer::singleton.getSafepointId(f);
+            // setAttributes(call, id, IS_STUB(call));
 
             // Fix the ic stub
             if (IS_STUB(call)) {
                 unsigned index = call->getNumArgOperands() - 2;
                 if (call->getArgOperand(index) != f) {
                     call->setArgOperand(index, f);
-                    call->setArgOperand(
-                        index + 1,
-                        ConstantInt::get(getGlobalContext(), APInt(64, id)));
-                    unsigned size = call->getNumArgOperands() - 5;
-                    rjit::JITCompileLayer::singleton.setPatchpoint(id, size);
+                    // unsigned size = call->getNumArgOperands() - 5;
+                    // rjit::JITCompileLayer::singleton.setPatchpoint(id, size);
                 }
             }
         }

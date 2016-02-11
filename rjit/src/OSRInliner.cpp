@@ -106,6 +106,8 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
                                       getOSRCondition(*it), compensation);
         // clean up
         VERIFYFUN2(res.second);
+        res.second->setGC("rjit");
+
         ret.clear();
         // Set the constant pool.
         setCP(fSexp, toInlineFunc);
@@ -158,7 +160,7 @@ SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
             return nullptr;
         formals = CDR(formals);
     }
-    printf("\n\n\nWE INLINE %s\n\n\n", name.c_str());
+    // printf("\n\n\nWE INLINE %s\n\n\n", name.c_str());
     return fSexp;
 }
 

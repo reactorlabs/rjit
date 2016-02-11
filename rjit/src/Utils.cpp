@@ -23,6 +23,7 @@
 #include "StateMap.hpp"
 
 using namespace rjit;
+using namespace llvm;
 namespace osr {
 
 REXPORT SEXP printWithoutSP(SEXP expr) {
@@ -40,15 +41,7 @@ REXPORT SEXP printFormals(SEXP f) {
 
 REXPORT SEXP testme(SEXP expr) {
     Compiler c("module");
-    /*SEXP result = c.compile("rfunction", BODY(expr), FORMALS(expr));
-    auto test = StateMap::generateIdentityMapping(GET_LLVM(result));
-    //test.first->removeFromParent();
-    (GET_LLVM(result))->getParent()->getFunctionList().push_back(test.first);
-    FunctionCall::fixIcStubs(test.first);
-    c.jitAll();
-    test.first->dump();*/
     SEXP result = OSRHandler::getFreshIR(expr, &c, true);
-    // FunctionCall::fixIcStubs(GET_LLVM(result));
     OSRHandler::resetSafepoints(result, &c);
     c.jitAll();
     return result;
