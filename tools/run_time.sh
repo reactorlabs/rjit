@@ -19,10 +19,9 @@ BENCH_DIR=${SRC_DIR}/benchmarks
 LOG_FILE_NAME="log"
 FRESH_R_DIR="${TARGET}/freshr"
 FRESH_R_VERS="3-2"
-<<<<<<< HEAD
-BENCH_RUN_NUMBER=1
-=======
 BENCH_RUN_NUM="2"
+
+>>>>>>> 399d58cc174efb368a60cfa15f4def3044bd9b97
 
 
 >>>>>>> Fixing patchpoints in the inlining

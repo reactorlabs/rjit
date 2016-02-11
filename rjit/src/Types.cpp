@@ -90,7 +90,6 @@ PointerType* initializeTypes() {
     DECLARE(sexp_contxtsexpsexp, t::SEXP, t::cntxtPtr, t::SEXP, t::SEXP);
     // TODO aghosn
     DECLARE(fixclosure_t, t::t_void, t::t_i64);
-
 #undef DECLARE
 
     // initialize LLVM backend

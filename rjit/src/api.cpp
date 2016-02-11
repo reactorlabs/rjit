@@ -14,14 +14,11 @@
 #include "ir/Ir.h"
 #include "ir/Builder.h"
 #include "ir/primitive_calls.h"
-#include "ir/primitive_calls.h"
 #include "OSRInliner.h"
 #include "OSRHandler.h"
-
 using namespace rjit;
 
-/** Compiles given ast and returns the NATIVESXP for it.
- */
+/** Compiles given ast and returns the NATIVESXP for it.*/
 REXPORT SEXP jitAst(SEXP ast, SEXP formals, SEXP rho) {
     Compiler c("module");
     SEXP result = c.compile("rfunction", ast, formals);
