@@ -124,16 +124,16 @@ class DispatchRecord:
         if (self.unconditional):
             args = self.unconditional.args
         elif (self.conditional):
-            args = self.conditional[0].args[1:]
+            args = self.conditional[0].args[0:-1]
         else:
             return False
         # now for each argument, if it is in llvm Instructions, it is llvm instruction, and we will use itertor, otherwise we use pattern
         result = []
         for i in range(len(args)):
             if (args[i] in instructions):
-                result.append("static_cast<{iType} *>(&*it{i})".format(iType = args[i], i = i))
+                result.append("reinterpret_cast<{iType} *>(&*it{i})".format(iType = args[i], i = i))
             else:
-                result.append("static_cast<{pType} *>(p{i})".format(pType = args[i], i = i))
+                result.append("reinterpret_cast<{pType} *>(p{i})".format(pType = args[i], i = i))
         return ", ".join(result)
 
 
@@ -153,13 +153,13 @@ class DispatchRecord:
         if (self.nextPatterns):
             p = "p{0}".format(current)
             print("""
-            Pattern * {p} = Pattern::get({it});
+            rjit::ir::Pattern * {p} = rjit::ir::Pattern::get({it});
             if ({p} != nullptr)
                 switch ({p}->kind) {{""".format(p = p, it = it), file = f)
             # now switch on the arguments
             for pName, dr in self.nextPatterns.items():
                 print("""
-                case Pattern::Kind::{pName}: {{
+                case rjit::ir::Pattern::Kind::{pName}: {{
                     {p}->advance({itNext});""".format(pName = pName.split("::")[-1], p = p, itNext = itNext), file = f)
                 dr.emit(f, current + 1)
                 print("break; }", file = f)

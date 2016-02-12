@@ -3,7 +3,7 @@
 
 #include "llvm.h"
 #include "Ir.h"
-#include "ir_scalars.h"
+#include "IrScalars.h"
 
 namespace rjit {
 namespace ir {
