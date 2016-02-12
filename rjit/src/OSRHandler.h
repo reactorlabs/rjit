@@ -13,8 +13,8 @@ namespace osr {
 #define NAME_CONTAINS(x, y)                                                    \
     ((((x)->getName().str()).find((y))) != std::string::npos)
 #define IS_STUB(x) NAME_CONTAINS((x)->getCalledFunction(), ICSTUB_NAME)
-
 #define GET_LLVM(sexp) (reinterpret_cast<llvm::Function*>(TAG(sexp)))
+
 typedef std::vector<Instruction*> Inst_Vector;
 typedef std::pair<Function*, Function*> OSRPair;
 typedef std::pair<SEXP, Function*> SEXPFunc;
@@ -33,15 +33,6 @@ class OSRHandler : public OSRLibrary {
      * @return     A pointer to the singleton instance.
      */
     static OSRHandler* getInstance() { return &instance; }
-
-    /**
-     * @brief      { function_description }
-     *
-     * @param      base  { parameter_description }
-     *
-     * @return     { description_of_the_return_value }
-     */
-    static Function* setupOpt(Function* base);
 
     /**
      * @brief      Returns a copy of base and registers a new mapping.
@@ -81,10 +72,6 @@ class OSRHandler : public OSRLibrary {
     static OSRHandler instance;
 
     OSRHandler() {}
-    // static bool existInstrument(Function* f);
-    static bool transContains(std::pair<Function*, Function*> key);
-    static bool baseVersionContains(SEXP key);
-    static void setAttributes(CallInst* call, uint64_t smid, bool stub);
 };
 
 } // namespace osr

@@ -80,9 +80,6 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
             toInlineClosure = inlineCalls(toInlineClosure);
             toInlineFunc = OSRHandler::getFreshIR(toInlineClosure, c, false);
         }
-        // TODO because of verifier
-        /*OSRHandler::addSexpToModule(toInlineFunc, c->getBuilder()->module());
-        OSRHandler::resetSafepoints(toInlineFunc, c);*/
 
         Function* toInline = GET_LLVM(toInlineFunc);
 
@@ -94,12 +91,8 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
         Inst_Vector* compensation = createCompensation(toInstrSexp, f);
 
         auto newrho = createNewRho((*it));
-
-        // Replace constant pool accesses and argument uses.
         Return_List ret;
         prepareCodeToInline(toInline, *it, newrho, LENGTH(CDR(fSexp)), &ret);
-        // TODO because of verifier
-        // OSRHandler::resetSafepoints(fSexp, c);
         insertBody(toOpt, toInline, toInstrument, *it, &ret);
         auto res =
             OSRHandler::insertOSRExit(toOpt, toInstrument, (*it)->getConsts(),
@@ -107,8 +100,8 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
         // clean up
         VERIFYFUN2(res.second);
         res.second->setGC("rjit");
-
         ret.clear();
+
         // Set the constant pool.
         setCP(fSexp, toInlineFunc);
     }
@@ -150,7 +143,7 @@ void OSRInliner::updateCPAccess(CallInst* call, int offset) {
 SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     SEXP symb = VECTOR_ELT(cp, symbol);
     SEXP fSexp = findFun(symb, env);
-    std::string name = CHAR(PRINTNAME(symb));
+    // std::string name = CHAR(PRINTNAME(symb));
     if (TYPEOF(fSexp) != CLOSXP || TYPEOF(TAG(fSexp)) != ENVSXP ||
         (TAG(fSexp) != R_GlobalEnv && ONLY_GLOBAL))
         return nullptr;
@@ -263,9 +256,6 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     // toInline->removeFromParent();
     delete deadBlock;
     delete toInline;
-
-    /*OSRHandler::insertOSRExit(toOpt, toInstrument, fc->getConsts(),
-                              getOSRCondition(fc), compensation);*/
 }
 
 Inst_Vector* OSRInliner::getTrueCondition() {
@@ -277,7 +267,6 @@ Inst_Vector* OSRInliner::getTrueCondition() {
     return res;
 }
 
-// TODO do the sexp
 Inst_Vector* OSRInliner::getOSRCondition(FunctionCall* fc) {
     Inst_Vector* res = new Inst_Vector();
     assert(fc->getInPtr() && "The function address has not been set.");
@@ -289,17 +278,13 @@ Inst_Vector* OSRInliner::getOSRCondition(FunctionCall* fc) {
 
 CallInst* OSRInliner::createNewRho(FunctionCall* fc) {
     Value* arglist = rjit::ir::Builder::convertToPointer(R_NilValue);
-
     auto args = fc->getArgs();
-    // TODO aghosn clean that
     for (auto it = args->begin(); it != (args->end()); ++it) {
         Value* arg = (*it);
         std::vector<Value*> f_arg;
         f_arg.push_back(arg);
         f_arg.push_back(arglist);
-        CallInst* inter =
-            CallInst::Create(CONS_NR, f_arg,
-                             ""); // TODO aghosn add somewhere in function.
+        CallInst* inter = CallInst::Create(CONS_NR, f_arg, "");
         arglist = inter;
         inter->insertBefore(fc->getIcStub());
     }

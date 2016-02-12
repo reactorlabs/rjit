@@ -14,18 +14,6 @@ std::map<std::pair<Function*, Function*>, StateMap*> OSRHandler::transitiveMaps;
 /******************************************************************************/
 /*                        Public functions                                    */
 /******************************************************************************/
-Function* OSRHandler::setupOpt(Function* base) {
-    assert(base && "OSRHandler: setup with nullptr");
-
-    // Generate a new clone of the function that we can modify.
-    auto toOpt = StateMap::generateIdentityMapping(base);
-
-    // Add the function to the module.
-    base->getParent()->getFunctionList().push_back(toOpt.first);
-
-    return toOpt.first;
-}
-
 Function* OSRHandler::getToInstrument(Function* base) {
     auto toInstrument = StateMap::generateIdentityMapping(base);
 
@@ -74,7 +62,8 @@ OSRHandler::insertOSRExit(Function* opt, Function* instrument, Instruction* src,
 
 void OSRHandler::removeEntry(Function* opt, Function* instrument, Value* val) {
     auto key = std::pair<Function*, Function*>(opt, instrument);
-    assert(transContains(key) && "This key has no statemap registered.");
+    assert(transitiveMaps.find(key) != transitiveMaps.end() &&
+           "This key has no statemap registered.");
     auto map = transitiveMaps[key];
     auto bidirect = map->getCorrespondingOneToOneValue(val);
     map->unregisterOneToOneValue(val);
@@ -87,7 +76,7 @@ SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
     SEXP body = BODY(closure);
     SEXP func = R_NilValue;
 
-    if (!baseVersionContains(closure)) {
+    if (baseVersions.find(closure) == baseVersions.end()) {
         if (TYPEOF(body) == NATIVESXP &&
             GET_LLVM(body)->getParent() == c->getBuilder()->module()) {
             func = body;
@@ -99,7 +88,7 @@ SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
         Function* clone =
             StateMap::generateIdentityMapping(GET_LLVM(func)).first;
         baseVersions[closure] = cloneSEXP(func, clone);
-        assert(baseVersionContains(closure));
+        assert(baseVersions.find(closure) != baseVersions.end());
     }
 
     SEXP entry = baseVersions[closure];
@@ -147,53 +136,15 @@ SEXP OSRHandler::resetSafepoints(SEXP func, rjit::Compiler* c) {
                 call->setCalledFunction(resolve);
             }
 
-            // auto id = rjit::JITCompileLayer::singleton.getSafepointId(f);
-            // setAttributes(call, id, IS_STUB(call));
-
             // Fix the ic stub
             if (IS_STUB(call)) {
                 unsigned index = call->getNumArgOperands() - 2;
                 if (call->getArgOperand(index) != f) {
                     call->setArgOperand(index, f);
-                    // unsigned size = call->getNumArgOperands() - 5;
-                    // rjit::JITCompileLayer::singleton.setPatchpoint(id, size);
                 }
             }
         }
     }
     return func;
 }
-/******************************************************************************/
-/*                        Private functions                                   */
-/******************************************************************************/
-
-bool OSRHandler::transContains(std::pair<Function*, Function*> key) {
-    return transitiveMaps.find(key) != transitiveMaps.end();
-}
-
-bool OSRHandler::baseVersionContains(SEXP key) {
-    return baseVersions.find(key) != baseVersions.end();
-}
-
-void OSRHandler::setAttributes(CallInst* call, uint64_t smid, bool stub) {
-    Module* m = call->getParent()->getParent()->getParent();
-    assert(m && "Module not set for call instruction.");
-    llvm::AttributeSet PAL;
-    {
-        llvm::SmallVector<llvm::AttributeSet, 4> Attrs;
-        llvm::AttributeSet PAS;
-        {
-            llvm::AttrBuilder B;
-            B.addAttribute("statepoint-id", std::to_string(smid));
-            if (stub)
-                B.addAttribute("statepoint-num-patch-bytes",
-                               std::to_string(rjit::patchpointSize));
-            PAS = llvm::AttributeSet::get(m->getContext(), ~0U, B);
-        }
-        Attrs.push_back(PAS);
-        PAL = llvm::AttributeSet::get(m->getContext(), Attrs);
-    }
-    call->setAttributes(PAL);
-}
-
 } // namespace osr

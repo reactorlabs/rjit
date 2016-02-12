@@ -84,6 +84,7 @@ void FunctionCall::fixPromises(SEXP cp, SEXP inFun, rjit::Compiler* c) {
                 c->getBuilder()->intrinsic<rjit::ir::CreatePromise>(), args_,
                 "");
             promise->insertAfter(args.at(i));
+            // TODO maybe remove this
             AttributeSet PAL;
             {
                 SmallVector<AttributeSet, 4> Attrs;
@@ -113,6 +114,7 @@ void FunctionCall::fixPromises(SEXP cp, SEXP inFun, rjit::Compiler* c) {
 Value* FunctionCall::getRho() {
     Function* fun = this->getFunction();
     assert(fun && "The function for this fc is null.");
+    // TODO CHANGE THIS ?
     for (auto RI = fun->arg_begin(), EI = fun->arg_end(); RI != EI; ++RI) {
         if (NAME_CONTAINS(&(*RI), "rho"))
             return &(*RI);
