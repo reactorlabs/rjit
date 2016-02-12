@@ -16,7 +16,7 @@ namespace ir {
 // TODO as a proof of concept this is great, however in long run it might be
 // better to let llvm know about the primitive functions and inline them where
 // appropriate?
-class ConstantLoadPass : public Pass {
+class ConstantLoadPass : public Pass, public Optimization {
   public:
     ConstantLoadPass() : Pass() {}
 
@@ -38,7 +38,7 @@ class ConstantLoadPass : public Pass {
     bool dispatch(llvm::BasicBlock::iterator& i) override;
 };
 
-class ConstantLoadOptimization : public ForwardDriver<ConstantLoadPass> {};
+class ConstantLoadOptimization : public LinearDriver<ConstantLoadPass> {};
 }
 }
 

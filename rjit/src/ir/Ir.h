@@ -120,7 +120,7 @@ class Pattern {
   protected:
     friend class Verifier;
     friend class View;
-    friend class Pass;
+    friend class Optimization;
     friend class Value;
     friend class Builder;
 
@@ -176,6 +176,51 @@ class Pattern {
         ins->setMetadata(MD_NAME, m);
     }
 };
+
+/** Predicates mockup
+
+  Each predicate must have the match method, that takes the same arguments as
+  the function they are guarding modulo all predicate arguments. It returns true
+  if the predicate approves of the matching, false if it should be denied.
+
+  The match method is deliberately not static - first we will still have to
+  create the object and pass it, so no savings there, and second, while for
+  simple cases we don't need the actual object, it might be beneficial as the
+  predicate may pass further information to the pass. In theory:)
+ */
+
+/** Base class for all predicates.
+ */
+class Predicate {
+public:
+    /** Returns the constant pool value for currently analyzed function.
+     */
+    llvm::Value * constantPool(ir::Pass & p);
+
+};
+
+namespace predicate {
+
+template <typename T, typename W, typename... MATCH_SEQ>
+class And {
+  public:
+    T lhs;
+    W rhs;
+    bool match(Pass& h, MATCH_SEQ... args) {
+        return lhs.match(h, args...) and rhs.match(h, args...);
+    }
+};
+
+template <typename T, typename W, typename... MATCH_SEQ>
+class Or {
+  public:
+    T lhs;
+    W rhs;
+    bool match(Pass& h, MATCH_SEQ... args) {
+        return lhs.match(h, args...) or rhs.match(h, args...);
+    }
+};
+}
 
 /** ir::Value is either a Pattern or llvm::Value.
 
@@ -786,6 +831,30 @@ class InvocationCount : public Pattern {
 
 class VectorGetElement : public Pattern {
   public:
+
+    /** Predicate for reading from a constant pool.
+
+      Matches when a constant index is being read from a constant pool vector.
+     */
+    class FromConstantPool : public Predicate {
+    public:
+        bool match(ir::Pass & p, VectorGetElement * vge);
+    };
+
+
+    /** Returns the vector being read.
+     */
+    llvm::Value * vector() {
+        return first()->getOperand(0);
+    }
+
+    /** Returns the index being read.
+     */
+    llvm::Value * index() {
+        return ins_->getPrevNode()->getOperand(1);
+    }
+
+
     static VectorGetElement* create(Builder& b, ir::Value vector,
                                     ir::Value index) {
         Sentinel s(b);
