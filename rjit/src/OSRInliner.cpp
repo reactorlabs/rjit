@@ -93,58 +93,6 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
         }
         setCP(fSexp, innerFunc);
     }
-
-    /*for (auto it = calls->begin(); it != calls->end(); ++it) {
-        // Get the callee
-        SEXP constantPool = CDR(fSexp);
-        SEXP toInlineClosure =
-            getFunction(constantPool, (*it)->getFunctionSymbol(), env);
-
-        // Function not found or arguments are missing, or recursive call.
-        if (!toInlineClosure ||
-            isMissingArgs(FORMALS(toInlineClosure), (*it)) ||
-            f == toInlineClosure)
-            continue;
-
-        // For the OSR condition.
-        (*it)->setInPtr(c, toInlineClosure);
-
-        // For the promises.
-        (*it)->fixPromises(constantPool, toInlineClosure, c);
-
-        // Get the LLVM IR for the function to Inline.
-        SEXP toInlineFunc = R_NilValue;
-        if (!INLINE_ALL) {
-            toInlineFunc = OSRHandler::getFreshIR(toInlineClosure, c, false);
-        } else {
-            toInlineClosure = inlineCalls(toInlineClosure);
-            toInlineFunc = OSRHandler::getFreshIR(toInlineClosure, c, false);
-        }
-
-        Function* toInline = GET_LLVM(toInlineFunc);
-
-        Function* toInstrument = OSRHandler::getToInstrument(toOpt);
-        SEXP toInstrSexp = OSRHandler::cloneSEXP(fSexp, toInstrument);
-        OSRHandler::resetSafepoints(toInstrSexp, c);
-        c->getBuilder()->module()->fixRelocations(formals, toInstrSexp,
-                                                  toInstrument);
-        Inst_Vector* compensation = createCompensation(toInstrSexp, f);
-
-        auto newrho = createNewRho((*it));
-        Return_List ret;
-        prepareCodeToInline(toInline, *it, newrho, LENGTH(CDR(fSexp)), &ret);
-        insertBody(toOpt, toInline, toInstrument, *it, &ret);
-        auto res =
-            OSRHandler::insertOSRExit(toOpt, toInstrument, (*it)->getConsts(),
-                                      getOSRCondition(*it), compensation);
-        // clean up
-        VERIFYFUN2(res.second);
-        res.second->setGC("rjit");
-        ret.clear();
-
-        // Set the constant pool.
-        setCP(fSexp, toInlineFunc);
-    }*/
     OSRHandler::resetSafepoints(fSexp, c);
     VERIFYFUN2(GET_LLVM(fSexp));
     SETCDR(f, fSexp);
