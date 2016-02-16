@@ -14,6 +14,8 @@ namespace osr {
 typedef std::vector<llvm::Instruction*> Inst_Vector;
 typedef std::list<llvm::ReturnInst*> Return_List;
 typedef std::pair<SEXP, SEXP> ExitEntry;
+typedef std::list<FunctionCall*> Call_List;
+typedef std::map<SEXP, Call_List> Call_Map;
 
 class OSRInliner {
   public:
@@ -57,6 +59,7 @@ class OSRInliner {
     static void setCP(SEXP firstP, SEXP secondP);
     static void updateCPAccess(CallInst* call, int offset);
     static SEXP getFunction(SEXP cp, int symbol, SEXP env);
+    Call_Map sortCalls(FunctionCalls* calls, SEXP outer);
     static bool isMissingArgs(SEXP formals, FunctionCall* fc);
     static void prepareCodeToInline(Function* toInline, FunctionCall* fc,
                                     CallInst* newrho, int cpOffset,

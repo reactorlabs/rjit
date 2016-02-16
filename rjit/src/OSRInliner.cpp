@@ -6,6 +6,7 @@
 #include "api.h"
 #include "ir/Builder.h"
 #include <llvm/IR/Verifier.h>
+#include <llvm/Transforms/Utils/Cloning.h>
 
 using namespace llvm;
 
@@ -52,9 +53,48 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
     c->getBuilder()->module()->fixRelocations(formals, fSexp, toOpt);
 
     /*Get the function calls inside f*/
-    FunctionCalls* calls = FunctionCall::getFunctionCalls(toOpt);
+    Call_Map calls = sortCalls(FunctionCall::getFunctionCalls(toOpt), f);
 
-    for (auto it = calls->begin(); it != calls->end(); ++it) {
+    SEXP innerFunc = R_NilValue;
+
+    // to Instrument here implies we always exit to the base function.
+    Function* toInstrument = OSRHandler::getToInstrument(toOpt);
+
+    for (auto it = calls.begin(); it != calls.end(); ++it) {
+        SEXP innerClosure = it->first;
+        if (!INLINE_ALL)
+            innerFunc = OSRHandler::getFreshIR(innerClosure, c, false);
+        else {
+            innerClosure = inlineCalls(innerClosure);
+            innerFunc = OSRHandler::getFreshIR(innerClosure, c, false);
+        }
+
+        SEXP toInstrSexp = OSRHandler::cloneSEXP(fSexp, toInstrument);
+        OSRHandler::resetSafepoints(toInstrSexp, c);
+        c->getBuilder()->module()->fixRelocations(formals, toInstrSexp,
+                                                  toInstrument);
+
+        for (auto call = it->second.begin(); call != it->second.end(); ++call) {
+            ValueToValueMapTy VMap;
+            Function* toInline =
+                CloneFunction(GET_LLVM(innerFunc), VMap, false);
+            auto newrho = createNewRho(*call);
+            Return_List ret;
+            prepareCodeToInline(toInline, *call, newrho, LENGTH(CDR(fSexp)),
+                                &ret);
+            insertBody(toOpt, toInline, toInstrument, *call, &ret);
+            Inst_Vector* compensation = createCompensation(toInstrSexp, f);
+            auto res = OSRHandler::insertOSRExit(
+                toOpt, toInstrument, (*call)->getConsts(),
+                getOSRCondition(*call), compensation);
+            VERIFYFUN2(res.second);
+            res.second->setGC("rjit");
+            ret.clear();
+        }
+        setCP(fSexp, innerFunc);
+    }
+
+    /*for (auto it = calls->begin(); it != calls->end(); ++it) {
         // Get the callee
         SEXP constantPool = CDR(fSexp);
         SEXP toInlineClosure =
@@ -104,7 +144,7 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
 
         // Set the constant pool.
         setCP(fSexp, toInlineFunc);
-    }
+    }*/
     OSRHandler::resetSafepoints(fSexp, c);
     VERIFYFUN2(GET_LLVM(fSexp));
     SETCDR(f, fSexp);
@@ -155,6 +195,23 @@ SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     }
     // printf("\n\n\nWE INLINE %s\n\n\n", name.c_str());
     return fSexp;
+}
+
+Call_Map OSRInliner::sortCalls(FunctionCalls* calls, SEXP outer) {
+    Call_Map map;
+    SEXP cp = CDR(BODY(outer));
+    SEXP env = TAG(outer);
+    for (auto it = calls->begin(); it != calls->end(); ++it) {
+        SEXP inner = getFunction(cp, (*it)->getFunctionSymbol(), env);
+        // Function not found or arguments are missing, or recursive call.
+        if (!inner || isMissingArgs(FORMALS(inner), (*it)) || outer == inner)
+            continue;
+
+        (*it)->setInPtr(c, inner);
+        (*it)->fixPromises(cp, inner, c);
+        map[inner].push_back(*it);
+    }
+    return map;
 }
 
 bool OSRInliner::isMissingArgs(SEXP formals, FunctionCall* fc) {
@@ -244,8 +301,11 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
             delete split;
         }
 
-        if (node)
+        if (node) {
             fc->getIcStub()->replaceAllUsesWith(node);
+            OSRHandler::updateEntry(Func_Pair(toOpt, toInstrument), node,
+                                    fc->getIcStub());
+        }
     }
 
     // Clean up.

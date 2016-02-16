@@ -72,3 +72,4 @@ fannkuchredux_naive <- function(args) {
 execute <- function(n = 9L) {
     fannkuchredux_naive(n)
 }
+execute(9L)

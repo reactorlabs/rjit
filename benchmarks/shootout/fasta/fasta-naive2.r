@@ -101,3 +101,4 @@ execute <- function(n = 150000L) {
     fasta_naive2(n)
 }
 
+execute(150000L)

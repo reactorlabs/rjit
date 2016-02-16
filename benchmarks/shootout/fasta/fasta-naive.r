@@ -96,3 +96,4 @@ fasta_naive <- function(args) {
 execute <- function(n = 150000L) {
     fasta_naive(n)
 }
+execute(150000L)

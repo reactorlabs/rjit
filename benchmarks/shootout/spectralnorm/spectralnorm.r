@@ -51,3 +51,4 @@ spectralnorm <- function(args) {
     execute <- function(n = 250L) {
         spectralnorm(n)
     }
+execute(250L)

@@ -41,3 +41,4 @@ execute <- function(n = 400L) {
     mandelbrot_naive(n)
 }
 
+execute(400L)

@@ -110,3 +110,4 @@ nbody_2 <- function(args) {
 execute <- function(n = 50000L) {
     nbody_2(n)
 }
+execute(50000L)

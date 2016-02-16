@@ -60,3 +60,4 @@ regexdna <- function(args) {
 execute <- function(n = "shootout/fasta/fasta500000.txt") {
     regexdna(n)
 }
+execute("../benchmarks/shootout/fasta/fasta500000.txt")

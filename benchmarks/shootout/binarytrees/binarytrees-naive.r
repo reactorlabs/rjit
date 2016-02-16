@@ -45,3 +45,4 @@ execute <- function(n = 13L) {
     binarytrees_naive(n)
 }
 
+execute(13L)

@@ -18,6 +18,7 @@ namespace osr {
 typedef std::vector<Instruction*> Inst_Vector;
 typedef std::pair<Function*, Function*> OSRPair;
 typedef std::pair<SEXP, Function*> SEXPFunc;
+typedef std::pair<Function*, Function*> Func_Pair;
 
 class OSRHandler : public OSRLibrary {
   public:
@@ -25,7 +26,7 @@ class OSRHandler : public OSRLibrary {
     /**
      * Map from a function pair <toOpt, toInstrument> to their statemaps.
      */
-    static std::map<std::pair<Function*, Function*>, StateMap*> transitiveMaps;
+    static std::map<Func_Pair, StateMap*> transitiveMaps;
 
     /**
      * @brief      Returns the singleton of the OSRHandler.
@@ -59,6 +60,8 @@ class OSRHandler : public OSRLibrary {
      * needed to have a clean StateMap.
      */
     static void removeEntry(Function* opt, Function* instrument, Value* val);
+
+    static void updateEntry(Func_Pair key, Value* phi, Value* stub);
 
     static SEXP getFreshIR(SEXP closure, rjit::Compiler* c,
                            bool compile = true);

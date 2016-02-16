@@ -94,3 +94,4 @@ fasta_2 <- function(args) {
 execute <- function(n = 150000L) {
     fasta_2(n)
 }
+execute(150000L)

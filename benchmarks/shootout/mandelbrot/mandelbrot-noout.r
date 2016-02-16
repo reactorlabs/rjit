@@ -34,3 +34,4 @@ execute <- function(n = 3000L) {
     mandelbrot_noout(n)
 }
 
+execute(3000L)

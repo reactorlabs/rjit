@@ -113,3 +113,4 @@ fastaredux <- function(args) {
 execute <- function(n = 150000L) {
     fastaredux(n)
 }
+execute(150000L)

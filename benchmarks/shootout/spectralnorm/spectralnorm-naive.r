@@ -40,3 +40,4 @@ spectralnorm_naive <- function(args) {
 execute <- function(n = 250L) {
     spectralnorm_naive(n)
 }
+execute(250L)

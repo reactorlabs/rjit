@@ -402,3 +402,4 @@ execute <- function(n = 150L) {
     pidigits(n)
 }
 
+execute(150L)

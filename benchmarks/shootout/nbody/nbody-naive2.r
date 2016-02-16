@@ -116,3 +116,4 @@ nbody_naive2 <- function(args) {
 execute <- function(n = 50000L) {
     nbody_naive2(n)
 }
+execute(50000L)

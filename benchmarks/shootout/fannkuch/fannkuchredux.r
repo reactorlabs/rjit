@@ -75,3 +75,4 @@ execute <- function(n = 9L) {
     fannkuchredux(n)
 }
 
+execute(9L)

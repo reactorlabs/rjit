@@ -18,3 +18,4 @@ spectralnorm_math <- function(args) {
 execute <- function(n = 250L) {
     spectralnorm_math(n)
 }
+execute(250L)

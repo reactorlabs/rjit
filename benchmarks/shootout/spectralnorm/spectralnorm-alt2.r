@@ -31,3 +31,4 @@ spectralnorm_alt2 <- function(args) {
 execute <- function(n = 250L) {
     spectralnorm_alt2(n)
 }
+execute(250L)

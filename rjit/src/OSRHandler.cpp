@@ -70,6 +70,15 @@ void OSRHandler::removeEntry(Function* opt, Function* instrument, Value* val) {
     map->unregisterOneToOneValue(bidirect);
 }
 
+void OSRHandler::updateEntry(Func_Pair key, Value* phi, Value* stub) {
+    assert(transitiveMaps.find(key) != transitiveMaps.end() &&
+           "This key has no statemap registered.");
+    auto map = transitiveMaps[key];
+    auto stubInstr = map->getCorrespondingOneToOneValue(stub);
+    map->unregisterOneToOneValue(stub);
+    map->registerOneToOneValue(phi, stubInstr, true);
+}
+
 SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
     assert(TYPEOF(closure) == CLOSXP && "getFreshIR requires a closure.");
 

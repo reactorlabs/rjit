@@ -34,3 +34,4 @@ execute <- function(n = "shootout/fasta/fasta300000.txt") {
     reversecomplement(n)
 }
 
+execute("../benchmarks/shootout/fasta/fasta300000.txt")
