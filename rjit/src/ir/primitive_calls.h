@@ -3229,6 +3229,38 @@ class ReturnJump : public PrimitiveCall {
     }
 };
 
+class Recompile : public PrimitiveCall {
+  public:
+    Recompile(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::Recompile) {}
+
+    static Recompile* create(Builder& b, ir::Value closure) {
+        Sentinel s(b);
+        return insertBefore(s, closure);
+    }
+
+    static Recompile* insertBefore(llvm::Instruction* ins, ir::Value closure) {
+        std::vector<llvm::Value*> args_;
+        args_.push_back(closure);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<Recompile>(ins->getModule()), args_, "", ins);
+
+        Builder::markSafepoint(i);
+        return new Recompile(i);
+    }
+
+    static char const* intrinsicName() { return "recompileFunction"; }
+
+    static llvm::FunctionType* intrinsicType() {
+        return llvm::FunctionType::get(t::nativeFunctionPtr_t, {t::SEXP},
+                                       false);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::Recompile;
+    }
+};
+
 class RecordType : public PrimitiveCall {
   public:
     RecordType(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::RecordType) {}

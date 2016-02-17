@@ -24,6 +24,22 @@ void TypeFeedback::record(SEXP value, int idx) {
         INTEGER(store)[idx] = info;
     }
 }
+
+int Instrumentation::getInvocationCount(SEXP closure) {
+    assert(TYPEOF(closure) == CLOSXP);
+    SEXP body = BODY(closure);
+    SEXP consts = CDR(body);
+    SEXP invocationCount = VECTOR_ELT(consts, 3);
+    return INTEGER(invocationCount)[0];
+}
+
+void Instrumentation::clearInvocationCount(SEXP closure) {
+    assert(TYPEOF(closure) == CLOSXP);
+    SEXP body = BODY(closure);
+    SEXP consts = CDR(body);
+    SEXP invocationCount = VECTOR_ELT(consts, 3);
+    INTEGER(invocationCount)[0] = 0;
+}
 }
 
 extern "C" void recordType(SEXP value, SEXP store, int idx) {
