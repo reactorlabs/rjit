@@ -8,6 +8,10 @@ namespace rjit {
 namespace symbol {
 #define DECLARE(name, txt) extern SEXP name
 
+DECLARE(AssignBracket, "[<-");
+DECLARE(AssignDoubleBracket, "[[<-");
+DECLARE(DoubleBracket, "[[");
+DECLARE(Bracket, "[");
 DECLARE(Block, "{");
 DECLARE(Parenthesis, "(");
 DECLARE(Assign, "<-");

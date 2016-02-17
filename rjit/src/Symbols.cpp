@@ -5,6 +5,10 @@ namespace rjit {
 namespace symbol {
 #define DECLARE(name, txt) SEXP name = Rf_install(txt)
 
+DECLARE(AssignBracket, "[<-");
+DECLARE(AssignDoubleBracket, "[[<-");
+DECLARE(DoubleBracket, "[[");
+DECLARE(Bracket, "[");
 DECLARE(Block, "{");
 DECLARE(Parenthesis, "(");
 DECLARE(Assign, "<-");
