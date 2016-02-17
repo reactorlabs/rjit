@@ -124,6 +124,8 @@ case $key in
     RJIT_BUILD_TYPE="Release"
     ;;
     --build-run-bench)
+    GEN="Ninja"
+    M="ninja"
     RJIT_BUILD_TYPE="Release"
     LLVM_TYPE="-nodebug"
     LLVM_BUILD_TYPE="Release"
@@ -351,11 +353,37 @@ if [ $BENCH_RUN -eq 1 ]; then
         echo "-> create the rjit packages"
         $M package_install
     fi
-
     if [ $SKIP_FRESHR -eq 0 ]; then
         cd ${TARGET}
 
-        build_freshr ${FRESH_R_DIR} ${FRESH_R_VERSION} ${OPT}
+        # create the freshr directory 
+        if [ ! -d ${FRESH_R_DIR} ]; then
+            mkdir ${FRESH_R_DIR}
+        fi
+
+        cd ${FRESH_R_DIR}
+    
+        FRESH_R_VERS_F=R-${FRESH_R_VERS}-branch
+        FRESH_R_SRC=${FRESH_R_DIR}/${FRESH_R_VERS_F}/
+
+        # checkout R-3-2 from svn
+        if [ ! -d ${FRESH_R_SRC} ]; then    
+            echo "-> checking out ${FRESH_R_VERS_F} to ${FRESH_R_SRC}"
+            svn co https://svn.r-project.org/R/branches/${FRESH_R_VERS_F}/ ${FRESH_R_SRC}
+        fi
+        cd ${FRESH_R_SRC}
+
+        # download the set of recommended packages for R-3-2
+        echo "-> checking out the recommended packages"
+        ./tools/rsync-recommended
+
+        # configure the make file
+        echo "-> building the config file"
+        ./configure
+
+        # make the R-3-2
+        echo "-> building a fresh copy of ${FRESH_R_VERS_F} to ${FRESH_R_DIR}"
+        make
     fi
 
     SHOOT_DIR=${BENCH_DIR}/shootout/
@@ -447,7 +475,7 @@ if [ $BENCH_RUN -eq 1 ]; then
     cat /etc/lsb-release >> ${CONFIG_FILE}
 
     # lscpu/lshw or sysctl hw
-    if [ $USING_OSX eq 1]; then
+    if [ $USING_OSX -eq 1 ]; then
         lscpu >> ${CONFIG_FILE}
         lshw >> ${CONFIG_FILE}
     else
@@ -461,8 +489,8 @@ if [ $BENCH_RUN -eq 1 ]; then
     echo "store your any carry on luggage underneath the seat in front of you, and have your password ready)"
 
     # Jan's machine must be on the list of known hosts, a ssh-keygen for Jan's machine should have been setup
-    tar cvzf ${RESULT_DIR}.tar ${RESULT_DIR}
-    scp -p ${RESULT_DIR}.tar teamcity@reactor.ccs.neu.edu:/Users/teamcity/reactorl/benchmark_result
+    #tar cvzf ${RESULT_DIR}.tar ${RESULT_DIR}
+    #scp -p ${RESULT_DIR}.tar teamcity@reactor.ccs.neu.edu:/Users/teamcity/reactorl/benchmark_result
 
     # Possibly delete everything created once the result are sent off?
 fi

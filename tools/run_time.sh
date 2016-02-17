@@ -19,7 +19,7 @@ BENCH_DIR=${SRC_DIR}/benchmarks
 LOG_FILE_NAME="log"
 FRESH_R_DIR="${TARGET}/freshr"
 FRESH_R_VERS="3-2"
-BENCH_RUN_NUMBER=1
+BENCH_RUN_NUMBER=10
 SHOOT_DIR=${BENCH_DIR}/shootout/
 
 TIMEN=$(date +"%H-%M-%S_%F")
@@ -32,12 +32,12 @@ if [ ! -d ${RESULT_DIR} ]; then
    mkdir ${RESULT_DIR}
 fi
 
-build_freshr $FRESH_R_DIR $FRESH_R_VERSION "-O2"
+# build_freshr $FRESH_R_DIR $FRESH_R_VERSION "-O2"
 
-FRESH_R_BIN=${FRESH_R_DIR}/R-${FRESH_R_VERS}-branch/bin/R
+# FRESH_R_BIN=${FRESH_R_DIR}/R-${FRESH_R_VERS}-branch/bin/R
 
-echo "-> installing ggplot2 to ${FRESH_R_VERS_F}"
-${FRESH_R_BIN} -e "install.packages(\"ggplot2\", repos=\"http://cran.rstudio.com/\")"
+# echo "-> installing ggplot2 to ${FRESH_R_VERS_F}"
+# ${FRESH_R_BIN} -e "install.packages(\"ggplot2\", repos=\"http://cran.rstudio.com/\")"
 
 cd ${BENCH_DIR}
 
