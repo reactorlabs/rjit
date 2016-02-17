@@ -40,7 +40,25 @@ SEXP Compiler::compilePromise(std::string const& name, SEXP ast) {
 SEXP Compiler::compileFunction(std::string const& name, SEXP ast,
                                SEXP formals) {
     b.openFunction(name, ast, formals);
-    ir::InvocationCount::create(b);
+
+    // Check the invocation count and recompile the function if it is hot.
+    auto limit =
+        ConstantInt::get(b.getContext(), APInt(32, StringRef("10000"), 10));
+    auto invocations = ir::InvocationCount::create(b);
+    auto condition = ir::IntegerLessThan::create(b, invocations, limit);
+    BasicBlock* bRecompile = b.createBasicBlock("recompile");
+    BasicBlock* next = b.createBasicBlock("functionBegin");
+
+    // TODO set weight to mark that the branch is unlikely
+    ir::Cbr::create(b, condition, next, bRecompile);
+
+    b.setBlock(bRecompile);
+    auto fun = ir::Recompile::create(b, b.closure());
+    auto res = ir::CallToAddress::create(b, fun, b.args());
+    ir::Return::create(b, res);
+
+    b.setBlock(next);
+
     return finalizeCompile(ast);
 }
 
@@ -407,7 +425,7 @@ Value* Compiler::compileCondition(SEXP e) {
     BasicBlock* ifTrue = b.createBasicBlock("ifTrue");
     BasicBlock* ifFalse = b.createBasicBlock("ifFalse");
     BasicBlock* next = b.createBasicBlock("next");
-    ir::Cbr::create(b, cond, ifTrue, ifFalse);
+    ir::CbrZero::create(b, cond, ifTrue, ifFalse);
 
     // true case has to be always present
     b.setBlock(ifTrue);
@@ -510,7 +528,7 @@ Value* Compiler::compileWhileLoop(SEXP ast) {
     Value* cond2 = compileExpression(condAst);
     Value* cond = ir::ConvertToLogicalNoNA::create(b, cond2, condAst)->result();
     BasicBlock* whileBody = b.createBasicBlock("whileBody");
-    ir::Cbr::create(b, cond, whileBody, b.breakTarget());
+    ir::CbrZero::create(b, cond, whileBody, b.breakTarget());
     // compile the body
     b.setBlock(whileBody);
     compileExpression(bodyAst);

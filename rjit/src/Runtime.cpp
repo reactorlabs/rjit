@@ -5,6 +5,7 @@
 #include "Compiler.h"
 #include "api.h"
 #include "ir/Builder.h"
+#include "Instrumentation.h"
 
 using namespace rjit;
 
@@ -79,4 +80,12 @@ extern "C" void* compileIC(uint64_t numargs, SEXP call, SEXP fun, SEXP rho,
     void* res = compiler.compile(call, fun, rho);
 
     return res;
+}
+
+extern "C" void* recompileFunction(SEXP closure) {
+    assert(TYPEOF(closure) == CLOSXP);
+    std::cout << "Requested to recompile " << (void*)closure << "\n";
+    Instrumentation::clearInvocationCount(closure);
+    // Return unchanged functino
+    return CAR(BODY(closure));
 }
