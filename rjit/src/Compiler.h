@@ -106,7 +106,17 @@ class Compiler {
     /** Index operator for assignment for vector access of double bracket [[]].
      *
      */
+    llvm::Value* compileAssignBracket2(SEXP call, SEXP value);
+
+    /** Index operator for assignment for vector access of double bracket [[]].
+     *
+     */
     llvm::Value* compileAssignDoubleBracket(SEXP call);
+
+    /** Index operator for assignment for vector access of double bracket [[]].
+     *
+     */
+    llvm::Value* compileAssignDoubleBracket2(SEXP call, SEXP value);
 
     /** Similar to R bytecode compiler, only the body of the created function is
       compiled, the default arguments are left in their ast forms for now.
