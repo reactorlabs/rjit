@@ -50,13 +50,10 @@ OSRHandler::insertOSRExit(Function* opt, Function* instrument, Instruction* src,
                                              *instrument, *lPad, *cond,
                                              *transitive, configuration);
     if (compensation) {
+        std::reverse(compensation->begin(), compensation->end());
         for (auto it = compensation->begin(); it != compensation->end(); ++it)
             (*it)->insertBefore(&(res.second->getEntryBlock().back()));
     }
-
-    // Printing
-    /*res.first->dump();
-    res.second->dump();*/
     return res;
 }
 

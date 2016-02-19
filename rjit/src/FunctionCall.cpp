@@ -84,23 +84,6 @@ void FunctionCall::fixPromises(SEXP cp, SEXP inFun, rjit::Compiler* c) {
                 c->getBuilder()->intrinsic<rjit::ir::CreatePromise>(), args_,
                 "");
             promise->insertAfter(args.at(i));
-            // TODO maybe remove this
-            AttributeSet PAL;
-            {
-                SmallVector<AttributeSet, 4> Attrs;
-                AttributeSet PAS;
-                {
-                    AttrBuilder B;
-                    auto id = rjit::JITCompileLayer::singleton.getSafepointId(
-                        getFunction());
-                    B.addAttribute("statepoint-id", std::to_string(id));
-                    PAS = AttributeSet::get(getGlobalContext(), ~0U, B);
-                }
-                Attrs.push_back(PAS);
-                PAL = AttributeSet::get(getGlobalContext(), Attrs);
-            }
-            promise->setAttributes(PAL);
-
             args.at(i)
                 ->replaceUsesOutsideBlock(promise, args.at(i)->getParent());
             args.at(i) = promise;
