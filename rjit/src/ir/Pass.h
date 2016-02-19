@@ -5,6 +5,7 @@
 #include "RIntlns.h"
 //#include "primitive_calls.h"
 #include "JITModule.h"
+#include "ir/Ir.h"
 
 namespace rjit {
 namespace ir {
@@ -50,8 +51,19 @@ protected:
 
 };
 
+/** A fixpoint driver.
+ */
 template<typename ASTATE>
 class Fixpoint {
+public:
+    typename ASTATE::Value const & operator [] (ir::Value index) const {
+        return state[index];
+    }
+
+    typename ASTATE::Value & operator [] (ir::Value index) {
+        return state[index];
+    }
+
 protected:
     template<typename T>
     friend class ForwardDriver;

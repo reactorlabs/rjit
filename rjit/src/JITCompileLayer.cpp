@@ -24,6 +24,7 @@
 #include "ir/Analysis/VariableAnalysis.h"
 #include "ir/Analysis/TypeAndShape.h"
 #include "ir/Optimization/ConstantLoad.h"
+#include "ir/Optimization/Scalars.h"
 
 using namespace llvm;
 
@@ -54,11 +55,12 @@ ExecutionEngine* JITCompileLayer::finalize(JITModule* m) {
     legacy::PassManager pm;
 
 
-    pm.add(new ir::VariableAnalysis());
-
-    pm.add(new ir::ConstantLoadOptimization());
-
     pm.add(new analysis::TypeAndShape());
+    pm.add(new optimization::Scalars());
+
+    pm.add(new ir::VariableAnalysis());
+    //pm.add(new ir::ConstantLoadOptimization());
+
 
     pm.add(createTargetTransformInfoWrapperPass(TargetIRAnalysis()));
 
@@ -70,12 +72,14 @@ ExecutionEngine* JITCompileLayer::finalize(JITModule* m) {
     pm.add(rjit::createPlaceRJITSafepointsPass());
     pm.add(rjit::createRJITRewriteStatepointsForGCPass());
 
-    /*for (llvm::Function& f : m->getFunctionList()) {
-        std::cerr << "--------------------------------------" << std::endl;
-        f.dump();
-    }*/
 
     pm.run(*m);
+
+    for (llvm::Function& f : m->getFunctionList()) {
+        std::cerr << "--------------------------------------" << std::endl;
+        f.dump();
+    }
+
 
     engine->finalizeObject();
     m->finalizeNativeSEXPs(engine);

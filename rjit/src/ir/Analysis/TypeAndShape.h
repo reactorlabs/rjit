@@ -36,6 +36,12 @@ public:
         Top,
     };
 
+    static TypeAndShapeValue_ merge(TypeAndShapeValue_ a, TypeAndShapeValue_ b) {
+        TypeAndShapeValue_ result(a);
+        result.mergeWith(b);
+        return result;
+    }
+
     bool mergeWith(TypeAndShapeValue_ const & other) {
         bool result = false;
         Type t = sup(type_, other.type_);
@@ -108,9 +114,7 @@ public:
     typedef TypeAndShapeValue_ Value;
     typedef ir::AState<Value> State;
 
-    match constant(ir::UserLiteral * p) {
-        std::cout << "USER_LITERAL" << std::endl;
-        SEXP c = p->indexValue();
+    void constantLoad(SEXP c, ir::Value p) {
         SEXPTYPE t = TYPEOF(c);
         Value::Shape s = (LENGTH(c) == 1) ? Value::Shape::Scalar : Value::Shape::Top;
         Value::Attributes a = Rf_isNull(ATTRIB(c)) ? Value::Attributes::Empty : Value::Attributes::Top;
@@ -141,17 +145,60 @@ public:
         }
     }
 
-    match constantPoolGetElement(ir::VectorGetElement * p, ir::VectorGetElement::FromConstantPool & cp) {
-        std::cout << "VGE" << std::endl;
+    match constant(ir::UserLiteral * p) {
+        constantLoad(p->indexValue(), p);
+    }
+
+
+    match binops(ir::BinaryOperator * p) {
+        auto lhs = p->lhs();
+        auto rhs = p->rhs();
+        state[p->pattern()] = Value::merge(state[lhs], state[rhs]);
+    }
+
+    /** If we have information about the variable, store it to the register, otherwise initialize the register to top.
+       */
+    match genericGetVar(ir::GenericGetVar * p) {
+        llvm::Value * dest = p->result();
+        SEXP symbol = p->symbolValue();
+        if (state.has(symbol))
+            state[dest] = state[symbol];
+        else
+            state[dest] = Value();
+    }
+
+    /** If we have incomming type & shape information, store it in the variable too. Otherwise do nothing (this means the variable will be assumed Top at read).
+     */
+    match genericSetVar(ir::GenericSetVar * p) {
+        llvm::Value * src = p->rho();
+        SEXP symbol = p->symbolValue();
+        if (state.has(src))
+            state[symbol] = state[src];
+    }
+
+    /** A call to ICStub invalidates all variables.
+
+      TODO call to ICStub should be its own pattern
+
+     */
+    match call(llvm::CallInst * ins) {
 
     }
 
-    bool dispatch(llvm::BasicBlock::iterator& i) override;
+    bool isScalar(ir::Value v) {
+        if (not state.has(v))
+            return false;
+        return state[v].shape() == Value::Shape::Scalar;
+    }
 
+
+    bool dispatch(llvm::BasicBlock::iterator& i) override;
 };
 
 class TypeAndShape : public ir::ForwardDriver<TypeAndShapePass> {
 public:
+    typedef TypeAndShapeValue_ Value;
+    typedef ir::AState<Value> State;
 
 } ;
 

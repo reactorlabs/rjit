@@ -33,12 +33,16 @@ public:
         return registers_.find(index) != registers_.end();
     }
 
-    AVALUE const & operator [] (ir::Value index) const {
+    AVALUE & operator [] (ir::Value index) {
         return registers_[index];
     }
 
-    AVALUE & operator [] (ir::Value index) {
-        return registers_[index];
+    bool has(SEXP symbol) const {
+        return variables_.find(symbol) != variables_.end();
+    }
+
+    AVALUE & operator [] (SEXP symbol) {
+        return  variables_[symbol];
     }
 
     /** Merges the other state into itself. Returns true if the state changed during the merge.
@@ -60,6 +64,7 @@ public:
 
 protected:
     std::map<llvm::Value *, AVALUE> registers_;
+    std::map<SEXP, AVALUE> variables_;
 
 
 
