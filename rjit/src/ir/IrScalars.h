@@ -39,6 +39,10 @@ public:
         return insertBefore(p->first(), type, size);
     }
 
+    static AllocVector * insertBefore(Pattern * p, SEXPTYPE type, int size) {
+        return insertBefore(p->first(), type, Builder::integer(size));
+    }
+
     static char const * intrinsicName() {
         return "Rf_allocVector";
     }
@@ -60,30 +64,37 @@ protected:
 
 };
 
-/** Base class for scalar operators.
+/** Base class for native operators.
 
-  Implements the lhs and rhs getters.
+  These should have their anchor instruction the native operator itself.
 */
-class ScalarOperator : public ir::BinaryOperator {
+class NativeBinaryOperator : public ir::Pattern, ir::BinaryOperator {
 public:
-    // TODO We want these to be virtual ?!
-    llvm::Value * lhs() {
+    llvm::Value * lhs() override {
         return ins_->getOperand(0);
     }
 
-    llvm::Value * rhs() {
+    llvm::Value * rhs() override {
         return ins_->getOperand(1);
     }
 
+    llvm::Instruction * first() const override {
+        return ir::Pattern::first();
+    }
+
+    llvm::Instruction * last() const override {
+        return ir::Pattern::last();
+    }
+
 protected:
-    ScalarOperator(llvm::Instruction * ins, Kind kind):
-        ir::BinaryOperator(ins, kind) {
+    NativeBinaryOperator(llvm::Instruction * ins, Kind kind):
+        ir::Pattern(ins, kind) {
     }
 };
 
 /** Floating point addition of two scalars w/o NA handling.
  */
-class FAdd : public ir::ScalarOperator {
+class FAdd : public ir::NativeBinaryOperator {
 public:
 
     static FAdd * create(ir::Builder & b, ir::Value lhs, ir::Value rhs) {
@@ -96,19 +107,23 @@ public:
         return new FAdd(i);
     }
 
+    static FAdd * insertBefore(ir::Pattern * p, ir::Value lhs, ir::Value rhs) {
+        return insertBefore(p->first(), lhs, rhs);
+    }
+
     static bool classof(Pattern const * s) {
         return s->kind == Kind::FAdd;
     }
 
 protected:
     FAdd(llvm::Instruction * ins):
-        ir::ScalarOperator(ins, Kind::FAdd) {
+        ir::NativeBinaryOperator(ins, Kind::FAdd) {
     }
 };
 
 /** Floating point subtraction of two scalars w/o NA handling.
  */
-class FSub : public ir::ScalarOperator {
+class FSub : public ir::NativeBinaryOperator {
 public:
 
     static FSub * create(ir::Builder & b, ir::Value lhs, ir::Value rhs) {
@@ -121,19 +136,23 @@ public:
         return new FSub(i);
     }
 
+    static FSub * insertBefore(ir::Pattern * p, ir::Value lhs, ir::Value rhs) {
+        return insertBefore(p->first(), lhs, rhs);
+    }
+
     static bool classof(Pattern const * s) {
         return s->kind == Kind::FSub;
     }
 
 protected:
     FSub(llvm::Instruction * ins):
-        ir::ScalarOperator(ins, Kind::FSub) {
+        ir::NativeBinaryOperator(ins, Kind::FSub) {
     }
 };
 
 /** Floating point multiplication of two scalars w/o NA handling.
  */
-class FMul : public ir::ScalarOperator {
+class FMul : public ir::NativeBinaryOperator {
 public:
 
     static FMul * create(ir::Builder & b, ir::Value lhs, ir::Value rhs) {
@@ -146,19 +165,22 @@ public:
         return new FMul(i);
     }
 
+    static FMul * insertBefore(ir::Pattern * p, ir::Value lhs, ir::Value rhs) {
+        return insertBefore(p->first(), lhs, rhs);
+    }
     static bool classof(Pattern const * s) {
         return s->kind == Kind::FMul;
     }
 
 protected:
     FMul(llvm::Instruction * ins):
-        ir::ScalarOperator(ins, Kind::FMul) {
+        ir::NativeBinaryOperator(ins, Kind::FMul) {
     }
 };
 
 /** Floating point division of two scalars w/o NA handling.
  */
-class FDiv : public ir::ScalarOperator {
+class FDiv : public ir::NativeBinaryOperator {
 public:
 
     static FDiv * create(ir::Builder & b, ir::Value lhs, ir::Value rhs) {
@@ -171,19 +193,23 @@ public:
         return new FDiv(i);
     }
 
+    static FDiv * insertBefore(ir::Pattern * p, ir::Value lhs, ir::Value rhs) {
+        return insertBefore(p->first(), lhs, rhs);
+    }
+
     static bool classof(Pattern const * s) {
         return s->kind == Kind::FDiv;
     }
 
 protected:
     FDiv(llvm::Instruction * ins):
-        ir::ScalarOperator(ins, Kind::FDiv) {
+        ir::NativeBinaryOperator(ins, Kind::FDiv) {
     }
 };
 
 /** Integer addition of two scalars without NA handling.
  */
-class Add : public ir::BinaryOperator {
+class Add : public ir::NativeBinaryOperator {
 public:
 
     static Add * create(ir::Builder & b, ir::Value lhs, ir::Value rhs) {
@@ -195,20 +221,25 @@ public:
         auto i = llvm::BinaryOperator::Create(llvm::Instruction::Add, lhs, rhs, "", ins);
         return new Add(i);
     }
+
+    static Add * insertBefore(ir::Pattern * ins, ir::Value lhs, ir::Value rhs) {
+        return insertBefore(ins->first(), lhs, rhs);
+    }
+
     static bool classof(Pattern const * s) {
         return s->kind == Kind::Add;
     }
 
 protected:
     Add(llvm::Instruction * ins):
-        ir::BinaryOperator(ins, Kind::Add) {
+        ir::NativeBinaryOperator(ins, Kind::Add) {
     }
 
 };
 
 /** Integer subtraction of two scalars without NA handling.
  */
-class Sub : public ir::BinaryOperator {
+class Sub : public ir::NativeBinaryOperator {
 public:
 
     static Sub * create(ir::Builder & b, ir::Value lhs, ir::Value rhs) {
@@ -220,20 +251,25 @@ public:
         auto i = llvm::BinaryOperator::Create(llvm::Instruction::Sub, lhs, rhs, "", ins);
         return new Sub(i);
     }
+
+    static Sub * insertBefore(ir::Pattern * p, ir::Value lhs, ir::Value rhs) {
+        return insertBefore(p->first(), lhs, rhs);
+    }
+
     static bool classof(Pattern const * s) {
         return s->kind == Kind::Sub;
     }
 
 protected:
     Sub(llvm::Instruction * ins):
-        ir::BinaryOperator(ins, Kind::Sub) {
+        ir::NativeBinaryOperator(ins, Kind::Sub) {
     }
 
 };
 
 /** Integer multiplication of two scalars without NA handling.
  */
-class Mul : public ir::BinaryOperator {
+class Mul : public ir::NativeBinaryOperator {
 public:
 
     static Mul * create(ir::Builder & b, ir::Value lhs, ir::Value rhs) {
@@ -245,20 +281,25 @@ public:
         auto i = llvm::BinaryOperator::Create(llvm::Instruction::Mul, lhs, rhs, "", ins);
         return new Mul(i);
     }
+
+    static Mul * insertBefore(ir::Pattern * p, ir::Value lhs, ir::Value rhs) {
+        return insertBefore(p->first(), lhs, rhs);
+    }
+
     static bool classof(Pattern const * s) {
         return s->kind == Kind::Mul;
     }
 
 protected:
     Mul(llvm::Instruction * ins):
-        ir::BinaryOperator(ins, Kind::Mul) {
+        ir::NativeBinaryOperator(ins, Kind::Mul) {
     }
 
 };
 
 /** Integer division of two scalars without NA handling.
  */
-class Div : public ir::BinaryOperator {
+class Div : public ir::NativeBinaryOperator {
 public:
 
     static Div * create(ir::Builder & b, ir::Value lhs, ir::Value rhs) {
@@ -270,13 +311,18 @@ public:
         auto i = llvm::BinaryOperator::Create(llvm::Instruction::SDiv, lhs, rhs, "", ins);
         return new Div(i);
     }
+
+    static Div * insertBefore(ir::Pattern * p, ir::Value lhs, ir::Value rhs) {
+        return insertBefore(p->first(), lhs, rhs);
+    }
+
     static bool classof(Pattern const * s) {
         return s->kind == Kind::Div;
     }
 
 protected:
     Div(llvm::Instruction * ins):
-        ir::BinaryOperator(ins, Kind::Div) {
+        ir::NativeBinaryOperator(ins, Kind::Div) {
     }
 
 };

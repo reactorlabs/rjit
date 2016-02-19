@@ -9,6 +9,8 @@
 
 #include "Builder.h"
 
+#include "Properties.h"
+
 /** \file "rjit/src/ir/Ir.h"
  */
 
@@ -435,19 +437,20 @@ class UnsignedIntegerLessThan : public IntegerComparison {
     }
 };
 
-// TODO the hierarchy of this is wrong, but actual thought is required to fix it
-// TODO Binop should be property
-class BinaryOperator : public Pattern {
-  protected:
-    BinaryOperator(llvm::Instruction* ins, Kind kind) : Pattern(ins, kind) {}
-};
-
 // TODO the hierarchy here should be better as well
-class IntegerAdd : public BinaryOperator {
+class IntegerAdd : public Pattern, public BinaryOperator {
   public:
-    llvm::Value* lhs() { return ins<llvm::ICmpInst>()->getOperand(0); }
+    llvm::Value* lhs() override { return ins<llvm::ICmpInst>()->getOperand(0); }
 
-    llvm::Value* rhs() { return ins<llvm::ICmpInst>()->getOperand(1); }
+    llvm::Value* rhs() override { return ins<llvm::ICmpInst>()->getOperand(1); }
+
+    llvm::Instruction * first() const override {
+        return Pattern::first();
+    }
+
+    llvm::Instruction * last() const override {
+        return Pattern::last();
+    }
 
     static IntegerAdd* create(Builder& b, ir::Value lhs, ir::Value rhs) {
         Sentinel s(b);
@@ -469,7 +472,7 @@ class IntegerAdd : public BinaryOperator {
     }
 
   protected:
-    IntegerAdd(llvm::Instruction* ins) : BinaryOperator(ins, Kind::IntegerAdd) {
+    IntegerAdd(llvm::Instruction* ins) : Pattern(ins, Kind::IntegerAdd) {
         assert(llvm::isa<llvm::BinaryOperator>(ins) and
                "Binary operator expected");
         assert(llvm::cast<llvm::BinaryOperator>(ins)->getOpcode() ==
@@ -829,6 +832,128 @@ class InvocationCount : public Pattern {
     }
 };
 
+class GetVectorElement : public Pattern {
+public:
+    /** Returns the vector being read.
+     */
+    llvm::Value * vector() {
+        return first()->getOperand(0);
+    }
+
+    /** Returns the index being read.
+     */
+    llvm::Value * index() {
+        return ins_->getPrevNode()->getOperand(1);
+    }
+
+    static GetVectorElement* insertBefore(llvm::Instruction* ins,
+                                          ir::Value vector, ir::Value index, llvm::Type * elementType) {
+        LLVMContext& c = ins->getContext();
+        ConstantInt* int64_1 =
+            ConstantInt::get(c, APInt(64, StringRef("1"), 10));
+        auto realVector = new BitCastInst(
+            vector, PointerType::get(t::VECTOR_SEXPREC, 1), "", ins);
+        auto payload = GetElementPtrInst::Create(
+            t::VECTOR_SEXPREC, realVector, std::vector<llvm::Value*>({int64_1}),
+            "", ins);
+        auto payloadPtr =
+            new BitCastInst(payload, PointerType::get(elementType, 1), "", ins);
+        GetElementPtrInst* el_ptr =
+            GetElementPtrInst::Create(elementType, payloadPtr, {index}, "", ins);
+        auto res = new LoadInst(el_ptr, "", false, ins);
+        res->setAlignment(8);
+        return new GetVectorElement(realVector, payload, payloadPtr, el_ptr, res);
+    }
+
+    static GetVectorElement * insertBefore(ir::Pattern * p, ir::Value vector, ir::Value index, llvm::Type * elementType) {
+        return insertBefore(p->first(), vector, index, elementType);
+    }
+
+    static GetVectorElement * insertBefore(ir::Pattern * p, ir::Value vector, int index, llvm::Type * elementType) {
+        return insertBefore(p->first(), vector, Builder::integer(index), elementType);
+    }
+
+    static GetVectorElement* create(Builder& b, ir::Value vector,
+                                    ir::Value index, llvm::Type * elementType) {
+        Sentinel s(b);
+        return insertBefore(s, vector, index, elementType);
+    }
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::GetVectorElement;
+    }
+
+    virtual llvm::Instruction* first() const override {
+        llvm::Instruction* r =
+            ins_->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+        // TODO better check for start
+        assert(Pattern::get(r) == this);
+        return r;
+    }
+
+    size_t length() const override { return 5; }
+
+  private:
+     GetVectorElement(llvm::Instruction* realVector, llvm::Instruction* payload,
+                     llvm::Instruction* payloadPtr, llvm::Instruction* el_ptr,
+                     llvm::Instruction* result)
+        : Pattern(result, Kind::GetVectorElement) {
+        attach(realVector);
+        attach(payload);
+        attach(payloadPtr);
+        attach(el_ptr);
+    }
+
+
+};
+
+class SetVectorElement : public Pattern {
+public:
+    static SetVectorElement * insertBefore(llvm::Instruction * ins, ir::Value vector, ir::Value index, ir::Value value, llvm::Type * elementType) {
+        LLVMContext & c = ins->getContext();
+        ConstantInt* int64_1 = ConstantInt::get(c, APInt(64, 1));
+        auto realVector = new BitCastInst(vector, PointerType::get(t::VECTOR_SEXPREC, 1), "", ins);
+        auto payload = GetElementPtrInst::Create(t::VECTOR_SEXPREC, realVector, std::vector<llvm::Value*>({int64_1}), "", ins);
+        auto payloadPtr = new BitCastInst(payload, PointerType::get(elementType, 1), "", ins);
+        GetElementPtrInst* el_ptr = GetElementPtrInst::Create(elementType, payloadPtr, {index}, "", ins);
+        auto store = new StoreInst(value, el_ptr, ins);
+        store->setAlignment(8);
+        return new SetVectorElement(realVector, payload, payloadPtr, el_ptr, store);
+    }
+
+    static SetVectorElement * create(Builder & b, ir::Value vector, ir::Value index, ir::Value value, llvm::Type * elementType) {
+        Sentinel s(b);
+        return insertBefore(s, vector, index, value, elementType);
+    }
+
+    static SetVectorElement * insertBefore(Pattern * p, ir::Value vector, int index, ir::Value value, llvm::Type * elementType) {
+        return insertBefore(p->first(), vector, Builder::integer(index), value, elementType);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->kind == Kind::SetVectorElement;
+    }
+
+    llvm::Instruction * result() const override {
+        assert(false and "VectorSetElement result is not expected to be used");
+        return nullptr;
+    }
+
+    size_t length() const override { return 5; }
+protected:
+    SetVectorElement(llvm::Instruction* realVector, llvm::Instruction* payload,
+                     llvm::Instruction* payloadPtr, llvm::Instruction* el_ptr,
+                     llvm::Instruction* store)
+        : Pattern(store, Kind::SetVectorElement) {
+        attach(realVector);
+        attach(payload);
+        attach(payloadPtr);
+        attach(el_ptr);
+    }
+};
+
+
+
+
 class VectorGetElement : public Pattern {
   public:
 
@@ -838,7 +963,20 @@ class VectorGetElement : public Pattern {
      */
     class FromConstantPool : public Predicate {
     public:
+        SEXP value() const {
+            return value_;
+        }
+
+        int index() const {
+            return index_;
+        }
+
         bool match(ir::Pass & p, VectorGetElement * vge);
+
+    private:
+
+        SEXP value_ = nullptr;
+        int index_ = 0;
     };
 
 
@@ -885,6 +1023,10 @@ class VectorGetElement : public Pattern {
     static VectorGetElement* insertBefore(Pattern* p, ir::Value vector,
                                           ir::Value index) {
         return insertBefore(p->first(), vector, index);
+    }
+
+    static VectorGetElement * insertBefore(Pattern * p, ir::Value vector, int index) {
+        return insertBefore(p->first(), vector, Builder::integer(index));
     }
 
     static bool classof(Pattern const* s) {
@@ -937,8 +1079,8 @@ public:
         return new VectorSetElement(realVector, payload, payloadPtr, el_ptr, store);
     }
 
-    static VectorSetElement * create(Pattern * p, ir::Value vector, ir::Value index, ir::Value value) {
-        return insertBefore(p->first(), vector, index, value);
+    static VectorSetElement * insertBefore(Pattern * p, ir::Value vector, int index, ir::Value value) {
+        return insertBefore(p->first(), vector, Builder::integer(index), value);
     }
 
     static bool classof(Pattern const* s) {
@@ -960,7 +1102,7 @@ protected:
       attach(realVector);
       attach(payload);
       attach(payloadPtr);
-      attach(store);
+      attach(el_ptr);
   }
 
 };

@@ -131,9 +131,10 @@ class DispatchRecord:
         result = []
         for i in range(len(args)):
             if (args[i] in instructions):
-                result.append("reinterpret_cast<{iType} *>(&*it{i})".format(iType = args[i], i = i))
+                result.append("dyn_cast<{iType}>(&*it{i})".format(iType = args[i], i = i))
             else:
-                result.append("reinterpret_cast<{pType} *>(p{i})".format(pType = args[i], i = i))
+                # dynamic cast for now, deal with efficiency in the new IR
+                result.append("dynamic_cast<{pType} *>(p{i})".format(pType = args[i], i = i))
         return ", ".join(result)
 
 
@@ -509,7 +510,7 @@ def loadClassParents(child, into):
     q = child.parentClasses[:]
     while (q):
         key = q.pop()
-        if (not key in result):
+        if (not key in into):
             D("  loading class {0}".format(key))
             value = CppClass(key)
             into[key] = value

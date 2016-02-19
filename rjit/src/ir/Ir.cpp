@@ -18,7 +18,16 @@ llvm::Value * Predicate::constantPool(ir::Pass & p) {
 
 
 bool VectorGetElement::FromConstantPool::match(ir::Pass & p, VectorGetElement * vge) {
-    return  vge->vector() == constantPool(p) and llvm::isa<llvm::ConstantInt>(vge->index());
+    if (vge->vector() == constantPool(p) and llvm::isa<llvm::ConstantInt>(vge->index())) {
+        index_ = Builder::integer(vge->index());
+        llvm::Function* f = vge->first()->getParent()->getParent();
+        JITModule* m = static_cast<JITModule*>(f->getParent());
+        value_ = VECTOR_ELT(m->constPool(f), index_);
+        return true;
+    } else {
+        return false;
+    }
+
 }
 
 

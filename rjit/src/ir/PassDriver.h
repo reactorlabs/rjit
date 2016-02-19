@@ -79,8 +79,8 @@ public:
     bool runOnFunction(llvm::Function & f) override {
         if (f.isDeclaration() or f.empty())
             return false;
-        pass.setFunction(&f);
-        q_.push_back(QueueItem(f.begin(), pass.initialState(&f)));
+        pass_.setFunction(&f);
+        q_.push_back(QueueItem(f.begin(), pass_.initialState(&f)));
         while (not q_.empty()) {
             auto & i = q_.front();
             runOnBlock(i.first, std::move(i.second));
@@ -90,27 +90,31 @@ public:
         return false;
     }
 
+    PASS * pass() {
+        return &pass_;
+    }
+
 protected:
 
     /** Executes the analysis pass on given block, checking whether a fixpoint has been reached, updating the current state and enqueuing its successors.
      */
     void runOnBlock(llvm::BasicBlock * block, typename PASS::State && incomming) {
-        if (not pass.runOnBlock(block, std::move(incomming)))
+        if (not pass_.runOnBlock(block, std::move(incomming)))
             return;
         // iterate over all instructions in the block
         BasicBlock::iterator i = block->begin();
         while (i != block->end())
-            pass.dispatch(i);
+            pass_.dispatch(i);
         // enqueue next block(s)
         llvm::TerminatorInst * t = block->getTerminator();
         for (unsigned ii = 1, end = t->getNumSuccessors(); ii < end; ++ii)
-            q_.push_back(std::pair<llvm::BasicBlock *, typename PASS::State>(t->getSuccessor(ii), pass.state));
+            q_.push_back(std::pair<llvm::BasicBlock *, typename PASS::State>(t->getSuccessor(ii), pass_.state));
         // enque first successor with move semantics
         if (t->getNumSuccessors() > 0)
-            q_.push_back(std::pair<llvm::BasicBlock *, typename PASS::State>(t->getSuccessor(0), std::move(pass.state)));
+            q_.push_back(std::pair<llvm::BasicBlock *, typename PASS::State>(t->getSuccessor(0), std::move(pass_.state)));
     }
 
-    PASS pass;
+    PASS pass_;
 private:
     std::deque<QueueItem> q_;
 };
