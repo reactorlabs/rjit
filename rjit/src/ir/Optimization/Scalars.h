@@ -38,7 +38,7 @@ public:
     void replaceWithScalar(ir::PrimitiveBinaryOperator * p) {
         llvm::Value * lhs = p->lhs();
         Value l = tsa()[lhs];
-        llvm::Value * rhs = p->lhs();
+        llvm::Value * rhs = p->rhs();
         Value r = tsa()[rhs];
         if (l.shape() == Value::Shape::Scalar and r.shape() == Value::Shape::Scalar) {
             if (l.type() == Value::Type::Double and r.type() == Value::Type::Double) {
