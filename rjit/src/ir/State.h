@@ -2,7 +2,25 @@
 #define IR_STATE_H
 
 /** State. All templated.
- */
+
+
+  State must allow merge
+
+  I want to know:
+
+  - type:
+     Raw Logical Integer Double Complex Character List Closure Top ??others
+                   \        /
+                     Numeric
+      \              /                     /
+                 Vector
+  - subtype: (class?)
+     array, matrix,
+
+
+
+
+  */
 
 #include <memory>
 
@@ -22,9 +40,6 @@ public:
 
     AState() = default;
     AState(AState const &) = default;
-    AState & operator = (AState const &) = default;
-    AState & operator = (AState &&) = default;
-
     AState(AState && other):
         registers_(std::move(other.registers_)) {
     }
@@ -33,17 +48,19 @@ public:
         return registers_.find(index) != registers_.end();
     }
 
-    AVALUE & operator [] (ir::Value index) {
-        return registers_[index];
-    }
-
     bool has(SEXP symbol) const {
         return variables_.find(symbol) != variables_.end();
     }
 
-    AVALUE & operator [] (SEXP symbol) {
-        return  variables_[symbol];
+    AVALUE & operator [] (ir::Value index) {
+        return registers_[index];
     }
+
+    AVALUE & operator [] (SEXP symbol) {
+        return variables_[symbol];
+    }
+
+    AState & operator = (AState<AVALUE> const &) = default;
 
     /** Merges the other state into itself. Returns true if the state changed during the merge.
      */
