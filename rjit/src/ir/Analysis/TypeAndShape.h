@@ -44,7 +44,7 @@ public:
     /** If we have incomming type & shape information, store it in the variable too. Otherwise do nothing (this means the variable will be assumed Top at read).
      */
     match genericSetVar(ir::GenericSetVar * p) {
-        llvm::Value * src = p->rho();
+        llvm::Value * src = p->value();
         SEXP symbol = p->symbolValue();
         if (state.has(src))
             state[symbol] = state[src];
