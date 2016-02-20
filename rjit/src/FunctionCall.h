@@ -47,6 +47,7 @@ class FunctionCall {
     Instruction* getConsts() { return consts; }
     Function* getFunction();
     void fixPromises(SEXP cp, SEXP inFun, rjit::Compiler* c);
+    bool tryFix(SEXP cp, SEXP inFun, rjit::Compiler* c);
 
     int getFunctionSymbol();
 

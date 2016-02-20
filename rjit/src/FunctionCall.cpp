@@ -94,6 +94,101 @@ void FunctionCall::fixPromises(SEXP cp, SEXP inFun, rjit::Compiler* c) {
     }
 }
 
+bool FunctionCall::tryFix(SEXP cp, SEXP inFun, rjit::Compiler* c) {
+    // Obtain the call.
+    ConstantInt* callIdx = dynamic_cast<ConstantInt*>(consts->getArgOperand(1));
+    assert(callIdx);
+    assert(TYPEOF(inFun) == CLOSXP);
+    SEXP call = VECTOR_ELT(cp, callIdx->getSExtValue());
+    unsigned size = args.size();
+
+    // Check for named arguments and promises.
+    std::vector<bool> promarg(size, false);
+    std::vector<long> positionalArg;
+    std::unordered_map<long, SEXP> namedArg;
+    std::unordered_map<SEXP, long> formals;
+
+    SEXP arg = CDR(call);
+    SEXP form = FORMALS(inFun);
+    unsigned i = 0;
+
+    while (arg != R_NilValue && form != R_NilValue) {
+        if (TAG(arg) != R_NilValue)
+            namedArg[i] = TAG(arg);
+        else
+            positionalArg.push_back(i);
+        formals[TAG(form)] = i;
+
+        // Ellipsis.
+        if (CAR(arg) == R_DotsSymbol || TAG(form) == R_DotsSymbol)
+            return false;
+
+        if (CAR(arg) == R_MissingArg)
+            return false;
+
+        switch (TYPEOF(CAR(arg))) {
+        case LGLSXP:
+        case INTSXP:
+        case REALSXP:
+        case CPLXSXP:
+        case STRSXP:
+            break;
+        default:
+            promarg[i] = true;
+        }
+        i++;
+        arg = CDR(arg);
+        form = CDR(form);
+    }
+
+    // number of args != number of formal args
+    if (form != R_NilValue || i != size)
+        return false;
+
+    std::vector<long> argOrder(size, -1);
+    for (auto p : namedArg) {
+        long argnum = std::get<0>(p);
+        SEXP name = std::get<1>(p);
+        if (!formals.count(name)) {
+            return false; // named argument does not match formal.
+        }
+        long pos = formals[name];
+        argOrder[pos] = argnum;
+    }
+
+    unsigned position = 0;
+    for (long argnum : positionalArg) {
+        while (position < size && argOrder[position] != -1)
+            ++position;
+        assert(position < size);
+        argOrder[position] = argnum;
+    }
+
+    // Copy of args.
+    std::vector<Instruction*> args_ = args;
+
+    // Sorting the args and creating promises.
+    for (unsigned i = size; i > 0; --i) {
+        long pos = argOrder[i - 1];
+        Instruction* arg = args_[pos];
+        if (promarg[pos]) {
+            Instruction* promiseInst = arg;
+            std::vector<Value*> _args_;
+            _args_.push_back(promiseInst);
+            _args_.push_back(getRho());
+            CallInst* promise = CallInst::Create(
+                c->getBuilder()->intrinsic<rjit::ir::CreatePromise>(), _args_,
+                "");
+            promise->insertAfter(arg);
+            arg->replaceUsesOutsideBlock(promise, arg->getParent());
+            args.at(i) = promise;
+        } else {
+            args.at(i) = arg;
+        }
+    }
+    return true;
+}
+
 Value* FunctionCall::getRho() {
     Function* fun = this->getFunction();
     assert(fun && "The function for this fc is null.");
