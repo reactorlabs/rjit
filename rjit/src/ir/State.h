@@ -65,11 +65,19 @@ public:
     /** Merges the other state into itself. Returns true if the state changed during the merge.
      */
     bool mergeWith(AState<AVALUE> const & other) {
+        bool result = mergeMaps(registers_, other.registers_);
+        return mergeMaps(variables_, other.variables_) or result;
+    }
+
+protected:
+
+    template<typename MAP>
+    bool mergeMaps(MAP & myMap, MAP const & theirMap) {
         bool result = false;
-        for (auto their : other.registers_) {
-            auto mine = registers_.find(their.first);
-            if (mine == registers_.end()) {
-                registers_[their.first] = their.second;
+        for (auto their : theirMap) {
+            auto mine = myMap.find(their.first);
+            if (mine == myMap.end()) {
+                myMap[their.first] = their.second;
                 result = true;
             } else {
                 result = mine->second.mergeWith(their.second) or result;
@@ -79,7 +87,6 @@ public:
         return result;
     }
 
-protected:
     std::map<llvm::Value *, AVALUE> registers_;
     std::map<SEXP, AVALUE> variables_;
 
