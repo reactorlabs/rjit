@@ -40,10 +40,10 @@ public:
         Value l = tsa()[lhs];
         llvm::Value * rhs = p->rhs();
         Value r = tsa()[rhs];
-        if (l.shape() == Value::Shape::Scalar and r.shape() == Value::Shape::Scalar) {
-            if (l.type() == Value::Type::Double and r.type() == Value::Type::Double) {
+        if (l.size() == Value::Size::Scalar and r.size() == Value::Size::Scalar) {
+            if (l.hasOnlyType(Value::Type::Float) and r.hasOnlyType(Value::Type::Float)) {
                 replaceWithScalar<typename T::ScalarDouble>(p, lhs, rhs, REALSXP, t::Double);
-            } else if (l.type() == Value::Type::Integer and r.type() == Value::Type::Integer) {
+            } else if (l.hasOnlyType(Value::Type::Integer) and r.hasOnlyType(Value::Type::Integer)) {
                 replaceWithScalar<typename T::ScalarInt>(p, lhs, rhs, INTSXP, t::Int);
             }
         }
