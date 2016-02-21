@@ -82,8 +82,16 @@ protected:
 
 };
 
+class Scalars : public ir::OptimizationDriver<ScalarsPass, analysis::TypeAndShape> {
+protected:
+    void setFunction(llvm::Function * f) override {
+        ir::OptimizationDriver<ScalarsPass, analysis::TypeAndShape>::setFunction(f);
+        pass.tsa_ = getAnalysis<analysis::TypeAndShape>().pass();
+    }
+};
 
-class Scalars : public ir::LinearDriver<ScalarsPass> {
+/*
+class Scalars2 : public ir::LinearDriver<ScalarsPass> {
 public:
     void getAnalysisUsage(AnalysisUsage& AU) const override {
         AU.addRequired<analysis::TypeAndShape>();
@@ -95,7 +103,7 @@ public:
         pass.tsa_ =  getAnalysis<analysis::TypeAndShape>().pass();
         return ir::LinearDriver<ScalarsPass>::runOnFunction(f);
     }
-};
+}; */
 
 } // namespace optimization
 } // namespace rjit

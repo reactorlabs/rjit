@@ -17,18 +17,22 @@ bool Pass::dispatch(llvm::BasicBlock::iterator& i) {
 }
 
 void Optimization::replaceAllUsesWith(llvm::Instruction* o, Pattern* n) {
+    changed_ = true;
     o->replaceAllUsesWith(n->ins_);
 }
 
 void Optimization::replaceAllUsesWith(Pattern* o, llvm::Instruction* n) {
+    changed_ = true;
     o->ins_->replaceAllUsesWith(n);
 }
 
 void Optimization::replaceAllUsesWith(Pattern* o, Pattern* n) {
+    changed_ = true;
     o->ins_->replaceAllUsesWith(n->ins_);
 }
 
 void Optimization::eraseFromParent(Pattern* p) {
+    changed_ = true;
     llvm::Instruction* last = p->last();
     llvm::Instruction* i = p->first();
     while (true) {
