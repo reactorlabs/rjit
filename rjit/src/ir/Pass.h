@@ -64,11 +64,20 @@ public:
         return state[index];
     }
 
+    /** During the optimization phase, sets the
+
+      TODO This should return true/false whether the basic block was analyzed, if it was not analyzed by any of the analyses the optimization should not concern itself with that block.
+     */
+    void setState(llvm::BasicBlock * bb) {
+        state = states_[bb];
+    }
+
 protected:
     template<typename T>
     friend class ForwardDriver;
 
     virtual bool runOnBlock(llvm::BasicBlock * block, ASTATE && incomming) {
+        std::cout << "Running on block " << (long)(block) << " " << block->getName().str() <<  std::endl;
         if (states_.find(block) != states_.end()) {
             if (not states_[block].mergeWith(incomming))
                 return false;
@@ -92,14 +101,18 @@ private:
 };
 
 
-
 /** Base class for all optimizations.
 
   Provides means to alter the ir.
  */
 class Optimization {
+public:
+    bool hasChanged() const {
+        return changed_;
+    }
   protected:
     void replaceAllUsesWith(llvm::Instruction* o, llvm::Instruction* n) {
+        changed_ = true;
         o->replaceAllUsesWith(n);
     }
 
@@ -114,8 +127,10 @@ class Optimization {
     void eraseFromParent(llvm::Instruction* ins) { ins->eraseFromParent(); }
 
     void eraseFromParent(Pattern* p);
-};
+private:
+    bool changed_ = false;
 
+};
 
 } // namespace ir
 } // namespace rjit

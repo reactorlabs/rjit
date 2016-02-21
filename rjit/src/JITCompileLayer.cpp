@@ -73,8 +73,10 @@ ExecutionEngine* JITCompileLayer::finalize(JITModule* m) {
     pm.add(rjit::createRJITRewriteStatepointsForGCPass());
 
     for (llvm::Function& f : m->getFunctionList()) {
-        std::cerr << "--------------------------------------" << std::endl;
-        f.dump();
+        if (not f.isDeclaration()) {
+            std::cerr << "--------------------------------------" << std::endl;
+            f.dump();
+        }
     }
 
 

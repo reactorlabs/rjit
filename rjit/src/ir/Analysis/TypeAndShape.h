@@ -59,13 +59,6 @@ public:
 
     }
 
-    bool isScalar(ir::Value v) {
-        if (not state.has(v))
-            return false;
-        return state[v].size() == Value::Size::Scalar;
-    }
-
-
     bool dispatch(llvm::BasicBlock::iterator& i) override;
 };
 

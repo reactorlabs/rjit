@@ -495,7 +495,8 @@ def loadClassHierarchy(baseClass):
     q = [ baseClass, ]
     while (q):
         key = q.pop()
-        if (not key in result):
+        # do not deal with templated passes as they are not allowed as leaves anyways.
+        if (not key in result and "<" not in key):
             D("  loading class {0}".format(key))
             value = CppClass(key)
             result[key] = value

@@ -41,7 +41,8 @@ public:
     AState() = default;
     AState(AState const &) = default;
     AState(AState && other):
-        registers_(std::move(other.registers_)) {
+        registers_(std::move(other.registers_)),
+        variables_(std::move(other.variables_)) {
     }
 
     bool has(ir::Value index) const {

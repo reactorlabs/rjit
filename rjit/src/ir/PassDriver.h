@@ -121,6 +121,114 @@ private:
 
 
 
+/** A driver for optimizations.
+
+  Is templated by the optimization's pass class and by the types of analyses that are required by the pass.
+
+ */
+template<typename PASS, typename... ANALYSES>
+class OptimizationDriver : public ir::PassDriver<PASS> {
+public:
+    void getAnalysisUsage(llvm::AnalysisUsage& au) const override {
+        require<ANALYSES...>(au);
+    }
+
+    /** LLVM's runOnFunction interface.
+
+      The function will only be analysed if it is not a declaration and is not empty.
+     */
+    virtual bool runOnFunction(llvm::Function & f) override {
+        if (f.isDeclaration() || f.empty())
+            return false;
+        return optimize(&f);
+    }
+
+
+protected:
+    PASS pass;
+
+    virtual bool optimize(llvm::Function * f) {
+        setFunction(f);
+        for (auto & b : *f) {
+            // at the beginning of each basic block we must set the proper state to all analyses we require
+            setState<ANALYSES...>(&b);
+            llvm::BasicBlock::iterator i = b.begin();
+            while (i != b.end()) {
+                // each analysis must advance its state past the instruction
+                // TODO the fact we do this before the optimization is fine because the state before cannot be different for the inputs of currently used instructions & patterns
+                advanceAnalysis<ANALYSES...>(i);
+                // do the opimization pass
+                if (!pass.dispatch(i))
+                    i++;
+            }
+        }
+        return pass.hasChanged();
+    }
+
+
+    virtual void setFunction(llvm::Function * f) {
+        pass.setFunction(f);
+    }
+
+private:
+
+    template<typename T>
+    void require(llvm::AnalysisUsage & au) const {
+        au.addRequired<T>();
+    }
+
+    template<typename T1, typename T2>
+    void require(llvm::AnalysisUsage & au) const {
+        au.addRequired<T1>();
+        au.addRequired<T2>();
+    }
+
+    template<typename T1, typename T2, typename... A>
+    void require(llvm::AnalysisUsage & au) const {
+        require<T1, T2>(au);
+        require<A...>(au);
+    }
+
+    template<typename T>
+    void setState(llvm::BasicBlock * bb) {
+        this->template getAnalysis<T>().pass()->setState(bb);
+    }
+
+    template<typename T1, typename T2>
+    void setState(llvm::BasicBlock * bb) {
+        this->template getAnalysis<T1>().pass()->setState(bb);
+        this->template getAnalysis<T2>().pass()->setState(bb);
+    }
+
+    template<typename T1, typename T2, typename... A>
+    void setState(llvm::BasicBlock * bb) {
+        setState<T1, T2>(bb);
+        setState<A...>(bb);
+    }
+
+    template<typename T>
+    void advanceAnalysis(llvm::BasicBlock::iterator i) {
+        this->template getAnalysis<T>().pass()->dispatch(i);
+    }
+
+    template<typename T1, typename T2>
+    void advanceAnalysis(llvm::BasicBlock::iterator i) {
+        this->template getAnalysis<T1>().pass()->dispatch(i);
+        this->template getAnalysis<T2>().pass()->dispatch(i);
+    }
+
+    template<typename T1, typename T2, typename... A>
+    void advanceAnalysis(llvm::BasicBlock::iterator i) {
+        advanceAnalysis<T1, T2>(i);
+        advanceAnalysis<A...>(i);
+    }
+
+
+};
+
+
+
+
 } // namespace ir
 } // namespace rjit
 
