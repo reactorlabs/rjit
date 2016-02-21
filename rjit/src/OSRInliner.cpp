@@ -70,13 +70,18 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
             innerFunc = OSRHandler::getFreshIR(innerClosure, c, false);
         else {
             innerClosure = inlineCalls(innerClosure);
-            innerFunc = OSRHandler::getFreshIR(innerClosure, c, false);
+            ValueToValueMapTy VMap;
+            Function* inLLVM =
+                CloneFunction(GET_LLVM(BODY(innerClosure)), VMap, false);
+            innerFunc = OSRHandler::cloneSEXP(BODY(innerClosure), inLLVM);
         }
 
         for (auto call = it->second.begin(); call != it->second.end(); ++call) {
             ValueToValueMapTy VMap;
             Function* toInline =
-                CloneFunction(GET_LLVM(innerFunc), VMap, false);
+                (*call == it->second.back())
+                    ? GET_LLVM(innerFunc)
+                    : CloneFunction(GET_LLVM(innerFunc), VMap, false);
             auto newrho = createNewRho(*call);
             Return_List ret;
             prepareCodeToInline(toInline, *call, newrho, LENGTH(CDR(fSexp)),
@@ -129,10 +134,10 @@ void OSRInliner::updateCPAccess(CallInst* call, int offset) {
 // Problem. FIXME
 SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     SEXP symb = VECTOR_ELT(cp, symbol);
-    SEXP fSexp = findFun(symb, env);
+    SEXP fSexp = findVar(symb, env);
     // std::string name = CHAR(PRINTNAME(symb));
     if (TYPEOF(fSexp) != CLOSXP || TYPEOF(TAG(fSexp)) != ENVSXP ||
-        (TAG(fSexp) != R_GlobalEnv && ONLY_GLOBAL))
+        (TAG(fSexp) != R_GlobalEnv))
         return nullptr;
     SEXP formals = FORMALS(fSexp);
     while (formals != R_NilValue) {
@@ -151,11 +156,11 @@ Call_Map OSRInliner::sortCalls(FunctionCalls* calls, SEXP outer) {
     for (auto it = calls->begin(); it != calls->end(); ++it) {
         SEXP inner = getFunction(cp, (*it)->getFunctionSymbol(), env);
         // Function not found or arguments are missing, or recursive call.
-        if (!inner || isMissingArgs(FORMALS(inner), (*it)) || outer == inner)
+        if (!inner || outer == inner || !((*it)->tryFix(cp, inner, c)))
             continue;
 
         (*it)->setInPtr(c, inner);
-        (*it)->fixPromises(cp, inner, c);
+        //(*it)->fixPromises(cp, inner, c);
         map[inner].push_back(*it);
     }
     return map;

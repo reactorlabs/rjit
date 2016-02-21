@@ -168,8 +168,8 @@ bool FunctionCall::tryFix(SEXP cp, SEXP inFun, rjit::Compiler* c) {
     std::vector<Instruction*> args_ = args;
 
     // Sorting the args and creating promises.
-    for (unsigned i = size; i > 0; --i) {
-        long pos = argOrder[i - 1];
+    for (unsigned i = 0; i < size; ++i) {
+        long pos = argOrder[i];
         Instruction* arg = args_[pos];
         if (promarg[pos]) {
             Instruction* promiseInst = arg;
