@@ -56,44 +56,6 @@ int FunctionCall::getFunctionSymbol() {
     return cst->getSExtValue();
 }
 
-void FunctionCall::fixPromises(SEXP cp, SEXP inFun, rjit::Compiler* c) {
-    ConstantInt* callIdx = dynamic_cast<ConstantInt*>(consts->getArgOperand(1));
-    assert(callIdx);
-    SEXP call = VECTOR_ELT(cp, callIdx->getSExtValue());
-
-    SEXP arg = CDR(call);
-    SEXP form = FORMALS(inFun);
-    unsigned i = 0;
-    while (arg != R_NilValue && form != R_NilValue) {
-        assert(TAG(arg) == R_NilValue);
-        assert(CAR(arg) != R_DotsSymbol && TAG(form) != R_DotsSymbol);
-        assert(CAR(arg) != R_MissingArg);
-        switch (TYPEOF(CAR(arg))) {
-        case LGLSXP:
-        case INTSXP:
-        case REALSXP:
-        case CPLXSXP:
-        case STRSXP:
-            break;
-        default:
-            Instruction* promiseInst = args.at(i);
-            std::vector<Value*> args_;
-            args_.push_back(promiseInst);
-            args_.push_back(getRho());
-            CallInst* promise = CallInst::Create(
-                c->getBuilder()->intrinsic<rjit::ir::CreatePromise>(), args_,
-                "");
-            promise->insertAfter(args.at(i));
-            args.at(i)
-                ->replaceUsesOutsideBlock(promise, args.at(i)->getParent());
-            args.at(i) = promise;
-        }
-        ++i;
-        arg = CDR(arg);
-        form = CDR(form);
-    }
-}
-
 bool FunctionCall::tryFix(SEXP cp, SEXP inFun, rjit::Compiler* c) {
     // Obtain the call.
     ConstantInt* callIdx = dynamic_cast<ConstantInt*>(consts->getArgOperand(1));

@@ -136,15 +136,9 @@ SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     SEXP symb = VECTOR_ELT(cp, symbol);
     SEXP fSexp = findVar(symb, env);
     // std::string name = CHAR(PRINTNAME(symb));
-    if (TYPEOF(fSexp) != CLOSXP || TYPEOF(TAG(fSexp)) != ENVSXP ||
-        (TAG(fSexp) != R_GlobalEnv))
+    if (TYPEOF(fSexp) != CLOSXP || TYPEOF(TAG(fSexp)) != ENVSXP /*||
+        (TAG(fSexp) != R_GlobalEnv)*/)
         return nullptr;
-    SEXP formals = FORMALS(fSexp);
-    while (formals != R_NilValue) {
-        if (TAG(formals) == R_DotsSymbol)
-            return nullptr;
-        formals = CDR(formals);
-    }
     // printf("\n\n\nWE INLINE %s\n\n\n", name.c_str());
     return fSexp;
 }
@@ -164,16 +158,6 @@ Call_Map OSRInliner::sortCalls(FunctionCalls* calls, SEXP outer) {
         map[inner].push_back(*it);
     }
     return map;
-}
-
-bool OSRInliner::isMissingArgs(SEXP formals, FunctionCall* fc) {
-    SEXP form = formals;
-    unsigned i = 0;
-    while (form != R_NilValue) {
-        ++i;
-        form = CDR(form);
-    }
-    return (i != fc->getArgs()->size());
 }
 
 void OSRInliner::prepareCodeToInline(Function* toInline, FunctionCall* fc,

@@ -60,7 +60,6 @@ class OSRInliner {
     static void updateCPAccess(CallInst* call, int offset);
     static SEXP getFunction(SEXP cp, int symbol, SEXP env);
     Call_Map sortCalls(FunctionCalls* calls, SEXP outer);
-    static bool isMissingArgs(SEXP formals, FunctionCall* fc);
     static void prepareCodeToInline(Function* toInline, FunctionCall* fc,
                                     CallInst* newrho, int cpOffset,
                                     Return_List* ret);
