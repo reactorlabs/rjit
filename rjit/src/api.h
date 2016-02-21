@@ -9,6 +9,6 @@ extern int RJIT_DEBUG;
 // TODO aghosn
 extern int OSR_INLINE;
 extern int INLINE_ALL;
-extern int ONLY_GLOBAL;
+extern int NO_REPLACE;
 
 #endif // API_H_

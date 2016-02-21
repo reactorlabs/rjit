@@ -114,7 +114,7 @@ int RJIT_DEBUG = getenv("RJIT_DEBUG") ? atoi(getenv("RJIT_DEBUG")) : 0;
 // TODO aghosn
 int OSR_INLINE = getenv("OSR_INLINE") ? atoi(getenv("OSR_INLINE")) : 0;
 int INLINE_ALL = getenv("INLINE_ALL") ? atoi(getenv("INLINE_ALL")) : 0;
-int ONLY_GLOBAL = getenv("ONLY_GLOBAL") ? atoi(getenv("ONLY_GLOBAL")) : 0;
+int NO_REPLACE = getenv("NO_REPLACE") ? atoi(getenv("NO_REPLACE")) : 0;
 
 REXPORT SEXP jitDisable(SEXP expression) {
     RJIT_COMPILE = false;

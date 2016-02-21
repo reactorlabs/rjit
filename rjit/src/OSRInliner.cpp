@@ -47,6 +47,8 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
     assert(TYPEOF(env) == ENVSXP && "Cannot extract environment.");
 
     SEXP fSexp = OSRHandler::getFreshIR(f, c, false);
+    if (NO_REPLACE)
+        SETCDR(f, fSexp);
     OSRHandler::addSexpToModule(fSexp, c->getBuilder()->module());
 
     Function* toOpt = GET_LLVM(fSexp);

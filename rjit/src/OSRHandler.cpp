@@ -2,6 +2,7 @@
 #include "OSRLibrary.hpp"
 #include <llvm/IR/InstIterator.h>
 #include "JITCompileLayer.h"
+#include "api.h"
 
 using namespace llvm;
 
@@ -88,7 +89,8 @@ SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
             func = body;
         } else {
             func = c->compile("rfunction", body, FORMALS(closure));
-            SETCDR(closure, func);
+            if (!NO_REPLACE)
+                SETCDR(closure, func);
         }
 
         Function* clone =
