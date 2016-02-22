@@ -41,6 +41,7 @@ REXPORT SEXP testOSR(SEXP outer, SEXP env) {
     osr::OSRInliner inliner(&c);
     SEXP res = inliner.inlineCalls(outer);
     c.jitAll();
+    OSR_INLINE = 0;
     return res;
 }
 
