@@ -47,9 +47,7 @@ public:
                 replaceWithScalar<typename T::ScalarInt>(p, lhs, rhs, INTSXP, t::Int);
             }
         }
-
     }
-
 
     match add(ir::GenericAdd * p) {
         replaceWithScalar<ir::GenericAdd>(p);
@@ -89,21 +87,6 @@ protected:
         pass.tsa_ = getAnalysis<analysis::TypeAndShape>().pass();
     }
 };
-
-/*
-class Scalars2 : public ir::LinearDriver<ScalarsPass> {
-public:
-    void getAnalysisUsage(AnalysisUsage& AU) const override {
-        AU.addRequired<analysis::TypeAndShape>();
-    }
-
-    bool runOnFunction(llvm::Function & f) override {
-        f.dump();
-        std::cout << "Running on function" << std::endl;
-        pass.tsa_ =  getAnalysis<analysis::TypeAndShape>().pass();
-        return ir::LinearDriver<ScalarsPass>::runOnFunction(f);
-    }
-}; */
 
 } // namespace optimization
 } // namespace rjit
