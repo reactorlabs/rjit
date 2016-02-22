@@ -3,7 +3,6 @@
 
 #include "llvm.h"
 #include "RIntlns.h"
-//#include "primitive_calls.h"
 #include "JITModule.h"
 #include "ir/Ir.h"
 
@@ -16,6 +15,15 @@ template <typename PASS>
 class ForwardDriver;
 
 
+/** Pass over the ir (both llvm and rjit instructions).
+
+  TODO this probably shound not be called a pass, I find it too confusing wrt our pass being in reality distinct from llvm's pass - although how much this matters in our own IR is a question.
+
+  Pass is a base of any class that wishes to be able to dispatch over the ir and it provides the basic functionality for that, notably the defaultMatch methods for any pattern and any llvm::instruction as default matchers if anything else fails.
+
+  It also provides pointers to current constant pool (as llvm value) and the llvm::Function it operates on. The setFunction() method should be called by the driver whenever the pass is invoked on a certain function.
+
+ */
 class Pass {
 public:
     typedef void match;
@@ -34,7 +42,7 @@ public:
         // ins->dump();
     }
 
-    void setFunction(llvm::Function * f) {
+    virtual void setFunction(llvm::Function * f) {
         this->f = f;
         constantPool = f->arg_begin();
     }
@@ -51,33 +59,52 @@ protected:
 
 };
 
-/** A fixpoint driver.
+/** A fixpoint pass.
+
+  Fixpoint is parametrized by a state type and for each basic block keeps its incomming state. During the analysis, whenever a basic block is enetered the setState(llvm::BasicBlock, ASTATE) method should be called which merges the incomming state with the stored incomming state and returns true if anything changed and therefore the basic block should be reexamined, false otherwise.
+
+  During the optimization phase, the setState(llvm::BasicBlock) method should be called to get the stored incomming state for the basic block and set it as current one.
+
+  Note that the fixpoint pass is itself not concerned with the direction of the analysis, as it does not define the meaning of incomming when talking about states, nor does it offer any driving capabilities. This is the job of pass driver subclasses.
+
  */
 template<typename ASTATE>
-class Fixpoint {
+class Fixpoint : public ir::Pass {
 public:
-    typename ASTATE::Value const & operator [] (ir::Value index) const {
-        return state[index];
-    }
 
+    /** Shortand for returning an abstract value associated with given ir::Value from current state.
+     */
     typename ASTATE::Value & operator [] (ir::Value index) {
         return state[index];
     }
 
-    /** During the optimization phase, sets the
+    /** During the optimization phase, sets the current state to the stored incomming state of the given basic block and returns true if successful.
 
-      TODO This should return true/false whether the basic block was analyzed, if it was not analyzed by any of the analyses the optimization should not concern itself with that block.
+      If the block does not have any incomming state, false is returned, indicating that the optimization should skip this basic block as it was not visited during the analysis and is therefore a dead code.
      */
-    void setState(llvm::BasicBlock * bb) {
-        state = states_[bb];
+    bool setState(llvm::BasicBlock * bb) {
+        auto i = states_.find(bb);
+        if (i == states_.end())
+            return false;
+        state = i->second;
+        return true;
+    }
+
+    void setFunction(llvm::Function * f) override {
+        ir::Pass::setFunction(f);
+        states_.clear();
     }
 
 protected:
     template<typename T>
     friend class ForwardDriver;
 
-    virtual bool runOnBlock(llvm::BasicBlock * block, ASTATE && incomming) {
-        std::cout << "Running on block " << (long)(block) << " " << block->getName().str() <<  std::endl;
+    /** When the driver enters a basic block with given incomming state, it must call this method to allow the fixpoint analysis to do the bookkeeping.
+
+      Returns true if the basic block should be analyzed, false if a fixpoint has been reached.
+     */
+    virtual bool setState(llvm::BasicBlock * block, ASTATE && incomming) {
+        //std::cout << "Running on block " << (long)(block) << " " << block->getName().str() <<  std::endl;
         if (states_.find(block) != states_.end()) {
             if (not states_[block].mergeWith(incomming))
                 return false;
@@ -89,21 +116,31 @@ protected:
         return true;
     }
 
+    /** Returns the initial state for the pass.
+
+      By default this is an empty state, but subclasses may override to deal with, e.g. function arguments, or already known globals.
+      */
     virtual ASTATE initialState(llvm::Function * f) {
         return ASTATE();
     }
 
+    /** Current state. Accessible to subclasses.
+     */
     ASTATE state;
 
 private:
+    /** Map of observed basic blocks and their incomming states.
+     */
     std::map<llvm::BasicBlock *, ASTATE> states_;
 
 };
 
 
-/** Base class for all optimizations.
+/** Manipulator class for optimizations.
 
-  Provides means to alter the ir.
+  Provides means to alter the ir and keeps track of changes.
+
+  TODO this should go elsewhere
  */
 class Optimization {
 public:
