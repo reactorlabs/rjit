@@ -359,6 +359,21 @@ class CppClass:
                     self.file = child.get("file")
                     self.line = child.get("line")
 
+    def checkForSubclasses(self):
+        """ Looks at all classes in the doxygen directory and identifies all that are subclasses. This is important because doxygen won't report derivedcompoundrefs of template classes. """
+        for f in os.listdir(doxygenRoot):
+            if (f[0:5] != "class"):
+                continue
+            x = et.parse(os.path.join(doxygenRoot, f)).getroot()[0]
+            name = ""
+            for child in x:
+                if (child.tag == "compoundname"):
+                    name = child.text
+                if (child.tag == "basecompoundref"):
+                    if (child.text.split("<")[0] == self.name):
+                        self.subclasses.append(name)
+                        return
+
     def includePath(self):
         """ Returns the include path of this file, i.e. what should go in the include statement.Some versions of doxygen don't generate absolute path, in that case rjit/src just need to be removed from the path."""
         return self.file[len(cppRoot) + 1:] if cppRoot in self.file else self.file[9:]
@@ -452,8 +467,8 @@ class CppClass:
         """ Emits the dispatcher's code.
 
         """
-        # don't emit the base pass
-        if (self.name == PASS_BASE):
+        # don't emit the base pass or any templated pass
+        if (self.name == PASS_BASE or self.template):
             return
         filename = os.path.join(destDir, self.name.replace("::", "_") + ".cpp")
         D("  {0}".format(filename))
@@ -495,14 +510,31 @@ def loadClassHierarchy(baseClass):
     q = [ baseClass, ]
     while (q):
         key = q.pop()
-        # do not deal with templated passes as they are not allowed as leaves anyways.
-        if (not key in result and "<" not in key):
+        # if the class is a template, load it, but do not emit any code for it
+        k = key.split("<")[0]
+        if (not k in result):
             D("  loading class {0}".format(key))
-            value = CppClass(key)
-            result[key] = value
+            value = CppClass(k)
+            value.template = k != key
+            if (value.template):
+                # if it is template, doxygen won't create derivedcompoundrefs for us to see subclasses, so we just load all classes and check for base classes.
+                value.checkForSubclasses()
+            result[k] = value
             # check if the class has any children and add them to the queue
             for child in value.subclasses:
                 q.append(child)
+
+
+
+
+        # do not deal with templated passes as they are not allowed as leaves anyways.
+#        if (not key in result and "<" not in key):
+#            D("  loading class {0}".format(key))
+#            value = CppClass(key)
+#            result[key] = value
+#            # check if the class has any children and add them to the queue
+#            for child in value.subclasses:
+#                q.append(child)
     return result
 
 def loadClassParents(child, into):
