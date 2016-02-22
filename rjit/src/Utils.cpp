@@ -21,6 +21,7 @@
 #include "OSRHandler.h"
 #include "OSRInliner.h"
 #include "StateMap.hpp"
+#include <llvm/IR/Verifier.h>
 
 using namespace rjit;
 using namespace llvm;
@@ -39,11 +40,21 @@ REXPORT SEXP printFormals(SEXP f) {
     return res;
 }
 
-REXPORT SEXP testme(SEXP expr) {
+REXPORT SEXP getFresh(SEXP expr) {
     Compiler c("module");
-    SEXP result = OSRHandler::getFreshIR(expr, &c, true);
+    SEXP result = OSRHandler::getFreshIR(expr, &c, false);
+    OSRHandler::addSexpToModule(result, c.getBuilder()->module());
+    c.getBuilder()->module()->fixRelocations(FORMALS(expr), result,
+                                             GET_LLVM(result));
     OSRHandler::resetSafepoints(result, &c);
+    printf("THE MODULE ADDRESS %p \n", c.getBuilder()->module());
+    llvm::verifyModule(*(c.getBuilder()->module()), &llvm::outs());
+    llvm::verifyFunction(*(GET_LLVM(result)), &llvm::outs());
     c.jitAll();
     return result;
+}
+REXPORT SEXP clearHandler() {
+    OSRHandler::clear();
+    return R_NilValue;
 }
 }

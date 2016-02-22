@@ -21,10 +21,6 @@ FRESH_R_DIR="${TARGET}/freshr"
 FRESH_R_VERS="3-2"
 BENCH_RUN_NUM="2"
 
->>>>>>> 399d58cc174efb368a60cfa15f4def3044bd9b97
-
-
->>>>>>> Fixing patchpoints in the inlining
 SHOOT_DIR=${BENCH_DIR}/shootout/
 
 TIMEN=$(date +"%H-%M-%S_%F")

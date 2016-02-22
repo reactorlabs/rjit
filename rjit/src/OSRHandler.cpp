@@ -3,6 +3,7 @@
 #include <llvm/IR/InstIterator.h>
 #include "JITCompileLayer.h"
 #include "api.h"
+#include <llvm/Transforms/Utils/Cloning.h>
 
 using namespace llvm;
 
@@ -82,6 +83,8 @@ SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
 
     SEXP body = BODY(closure);
     SEXP func = R_NilValue;
+    // SEXP env = TAG(closure);
+    // assert(TYPEOF(env) == ENVSXP && "Not an environment");
 
     if (baseVersions.find(closure) == baseVersions.end()) {
         if (TYPEOF(body) == NATIVESXP &&
@@ -93,15 +96,15 @@ SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
                 SETCDR(closure, func);
         }
 
-        Function* clone =
-            StateMap::generateIdentityMapping(GET_LLVM(func)).first;
+        ValueToValueMapTy VMap;
+        Function* clone = CloneFunction(GET_LLVM(func), VMap, false);
         baseVersions[closure] = cloneSEXP(func, clone);
         assert(baseVersions.find(closure) != baseVersions.end());
     }
 
     SEXP entry = baseVersions[closure];
-    Function* workingCopy =
-        StateMap::generateIdentityMapping(GET_LLVM(entry)).first;
+    ValueToValueMapTy VMap;
+    Function* workingCopy = CloneFunction(GET_LLVM(entry), VMap, false);
 
     func = cloneSEXP(entry, workingCopy);
     // Adding the result to the relocations.
@@ -138,9 +141,9 @@ SEXP OSRHandler::resetSafepoints(SEXP func, rjit::Compiler* c) {
                 Function* target = call->getCalledFunction();
                 Function* resolve = m->getFunction(target->getName());
                 if (!resolve)
-                    resolve = Function::Create(target->getFunctionType(),
-                                               Function::ExternalLinkage,
-                                               target->getName(), m);
+                    resolve = Function::Create(
+                        target->getFunctionType(), // This might be a problem
+                        Function::ExternalLinkage, target->getName(), m);
                 call->setCalledFunction(resolve);
             }
 
@@ -155,4 +158,10 @@ SEXP OSRHandler::resetSafepoints(SEXP func, rjit::Compiler* c) {
     }
     return func;
 }
+
+void OSRHandler::clear() {
+    baseVersions.clear();
+    transitiveMaps.clear();
+}
+
 } // namespace osr

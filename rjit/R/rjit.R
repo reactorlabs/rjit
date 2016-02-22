@@ -87,10 +87,13 @@ jit.testOSR <- function(what, whut, env=environment(what)) {
     }
 }
 
-jit.testme <- function(what) {
-    res = .Call("testme", what)
+jit.getFresh <- function(what) {
+    res = .Call("getFresh", what)
     result = .Internal(bcClose(formals(what), res, environment(what)))
     result
 }
 
-
+jit.clearHandler <- function() {
+    res = .Call("clearHandler")
+    res
+}

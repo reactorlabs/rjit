@@ -22,6 +22,7 @@ typedef std::pair<Function*, Function*> Func_Pair;
 
 class OSRHandler : public OSRLibrary {
   public:
+    static void clear();
     static std::map<SEXP, SEXP> baseVersions;
     /**
      * Map from a function pair <toOpt, toInstrument> to their statemaps.
