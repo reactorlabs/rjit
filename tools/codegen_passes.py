@@ -491,15 +491,23 @@ class CppClass:
             # emit the dispatch table
             self.dispatchTable.emit(f, 0)
             # if the emitted code get here, the match was not successful, delegate to a parent
-            for parent in self.parentClasses:
-                if (parent in passes):
-                    print("return {parentClass}::dispatch(it0);".format(parentClass = parent), file = f)
-                    break
-            print("}", file = f)
-        # now we must do clang-format on the file so that it does not look too ugly
+            x = self
+            while (x):
+                for parent in x.parentClasses:
+                    parent = parent.split("<")[0]
+                    if (parent in passes):
+                        x = passes[parent]
+                        if (not x.template):
+                            print("return {parentClass}::dispatch(it0);".format(parentClass = parent), file = f)
+                            print("}", file = f)
+                            # now we must do clang-format on the file so that it does not look too ugly
+                            x = False
+                            break
+
         if (clangFormat != "noformat"):
             subprocess.call([clangFormat, "-i", "-style=file", ".clang_format", filename])
-        #clang-format -i -style=LLVM
+            #clang-format -i -style=LLVM
+
 # ---------------------------------------------------------------------------------------------------------------------
 
 def loadClassHierarchy(baseClass):
@@ -515,7 +523,9 @@ def loadClassHierarchy(baseClass):
         if (not k in result):
             D("  loading class {0}".format(key))
             value = CppClass(k)
-            value.template = k != key
+            value.template = (k != key)
+            if (value.template):
+                D("    template")
             if (value.template):
                 # if it is template, doxygen won't create derivedcompoundrefs for us to see subclasses, so we just load all classes and check for base classes.
                 value.checkForSubclasses()
