@@ -69,8 +69,6 @@ protected:
 
 /** Forward driver for passes.
 
- The forward driver does
-
  */
 template <typename PASS>
 class ForwardDriver : public PassDriver<PASS> {
@@ -99,7 +97,7 @@ protected:
     /** Executes the analysis pass on given block, checking whether a fixpoint has been reached, updating the current state and enqueuing its successors.
      */
     void runOnBlock(llvm::BasicBlock * block, typename PASS::State && incomming) {
-        if (not pass_.runOnBlock(block, std::move(incomming)))
+        if (not pass_.setState(block, std::move(incomming)))
             return;
         // iterate over all instructions in the block
         BasicBlock::iterator i = block->begin();
@@ -124,6 +122,10 @@ private:
 /** A driver for optimizations.
 
   Is templated by the optimization's pass class and by the types of analyses that are required by the pass.
+
+  Linearly passes over the basic blocks in the function and advances all required analyses as well.
+
+  TODO this only works for forward analyses, we might beed a backward optimization pass too, or a backward analysis advancement that will work with fw passes too.
 
  */
 template<typename PASS, typename... ANALYSES>
@@ -151,15 +153,16 @@ protected:
         setFunction(f);
         for (auto & b : *f) {
             // at the beginning of each basic block we must set the proper state to all analyses we require
-            setState<ANALYSES...>(&b);
-            llvm::BasicBlock::iterator i = b.begin();
-            while (i != b.end()) {
-                // each analysis must advance its state past the instruction
-                // TODO the fact we do this before the optimization is fine because the state before cannot be different for the inputs of currently used instructions & patterns
-                advanceAnalysis<ANALYSES...>(i);
-                // do the opimization pass
-                if (!pass.dispatch(i))
-                    i++;
+            if (setState<ANALYSES...>(&b)) {
+                llvm::BasicBlock::iterator i = b.begin();
+                while (i != b.end()) {
+                    // each analysis must advance its state past the instruction
+                    // TODO the fact we do this before the optimization is fine because the state before cannot be different for the inputs of currently used instructions & patterns
+                    advanceAnalysis<ANALYSES...>(i);
+                    // do the opimization pass
+                    if (!pass.dispatch(i))
+                        i++;
+                }
             }
         }
         return pass.hasChanged();
@@ -190,20 +193,18 @@ private:
     }
 
     template<typename T>
-    void setState(llvm::BasicBlock * bb) {
-        this->template getAnalysis<T>().pass()->setState(bb);
+    bool setState(llvm::BasicBlock * bb) {
+        return this->template getAnalysis<T>().pass()->setState(bb);
     }
 
     template<typename T1, typename T2>
-    void setState(llvm::BasicBlock * bb) {
-        this->template getAnalysis<T1>().pass()->setState(bb);
-        this->template getAnalysis<T2>().pass()->setState(bb);
+    bool setState(llvm::BasicBlock * bb) {
+        return this->template getAnalysis<T1>().pass()->setState(bb) and this->template getAnalysis<T2>().pass()->setState(bb);
     }
 
     template<typename T1, typename T2, typename... A>
-    void setState(llvm::BasicBlock * bb) {
-        setState<T1, T2>(bb);
-        setState<A...>(bb);
+    bool setState(llvm::BasicBlock * bb) {
+        return setState<T1, T2>(bb) and setState<A...>(bb);
     }
 
     template<typename T>

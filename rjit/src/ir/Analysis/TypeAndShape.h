@@ -10,7 +10,7 @@
 namespace rjit {
 namespace analysis {
 
-class TypeAndShapePass : public ir::Pass, public ir::Fixpoint<ir::AState<TypeInfo>> {
+class TypeAndShapePass : public ir::Fixpoint<ir::AState<TypeInfo>> {
 public:
     typedef TypeInfo Value;
     typedef ir::AState<Value> State;
