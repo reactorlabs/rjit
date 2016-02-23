@@ -43,13 +43,16 @@ REXPORT SEXP printFormals(SEXP f) {
 REXPORT SEXP getFresh(SEXP expr) {
     Compiler c("module");
     SEXP result = OSRHandler::getFreshIR(expr, &c, false);
+    /*SEXP control = c.compile("rfunction", BODY(expr), FORMALS(expr));
+    Function* f = GET_LLVM(control);
+    assert(f);*/
     OSRHandler::addSexpToModule(result, c.getBuilder()->module());
     c.getBuilder()->module()->fixRelocations(FORMALS(expr), result,
                                              GET_LLVM(result));
     OSRHandler::resetSafepoints(result, &c);
-    printf("THE MODULE ADDRESS %p \n", c.getBuilder()->module());
-    llvm::verifyModule(*(c.getBuilder()->module()), &llvm::outs());
-    llvm::verifyFunction(*(GET_LLVM(result)), &llvm::outs());
+    // printf("THE MODULE ADDRESS %p \n", c.getBuilder()->module());
+    // llvm::verifyModule(*(c.getBuilder()->module()), &llvm::outs());
+    // llvm::verifyFunction(*(GET_LLVM(result)), &llvm::outs());
     c.jitAll();
     return result;
 }

@@ -93,14 +93,14 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
             auto res = OSRHandler::insertOSRExit(
                 toOpt, toInstrument, (*call)->getConsts(),
                 getOSRCondition(*call), compensation);
-            VERIFYFUN2(res.second);
+            // VERIFYFUN2(res.second);
             res.second->setGC("rjit");
             ret.clear();
         }
         setCP(fSexp, innerFunc);
     }
     OSRHandler::resetSafepoints(fSexp, c);
-    VERIFYFUN2(GET_LLVM(fSexp));
+    // VERIFYFUN2(GET_LLVM(fSexp));
     SETCDR(f, fSexp);
     return f;
 }

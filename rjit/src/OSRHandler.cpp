@@ -83,8 +83,6 @@ SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
 
     SEXP body = BODY(closure);
     SEXP func = R_NilValue;
-    // SEXP env = TAG(closure);
-    // assert(TYPEOF(env) == ENVSXP && "Not an environment");
 
     if (baseVersions.find(closure) == baseVersions.end()) {
         if (TYPEOF(body) == NATIVESXP &&
@@ -128,6 +126,7 @@ void OSRHandler::addSexpToModule(SEXP f, Module* m) {
     assert(GET_LLVM(f) && "Trying to add a null function to the module.");
     m->getFunctionList().push_back(GET_LLVM(f));
 }
+
 // TODO rename
 SEXP OSRHandler::resetSafepoints(SEXP func, rjit::Compiler* c) {
     assert(TYPEOF(func) == NATIVESXP && GET_LLVM(func) && "Invalid function.");
