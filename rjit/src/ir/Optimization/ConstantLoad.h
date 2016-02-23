@@ -21,16 +21,16 @@ class ConstantLoadPass : public Pass, public Optimization {
     ConstantLoadPass() : Pass() {}
 
     match u(UserLiteral* var) {
-        auto ve = VectorGetElement::insertBefore(
-            var, var->constantPool(), Builder::integer(var->index()));
+        auto ve = GetVectorElement::insertBefore(
+            var, var->constantPool(), Builder::integer(var->index()), t::SEXP);
         MarkNotMutable::insertBefore(var, ve->result());
         replaceAllUsesWith(var, ve);
         eraseFromParent(var);
     }
 
     match c(Constant* var) {
-        auto ve = VectorGetElement::insertBefore(
-            var, var->constantPool(), Builder::integer(var->index()));
+        auto ve = GetVectorElement::insertBefore(
+            var, var->constantPool(), Builder::integer(var->index()), t::SEXP);
         replaceAllUsesWith(var, ve);
         eraseFromParent(var);
     }
