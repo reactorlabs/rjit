@@ -70,6 +70,11 @@ public:
         return mergeMaps(variables_, other.variables_) or result;
     }
 
+    void invalidateVariables(AVALUE top) {
+        for (auto i = variables_.begin(), e = variables_.end(); i != e; ++i)
+            i->second = top;
+    }
+
 protected:
 
     template<typename MAP>
