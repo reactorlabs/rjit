@@ -1105,6 +1105,45 @@ class PrimitiveCall : public Pattern {
     }
 };
 
+/** Call to a user function call stub.
+ */
+class ICStub : public ir::Pattern {
+public:
+    static ICStub * insertBefore(llvm::Instruction * ins, llvm::Function * f, llvm::ArrayRef<llvm::Value*> arguments, size_t size) {
+       auto i = CallInst::Create(f, arguments, "", ins);
+       llvm::AttributeSet PAL;
+       {
+           SmallVector<AttributeSet, 4> Attrs;
+           AttributeSet PAS;
+           {
+               AttrBuilder B;
+               B.addAttribute("ic-stub", std::to_string(size));
+               PAS = AttributeSet::get(ins->getContext(), ~0U, B);
+           }
+           Attrs.push_back(PAS);
+           PAL = AttributeSet::get(ins->getContext(), Attrs);
+       }
+       i->setAttributes(PAL);
+       return new ICStub(i);
+    }
+
+    static ICStub * create(Builder & b, llvm::Function * f, llvm::ArrayRef<llvm::Value*> arguments, size_t size) {
+        Sentinel s(b);
+        return insertBefore(s, f, arguments, size);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->kind == Kind::ICStub;
+    }
+
+protected:
+    ICStub(llvm::Instruction* call):
+        Pattern(call, Kind::ICStub) {
+    }
+};
+
+
+
 } // namespace ir
 
 static_assert(sizeof(ir::Value) == sizeof(llvm::Value*),

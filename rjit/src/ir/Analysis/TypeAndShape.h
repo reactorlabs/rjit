@@ -55,8 +55,8 @@ public:
       TODO call to ICStub should be its own pattern
 
      */
-    match call(llvm::CallInst * ins) {
-
+    match call(ir::ICStub * ins) {
+       state.invalidateVariables(Value(Value::Type::Any));
     }
 
     bool dispatch(llvm::BasicBlock::iterator& i) override;
