@@ -355,7 +355,7 @@ if [ $BENCH_RUN -eq 1 ]; then
     if [ $SKIP_FRESHR -eq 0 ]; then
         cd ${TARGET}
 
-        build_freshr ${FRESH_R_DIR} ${FRESH_R_VERSION} ${OPT}
+        build_freshr ${FRESH_R_DIR} ${FRESH_R_VERSION} "-O2"
     fi
 
     SHOOT_DIR=${BENCH_DIR}/shootout/

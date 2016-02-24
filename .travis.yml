@@ -53,7 +53,7 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then export LLVM_BUILD_DIR=${TRAVIS_BUILD_DIR}/llvm/llvm-install-linux; fi
 
 before_script:
-  - ./tools/setup.sh -n -l -f -O2
+    - ./tools/setup.sh -n -l -f -O2 --rjit-release -j 2
 
 script:
   - ./tools/integration_tests.sh
