@@ -97,3 +97,13 @@ jit.clearHandler <- function() {
     res = .Call("clearHandler")
     res
 }
+
+jit.enableOSR <- function() {
+    res =.Call("enableOSR")
+    res
+}
+
+jit.disableOSR <- function() {
+    res = .Call("disableOSR")
+    res
+}

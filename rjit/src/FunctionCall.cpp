@@ -25,8 +25,7 @@ FunctionCall::FunctionCall(CallInst* icStub) : icStub(icStub) {
     assert(consts && "Cannot convert consts to Instruction.");
     ++i;
     getFunc = dynamic_cast<CallInst*>(icStub->getArgOperand(i));
-    assert(getFunc && IS_GET_FUNCTION(getFunc) &&
-           "Could not find the getFunc.");
+    assert(getFunc && "Could not find the getFunc.");
     inPtr = nullptr;
 }
 

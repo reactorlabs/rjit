@@ -60,4 +60,13 @@ REXPORT SEXP clearHandler() {
     OSRHandler::clear();
     return R_NilValue;
 }
+
+REXPORT SEXP enableOSR() {
+    OSR_INLINE = 1;
+    return R_NilValue;
+}
+REXPORT SEXP disableOSR() {
+    OSR_INLINE = 0;
+    return R_NilValue;
+}
 }

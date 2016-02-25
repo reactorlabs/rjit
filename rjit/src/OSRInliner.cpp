@@ -150,6 +150,9 @@ Call_Map OSRInliner::sortCalls(FunctionCalls* calls, SEXP outer) {
     SEXP cp = CDR(BODY(outer));
     SEXP env = TAG(outer);
     for (auto it = calls->begin(); it != calls->end(); ++it) {
+        if (!IS_GET_FUNCTION((*it)->getGetFunc()))
+            continue;
+
         SEXP inner = getFunction(cp, (*it)->getFunctionSymbol(), env);
         // Function not found or arguments are missing, or recursive call.
         if (!inner || outer == inner || !((*it)->tryFix(cp, inner, c)))
