@@ -26,30 +26,20 @@ class TypeInfo {
 
     // -- Constructors
 
-    TypeInfo() {
-        // Make sure that all other bits are 0
-        // This allows us to compare TypeInfo with one = operaion on the
-        // underlying int
-        *reinterpret_cast<int*>(&store) = 0;
-
+    TypeInfo() : TypeInfo(0) {
         store.types_ = EnumBitset<Type>();
         store.size_ = Size::Unknown;
         store.attrib_ = Attrib::Unknown;
     }
 
-    TypeInfo(Type type, Size s = Size::Any, Attrib attributes = Attrib::Any) {
-        // Make sure that all other bits are 0
-        *reinterpret_cast<int*>(&store) = 0;
-
+    TypeInfo(Type type, Size s = Size::Any, Attrib attributes = Attrib::Any)
+        : TypeInfo(0) {
         store.types_ = EnumBitset<Type>(type);
         store.size_ = s;
         store.attrib_ = attributes;
     }
 
-    TypeInfo(SEXP from) {
-        // Make sure that all other bits are 0
-        *reinterpret_cast<int*>(&store) = 0;
-
+    TypeInfo(SEXP from) : TypeInfo(0) {
         store.types_ = EnumBitset<Type>();
         store.size_ = Size::Unknown;
         store.attrib_ = Attrib::Unknown;
