@@ -40,7 +40,7 @@ public:
     }
 
     static AllocVector * insertBefore(Pattern * p, SEXPTYPE type, int size) {
-        return insertBefore(p->first(), type, Builder::integer(size));
+        return insertBefore(p->first(), type, Builder::integer(size, 64));
     }
 
     static char const * intrinsicName() {
