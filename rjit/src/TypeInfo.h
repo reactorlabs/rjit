@@ -27,18 +27,29 @@ class TypeInfo {
     // -- Constructors
 
     TypeInfo() {
+        // Make sure that all other bits are 0
+        // This allows us to compare TypeInfo with one = operaion on the
+        // underlying int
+        *reinterpret_cast<int*>(&store) = 0;
+
         store.types_ = EnumBitset<Type>();
         store.size_ = Size::Unknown;
         store.attrib_ = Attrib::Unknown;
     }
 
     TypeInfo(Type type, Size s = Size::Any, Attrib attributes = Attrib::Any) {
+        // Make sure that all other bits are 0
+        *reinterpret_cast<int*>(&store) = 0;
+
         store.types_ = EnumBitset<Type>(type);
         store.size_ = s;
         store.attrib_ = attributes;
     }
 
     TypeInfo(SEXP from) {
+        // Make sure that all other bits are 0
+        *reinterpret_cast<int*>(&store) = 0;
+
         store.types_ = EnumBitset<Type>();
         store.size_ = Size::Unknown;
         store.attrib_ = Attrib::Unknown;
@@ -57,7 +68,8 @@ class TypeInfo {
     // -- getters
 
     bool any() {
-        return types().has(Type::Any) && attrib() == Attrib::Any && size() == Size::Any;
+        return types().has(Type::Any) && attrib() == Attrib::Any &&
+               size() == Size::Any;
     }
 
     const EnumBitset<Type> types() { return EnumBitset<Type>(store.types_); }
@@ -79,7 +91,6 @@ class TypeInfo {
         return t;
     }
 
-
     Size size(Size s) {
         assert(s > Size::Unknown && s <= Size::Any);
         store.size_ = s;
@@ -94,7 +105,7 @@ class TypeInfo {
 
     // -- record a new runtime type instance
 
-    const EnumBitset<Type> addType(int sexpType);
+    const EnumBitset<Type> addType(SEXP value);
     void mergeAttrib(SEXP v);
     void mergeSize(SEXP v);
     void mergeAll(SEXP s);
