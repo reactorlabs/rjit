@@ -81,7 +81,8 @@ llvm::BasicBlock* Builder::createBasicBlock(std::string const& name) {
     return llvm::BasicBlock::Create(m_->getContext(), name, c_->f);
 }
 
-void Builder::openFunction(std::string const& name, SEXP ast, SEXP formals) {
+void Builder::openFunction(std::string const& name, SEXP ast, SEXP formals,
+                           TypeFeedback* tf) {
     if (c_ != nullptr)
         contextStack_.push_back(c_);
     c_ = new ClosureContext(name, m_, formals);
@@ -91,6 +92,10 @@ void Builder::openFunction(std::string const& name, SEXP ast, SEXP formals) {
     c_->addConstantPoolObject(R_NilValue);
     c_->addConstantPoolObject(R_NilValue);
     c_->addConstantPoolObject(R_NilValue);
+
+    if (tf) {
+        tf->attach(c_->f);
+    }
 }
 
 void Builder::openFunctionOrPromise(SEXP ast) {

@@ -9,6 +9,7 @@
 #include "StackMap.h"
 #include "JITCompileLayer.h"
 #include "JITModule.h"
+#include "Instrumentation.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/Support/TargetSelect.h"
@@ -108,7 +109,8 @@ class Builder {
       pool.
      */
     void openPromise(std::string const& name, SEXP ast);
-    void openFunction(std::string const& name, SEXP ast, SEXP formals);
+    void openFunction(std::string const& name, SEXP ast, SEXP formals,
+                      TypeFeedback* tf = nullptr);
     void openFunctionOrPromise(SEXP ast);
 
     void openIC(std::string const& name, FunctionType* ty) {

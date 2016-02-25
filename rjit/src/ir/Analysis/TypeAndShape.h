@@ -39,7 +39,7 @@ public:
         if (state.has(symbol))
             state[dest] = state[symbol];
         else
-            state[dest] = Value(Instrumentation::getTypefeedback(symbol));
+            state[dest] = Value(typeFeedback ? typeFeedback->get(symbol) : Value::Type::Any);
     }
 
     /** If we have incomming type & shape information, store it in the variable too. Otherwise do nothing (this means the variable will be assumed Top at read).

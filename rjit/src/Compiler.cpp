@@ -42,17 +42,19 @@ SEXP Compiler::compileFunction(std::string const& name, SEXP ast,
                                SEXP formals) {
 
     if (TYPEOF(ast) == NATIVESXP) {
-        assert(!Instrumentation::__cp__);
-        Instrumentation::__cp__ = CDR(ast);
+        SEXP native = ast;
         ast = VECTOR_ELT(CDR(ast), 0);
-    }
+        TypeFeedback* tf = new TypeFeedback(native);
+        tf->clearInvocationCount();
 
-    b.openFunction(name, ast, formals);
+        b.openFunction(name, ast, formals, tf);
 
-    if (!Instrumentation::hasTypeInfo()) {
+    } else {
+        b.openFunction(name, ast, formals);
+
         // Check the invocation count and recompile the function if it is hot.
-        auto limit =
-            ConstantInt::get(b.getContext(), APInt(32, StringRef("200"), 10));
+        auto limit = ConstantInt::get(b.getContext(),
+                                      APInt(32, StringRef("100000"), 10));
         auto invocations = ir::InvocationCount::create(b);
         auto condition = ir::IntegerLessThan::create(b, invocations, limit);
         BasicBlock* bRecompile = b.createBasicBlock("recompile");
@@ -134,7 +136,7 @@ Value* Compiler::compileSymbol(SEXP value) {
     auto name = CHAR(PRINTNAME(value));
     assert(strlen(name));
     Value* res = ir::GenericGetVar::create(b, b.rho(), value)->result();
-    if (b.isFunction() && !Instrumentation::hasTypeInfo())
+    if (b.isFunction() && !TypeFeedback::get(b.f()))
         ir::RecordType::create(b, value, res);
     res->setName(name);
     return res;

@@ -7,6 +7,7 @@
 #include "JITSymbolResolver.h"
 #include "StackMap.h"
 #include "CodeCache.h"
+#include "Instrumentation.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
@@ -76,23 +77,27 @@ ExecutionEngine* JITCompileLayer::finalize(JITModule* m) {
     pm.add(rjit::createPlaceRJITSafepointsPass());
     pm.add(rjit::createRJITRewriteStatepointsForGCPass());
 
-/*    for (llvm::Function& f : m->getFunctionList()) {
-        if (not f.isDeclaration()) {
-            std::cerr << "--------------------------------------" << std::endl;
-            f.dump();
-        }
-    } */
-
+    /*    for (llvm::Function& f : m->getFunctionList()) {
+            if (not f.isDeclaration()) {
+                std::cerr << "--------------------------------------" <<
+       std::endl;
+                f.dump();
+            }
+        } */
 
     pm.run(*m);
 
-    std::cout<<rso.str();
+    std::cout << rso.str();
 
     engine->finalizeObject();
     m->finalizeNativeSEXPs(engine);
 
     // Fill in addresses for cached code
     for (llvm::Function& f : m->getFunctionList()) {
+        TypeFeedback* tf = TypeFeedback::get(&f);
+        if (tf)
+            delete tf;
+
         if (CodeCache::missingAddress(f.getName())) {
             CodeCache::setAddress(f.getName(),
                                   (uint64_t)engine->getPointerToFunction(&f));

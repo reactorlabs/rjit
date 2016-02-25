@@ -4,26 +4,32 @@
 #include "RDefs.h"
 #include "TypeInfo.h"
 
+#include <llvm/IR/Function.h>
+
 namespace rjit {
 
-class TypeFeedback {
+class TypeRecorder {
   public:
-    TypeFeedback(SEXP store);
+    TypeRecorder(SEXP store);
     void record(SEXP value, int idx);
 
   private:
     SEXP store;
 };
 
-class Instrumentation {
+class TypeFeedback {
   public:
-    static int getInvocationCount(SEXP closure);
-    static void clearInvocationCount(SEXP closure);
-    static TypeInfo getTypefeedback(SEXP sym);
-    static bool hasTypeInfo() {
-        return __cp__;
-    }
-    static SEXP __cp__;
+    TypeFeedback(SEXP native);
+
+    void clearInvocationCount();
+    TypeInfo get(SEXP symbol);
+
+    void attach(llvm::Function* f);
+    static TypeFeedback* get(llvm::Function* f);
+
+  private:
+    SEXP cp();
+    SEXP native;
 };
 }
 
