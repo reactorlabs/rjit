@@ -34,8 +34,8 @@ namespace rjit {
 
 SEXP Compiler::compilePromise(std::string const& name, SEXP ast) {
     b.openPromise(name, ast);
-    ir::InvocationCount::create(b);
-    return finalizeCompile(ast);
+    finalizeCompile(ast);
+    return b.closePromise();
 }
 
 SEXP Compiler::compileFunction(std::string const& name, SEXP ast,
@@ -62,17 +62,19 @@ SEXP Compiler::compileFunction(std::string const& name, SEXP ast,
         ir::Cbr::create(b, condition, next, bRecompile);
 
         b.setBlock(bRecompile);
-        auto res = ir::Recompile::create(b, b.closure(), b.f(), b.consts(), b.rho());
+        auto res =
+            ir::Recompile::create(b, b.closure(), b.f(), b.consts(), b.rho());
         ir::Return::create(b, res);
 
         b.setBlock(next);
     }
 
-    SEXP res = finalizeCompile(ast);
-    return res;
+    finalizeCompile(ast);
+
+    return b.closeFunction();
 }
 
-SEXP Compiler::finalizeCompile(SEXP ast) {
+void Compiler::finalizeCompile(SEXP ast) {
     Value* last = compileExpression(ast);
 
     // since we are going to insert implicit return, which is a simple return
@@ -80,11 +82,6 @@ SEXP Compiler::finalizeCompile(SEXP ast) {
     b.setResultJump(false);
     if (last != nullptr)
         compileReturn(last, /*tail=*/true);
-    // now we create the NATIVESXP
-    // NATIVESXP should be a static builder, but this is not how it works
-    // at the moment
-    SEXP result = b.closeFunctionOrPromise();
-    return result;
 }
 
 void Compiler::finalize() {
@@ -137,7 +134,7 @@ Value* Compiler::compileSymbol(SEXP value) {
     auto name = CHAR(PRINTNAME(value));
     assert(strlen(name));
     Value* res = ir::GenericGetVar::create(b, b.rho(), value)->result();
-    if (!Instrumentation::hasTypeInfo())
+    if (b.isFunction() && !Instrumentation::hasTypeInfo())
         ir::RecordType::create(b, value, res);
     res->setName(name);
     return res;
