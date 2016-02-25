@@ -129,6 +129,7 @@ namespace {
 
 void rjit_gcCallback(void (*forward_node)(SEXP)) {
     StackScan::stackScanner(forward_node);
+    Compiler::gcCallback(forward_node);
 }
 
 int rjitStartup() {

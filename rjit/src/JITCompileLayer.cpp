@@ -26,6 +26,8 @@
 #include "ir/Optimization/ConstantLoad.h"
 #include "ir/Optimization/Scalars.h"
 
+#include "llvm/IR/IRPrintingPasses.h"
+
 using namespace llvm;
 
 namespace rjit {
@@ -51,16 +53,18 @@ ExecutionEngine* JITCompileLayer::finalize(JITModule* m) {
         exit(1);
     }
 
+    std::string str;
+    llvm::raw_string_ostream rso(str);
+
     // Make sure we can resolve symbols in the program as well. The zero arg
     legacy::PassManager pm;
 
-
     pm.add(new analysis::TypeAndShape());
     pm.add(new optimization::Scalars());
+    // pm.add(createPrintModulePass(rso));
 
     pm.add(new ir::VariableAnalysis());
-    //pm.add(new ir::ConstantLoadOptimization());
-
+    pm.add(new ir::ConstantLoadOptimization());
 
     pm.add(createTargetTransformInfoWrapperPass(TargetIRAnalysis()));
 
@@ -82,7 +86,7 @@ ExecutionEngine* JITCompileLayer::finalize(JITModule* m) {
 
     pm.run(*m);
 
-
+    std::cout<<rso.str();
 
     engine->finalizeObject();
     m->finalizeNativeSEXPs(engine);

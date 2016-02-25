@@ -2,6 +2,7 @@
 #define INSTRUMENTATION_H
 
 #include "RDefs.h"
+#include "TypeInfo.h"
 
 namespace rjit {
 
@@ -18,6 +19,11 @@ class Instrumentation {
   public:
     static int getInvocationCount(SEXP closure);
     static void clearInvocationCount(SEXP closure);
+    static TypeInfo getTypefeedback(SEXP sym);
+    static bool hasTypeInfo() {
+        return __cp__;
+    }
+    static SEXP __cp__;
 };
 }
 

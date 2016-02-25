@@ -82,10 +82,23 @@ extern "C" void* compileIC(uint64_t numargs, SEXP call, SEXP fun, SEXP rho,
     return res;
 }
 
-extern "C" void* recompileFunction(SEXP closure) {
+extern "C" void* recompileFunction(SEXP closure, SEXP(*caller)(SEXP, SEXP, SEXP), SEXP consts, SEXP rho) {
+    if (!closure) {
+        return caller(consts, rho, closure);
+    }
     assert(TYPEOF(closure) == CLOSXP);
     std::cout << "Requested to recompile " << (void*)closure << "\n";
+
+    SEXP body = BODY(closure);
+
+    Compiler c("optimized module");
+    SEXP result = c.compile("rOptFunction", body, FORMALS(closure));
+    c.finalize();
     Instrumentation::clearInvocationCount(closure);
-    // Return unchanged functino
-    return CAR(BODY(closure));
+    SEXP(*newCaller)(SEXP, SEXP, SEXP) = (SEXP(*)(SEXP, SEXP, SEXP))CAR(result);
+    SEXP newConsts = CDR(result);
+    SETCDR(closure, result);
+
+    Instrumentation::__cp__ = nullptr;
+    return newCaller(newConsts, rho, closure);
 }

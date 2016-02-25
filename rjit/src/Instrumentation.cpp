@@ -40,6 +40,25 @@ void Instrumentation::clearInvocationCount(SEXP closure) {
     SEXP invocationCount = VECTOR_ELT(consts, 3);
     INTEGER(invocationCount)[0] = 0;
 }
+
+TypeInfo Instrumentation::getTypefeedback(SEXP sym) {
+    if (!__cp__) return TypeInfo();
+
+    SEXP store = VECTOR_ELT(__cp__, 1);
+    SEXP names = VECTOR_ELT(__cp__, 2);
+    assert(TYPEOF(store) == INTSXP);
+    assert(TYPEOF(names) == VECSXP);
+    assert(XLENGTH(store) == XLENGTH(names));
+    for (unsigned i = 0; i < XLENGTH(store); ++i) {
+        if (VECTOR_ELT(names, i) == sym) {
+            return TypeInfo(INTEGER(store)[i]);
+        }
+    }
+    return TypeInfo();
+}
+
+SEXP Instrumentation::__cp__ = nullptr;
+
 }
 
 extern "C" void recordType(SEXP value, SEXP store, int idx) {

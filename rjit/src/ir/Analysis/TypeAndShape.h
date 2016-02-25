@@ -6,6 +6,7 @@
 #include "ir/PassDriver.h"
 
 #include "TypeInfo.h"
+#include "Instrumentation.h"
 
 namespace rjit {
 namespace analysis {
@@ -38,7 +39,7 @@ public:
         if (state.has(symbol))
             state[dest] = state[symbol];
         else
-            state[dest] = Value(Value::Type::Any);
+            state[dest] = Value(Instrumentation::getTypefeedback(symbol));
     }
 
     /** If we have incomming type & shape information, store it in the variable too. Otherwise do nothing (this means the variable will be assumed Top at read).

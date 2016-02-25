@@ -23,6 +23,7 @@
 #include "ir/primitive_calls.h"
 #include "ir/Ir.h"
 
+#include "Instrumentation.h"
 #include "api.h"
 
 #include "RIntlns.h"
@@ -39,27 +40,36 @@ SEXP Compiler::compilePromise(std::string const& name, SEXP ast) {
 
 SEXP Compiler::compileFunction(std::string const& name, SEXP ast,
                                SEXP formals) {
+
+    if (TYPEOF(ast) == NATIVESXP) {
+        assert(!Instrumentation::__cp__);
+        Instrumentation::__cp__ = CDR(ast);
+        ast = VECTOR_ELT(CDR(ast), 0);
+    }
+
     b.openFunction(name, ast, formals);
 
-    // Check the invocation count and recompile the function if it is hot.
-    auto limit =
-        ConstantInt::get(b.getContext(), APInt(32, StringRef("10000"), 10));
-    auto invocations = ir::InvocationCount::create(b);
-    auto condition = ir::IntegerLessThan::create(b, invocations, limit);
-    BasicBlock* bRecompile = b.createBasicBlock("recompile");
-    BasicBlock* next = b.createBasicBlock("functionBegin");
+    if (!Instrumentation::hasTypeInfo()) {
+        // Check the invocation count and recompile the function if it is hot.
+        auto limit =
+            ConstantInt::get(b.getContext(), APInt(32, StringRef("200"), 10));
+        auto invocations = ir::InvocationCount::create(b);
+        auto condition = ir::IntegerLessThan::create(b, invocations, limit);
+        BasicBlock* bRecompile = b.createBasicBlock("recompile");
+        BasicBlock* next = b.createBasicBlock("functionBegin");
 
-    // TODO set weight to mark that the branch is unlikely
-    ir::Cbr::create(b, condition, next, bRecompile);
+        // TODO set weight to mark that the branch is unlikely
+        ir::Cbr::create(b, condition, next, bRecompile);
 
-    b.setBlock(bRecompile);
-    auto fun = ir::Recompile::create(b, b.closure());
-    auto res = ir::CallToAddress::create(b, fun, b.args());
-    ir::Return::create(b, res);
+        b.setBlock(bRecompile);
+        auto res = ir::Recompile::create(b, b.closure(), b.f(), b.consts(), b.rho());
+        ir::Return::create(b, res);
 
-    b.setBlock(next);
+        b.setBlock(next);
+    }
 
-    return finalizeCompile(ast);
+    SEXP res = finalizeCompile(ast);
+    return res;
 }
 
 SEXP Compiler::finalizeCompile(SEXP ast) {
@@ -112,8 +122,6 @@ Value* Compiler::compileExpression(SEXP value) {
         return ir::UserLiteral::create(b, value)->result();
     }
     case BCODESXP:
-    // TODO: reuse the compiled fun
-    case NATIVESXP:
         return compileExpression(VECTOR_ELT(CDR(value), 0));
     default:
         assert(false && "Unknown SEXP type in compiled ast.");
@@ -129,7 +137,8 @@ Value* Compiler::compileSymbol(SEXP value) {
     auto name = CHAR(PRINTNAME(value));
     assert(strlen(name));
     Value* res = ir::GenericGetVar::create(b, b.rho(), value)->result();
-    ir::RecordType::create(b, value, res);
+    if (!Instrumentation::hasTypeInfo())
+        ir::RecordType::create(b, value, res);
     res->setName(name);
     return res;
 }
