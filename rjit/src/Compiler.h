@@ -101,22 +101,22 @@ class Compiler {
     /** Index operator for assignment for vector access of double bracket [[]].
      *
      */
-    llvm::Value* compileAssignBracket(SEXP call);
+    llvm::Value* compileAssignBracket(SEXP call, SEXP value, bool super);
 
     /** Index operator for assignment for vector access of double bracket [[]].
      *
      */
-    llvm::Value* compileAssignBracket2(SEXP call, SEXP value);
+    // llvm::Value* compileAssignBracket2(SEXP call, SEXP value);
 
     /** Index operator for assignment for vector access of double bracket [[]].
      *
      */
-    llvm::Value* compileAssignDoubleBracket(SEXP call);
+    llvm::Value* compileAssignDoubleBracket(SEXP call, SEXP value, bool super);
 
     /** Index operator for assignment for vector access of double bracket [[]].
      *
      */
-    llvm::Value* compileAssignDoubleBracket2(SEXP call, SEXP value);
+    // llvm::Value* compileAssignDoubleBracket2(SEXP call, SEXP value);
 
     /** Similar to R bytecode compiler, only the body of the created function is
       compiled, the default arguments are left in their ast forms for now.
@@ -203,6 +203,8 @@ class Compiler {
     bool canSkipLoopContext(SEXP ast, bool breakOK = true);
 
     bool canSkipLoopContextList(SEXP ast, bool breakOK);
+
+    bool caseHandled(SEXP call, SEXP value);
 
     /** Compiles the switch statement.
 

@@ -233,6 +233,7 @@ Value* Compiler::compileArgument(SEXP arg, SEXP name) {
   want to.
   */
 Value* Compiler::compileIntrinsic(SEXP call) {
+
 #define CASE(sym) if (CAR(call) == sym)
     CASE(symbol::Block)
     return compileBlock(CDR(call));
@@ -240,10 +241,6 @@ Value* Compiler::compileIntrinsic(SEXP call) {
     return compileBracket(call);
     CASE(symbol::DoubleBracket)
     return compileDoubleBracket(call);
-    CASE(symbol::AssignBracket)
-    return compileAssignBracket(call);
-    CASE(symbol::AssignDoubleBracket)
-    return compileAssignDoubleBracket(call);
     CASE(symbol::Parenthesis)
     return compileParenthesis(CDR(call));
     CASE(symbol::Function)
@@ -254,12 +251,18 @@ Value* Compiler::compileIntrinsic(SEXP call) {
                          ir::Constant::create(b, R_NilValue)->result())
                    : compileReturn(compileExpression(CAR(CDR(call))));
     }
-    CASE(symbol::Assign)
-    return compileAssignment(call);
-    CASE(symbol::Assign2)
-    return compileAssignment(call);
-    CASE(symbol::SuperAssign)
-    return compileSuperAssignment(call);
+    CASE(symbol::Assign) {
+        // assignBeforeDispatch = true;
+        return compileAssignment(call);
+    }
+    CASE(symbol::Assign2) {
+        // assignBeforeDispatch = true
+        return compileAssignment(call);
+    }
+    CASE(symbol::SuperAssign) {
+        // assignBeforeDispatch = true;
+        return compileSuperAssignment(call);
+    }
     CASE(symbol::If)
     return compileCondition(call);
     CASE(symbol::Break)
@@ -412,7 +415,7 @@ Value* Compiler::compileBracket(SEXP call) {
     assert(vector);
 
     Value* indexVal = compileExpression(index);
-    printf("%s\n", "single brackets");
+    // printf("%s\n", "single brackets");
     b.setResultVisible(true);
     return ir::GetDispatchValue::create(b, vector, indexVal, b.rho(), call)
         ->result();
@@ -432,7 +435,7 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
     // the case when the index is a language object is really weird,
     // and it's something that I should handle
     if (CDDR(value) != R_NilValue) {
-        printf("%s\n", "Multiple arguments for the index in double bracket.");
+        printf("%s\n", "Multiple arguments index in double bracket.");
         return nullptr;
     }
 
@@ -484,266 +487,62 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
     assert(vector);
 
     Value* indexVal = compileExpression(index);
-    printf("%s\n", "double brackets");
+    // printf("%s\n", "double brackets");
     b.setResultVisible(true);
     return ir::GetDispatchValue2::create(b, vector, indexVal, b.rho(), call)
         ->result();
 }
 
-Value* Compiler::compileAssignBracket(SEXP call) {
-    SEXP expression = CDR(call);
-    SEXP lhs = CAR(expression);
-    SEXP val = CAR(CDR(expression));
-
-    SEXP vector = CAR(CDR(lhs));
-    SEXP index = CAR(CDDR(lhs));
-
-    if (CDDR(expression) != R_NilValue) {
-        printf("%s\n", "Multiple arguments index in single assignment.");
-        return nullptr;
-    }
-
-    if (TYPEOF(index) == LANGSXP) {
-        printf("%s\n", "Index is language object in single assignment.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is null.
-    if (index == R_NilValue || vector == R_NilValue) {
-        printf("%s\n", "Null index in single assignment.");
-        return nullptr;
-    }
-
-    // TODO handle indexing on the result of a function call.
-    if (CAR(vector) == symbol::Function) {
-        printf("%s\n", "Indexing on a function in single assignment.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is empty.
-    // In this case the vec is returned, using genericGetVar and only the
-    // "relevant" attributes of vec are retained.
-    if (TYPEOF(index) == SYMSXP && !strlen(CHAR(PRINTNAME(index)))) {
-        printf("%s\n", "Empty index in single assignment.");
-        return nullptr;
-
-        // Value* res = ir::GenericGetVar::create(b, b.rho(), vector);
-
-        // have to set the relevant attributes of vec
-
-        /*
-        AttributeSet PAL;
-        {
-            SmallVector<AttributeSet, 4> Attrs;
-            AttributeSet PAS;
-            {
-                AttrBuilder B;
-                B.addAttribute("statepoint-id", std::to_string(smid));
-                B.addAttribute("statepoint-num-patch-bytes",
-                               std::to_string(patchpointSize));
-                PAS = AttributeSet::get(b.getContext(), ~0U, B);
-            }
-            Attrs.push_back(PAS);
-            PAL = AttributeSet::get(b.getContext(), Attrs);
-        }
-        res->setAttributes(PAL);
-
-        */
-
-        // return res;
-    }
-
-    Value* resultLHS = compileExpression(lhs);
-    assert(resultLHS);
-    Value* resultVal = compileExpression(val);
-
-    Value* resultIndex = compileExpression(index);
-    Value* resultVector = compileExpression(vector);
-
-    b.setResultVisible(false);
-    printf("%s\n", "single brackets assignment");
-    return ir::AssignDispatchValue::create(b, resultLHS, resultVector,
-                                           resultIndex, resultVal, b.rho(),
-                                           call)
-        ->result();
-}
-
-Value* Compiler::compileAssignBracket2(SEXP call, SEXP value) {
+Value* Compiler::compileAssignBracket(SEXP call, SEXP value, bool super) {
     SEXP expression = CDR(call);
 
     SEXP vector = CAR(expression);
     SEXP index = CAR(CDR(expression));
-
-    if (CDDR(expression) != R_NilValue) {
-        printf("%s\n", "Multiple arguments index in single assignment.");
-        return nullptr;
-    }
-
-    if (TYPEOF(index) == LANGSXP) {
-        printf("%s\n", "Index is language object in single assignment.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is null.
-    if (index == R_NilValue || vector == R_NilValue) {
-        printf("%s\n", "Null index in single assignment.");
-        return nullptr;
-    }
-
-    // TODO handle indexing on the result of a function call.
-    if (CAR(vector) == symbol::Function) {
-        printf("%s\n", "Indexing on a function in single assignment.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is empty.
-    // In this case the vec is returned, using genericGetVar and only the
-    // "relevant" attributes of vec are retained.
-    if (TYPEOF(index) == SYMSXP && !strlen(CHAR(PRINTNAME(index)))) {
-        printf("%s\n", "Empty index in single assignment.");
-        return nullptr;
-    }
 
     Value* resultVal = compileExpression(value);
 
     Value* resultIndex = compileExpression(index);
     Value* resultVector = compileExpression(vector);
 
+    if (super) {
+        printf("%s\n", "single bracket SUPER assignment");
+        return ir::SuperAssignDispatch::create(b, resultVector, resultIndex,
+                                               resultVal, b.rho(), call)
+            ->result();
+    }
+
     b.setResultVisible(false);
-    printf("%s\n", "single brackets assignment");
+    printf("%s\n", "single bracket assignment");
     return ir::AssignDispatchValue::create(
-               b, ir::GetDispatchValue::create(b, resultVector, resultIndex,
-                                               b.rho(), call)
-                      ->result(),
+               b,
+               // ir::GetDispatchValue::create(b, resultVector, resultIndex,
+               // b.rho(), call) ->result(),
                resultVector, resultIndex, resultVal, b.rho(), call)
         ->result();
 }
 
-Value* Compiler::compileAssignDoubleBracket(SEXP call) {
-    SEXP expression = CDR(call);
-    SEXP lhs = CAR(expression);
-    SEXP val = CAR(CDR(expression));
+Value* Compiler::compileAssignDoubleBracket(SEXP call, SEXP value, bool super) {
 
-    SEXP vector = CAR(CDR(lhs));
-    SEXP index = CAR(CDDR(lhs));
-
-    if (CDDR(expression) != R_NilValue) {
-        printf("%s\n", "Multiple arguments index in double assignment.");
-        return nullptr;
-    }
-
-    if (TYPEOF(index) == LANGSXP) {
-        printf("%s\n", "Index is language object in double assignment.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is null.
-    if (index == R_NilValue || vector == R_NilValue) {
-        printf("%s\n", "Null index in double assignment.");
-        return nullptr;
-    }
-
-    // TODO handle indexing on the result of a function call.
-    if (CAR(vector) == symbol::Function) {
-        printf("%s\n", "Indexing on a function in double assignment.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is empty.
-    // In this case the vec is returned, using genericGetVar and only the
-    // "relevant" attributes of vec are retained.
-    if (TYPEOF(index) == SYMSXP && !strlen(CHAR(PRINTNAME(index)))) {
-        printf("%s\n", "Empty index in double assignment.");
-        return nullptr;
-
-        // Value* res = ir::GenericGetVar::create(b, b.rho(), vector);
-
-        // have to set the relevant attributes of vec
-
-        /*
-        AttributeSet PAL;
-        {
-            SmallVector<AttributeSet, 4> Attrs;
-            AttributeSet PAS;
-            {
-                AttrBuilder B;
-                B.addAttribute("statepoint-id", std::to_string(smid));
-                B.addAttribute("statepoint-num-patch-bytes",
-                               std::to_string(patchpointSize));
-                PAS = AttributeSet::get(b.getContext(), ~0U, B);
-            }
-            Attrs.push_back(PAS);
-            PAL = AttributeSet::get(b.getContext(), Attrs);
-        }
-        res->setAttributes(PAL);
-
-        */
-
-        // return res;
-    }
-
-    Value* resultLHS = compileExpression(lhs);
-    assert(resultLHS);
-    Value* resultVal = compileExpression(val);
-
-    Value* resultIndex = compileExpression(index);
-    Value* resultVector = compileExpression(vector);
-
-    b.setResultVisible(false);
-    printf("%s\n", "double brackets assignment");
-    return ir::AssignDispatchValue2::create(b, resultLHS, resultVector,
-                                            resultIndex, resultVal, b.rho(),
-                                            call)
-        ->result();
-}
-
-Value* Compiler::compileAssignDoubleBracket2(SEXP call, SEXP value) {
     SEXP expression = CDR(call);
 
     SEXP vector = CAR(expression);
     SEXP index = CAR(CDR(expression));
 
-    if (CDDR(expression) != R_NilValue) {
-        printf("%s\n", "Multiple arguments index in double assignment.");
-        return nullptr;
-    }
-
-    if (TYPEOF(index) == LANGSXP) {
-        printf("%s\n", "Index is language object in double assignment.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is null.
-    if (index == R_NilValue || vector == R_NilValue) {
-        printf("%s\n", "Null index in double assignment.");
-        return nullptr;
-    }
-
-    // TODO handle indexing on the result of a function call.
-    if (CAR(vector) == symbol::Function) {
-        printf("%s\n", "Indexing on a function in double assignment.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is empty.
-    // In this case the vec is returned, using genericGetVar and only the
-    // "relevant" attributes of vec are retained.
-    if (TYPEOF(index) == SYMSXP && !strlen(CHAR(PRINTNAME(index)))) {
-        printf("%s\n", "Empty index in double assignment.");
-        return nullptr;
-    }
-
     Value* resultVal = compileExpression(value);
     Value* resultIndex = compileExpression(index);
     Value* resultVector = compileExpression(vector);
 
+    if (super) {
+        printf("%s\n", "double bracket SUPER assignment");
+        return ir::SuperAssignDispatch2::create(b, resultVector, resultIndex,
+                                                resultVal, b.rho(), call)
+            ->result();
+    }
+
     b.setResultVisible(false);
-    printf("%s\n", "double brackets assignment");
-    return ir::AssignDispatchValue2::create(
-               b, ir::GetDispatchValue::create(b, resultVector, resultIndex,
-                                               b.rho(), call)
-                      ->result(),
-               resultVector, resultIndex, resultVal, b.rho(), call)
+    printf("%s\n", "double bracket assignment");
+    return ir::AssignDispatchValue2::create(b, resultVector, resultIndex,
+                                            resultVal, b.rho(), call)
         ->result();
 }
 
@@ -758,19 +557,83 @@ Value* Compiler::compileFunctionDefinition(SEXP fdef) {
     return ir::CreateClosure::create(b, b.rho(), forms, body)->result();
 }
 
+bool Compiler::caseHandled(SEXP call, SEXP value) {
+
+    SEXP expression = CDR(call);
+    SEXP vector = CAR(expression);
+    SEXP index = CAR(CDR(expression));
+
+    if (CDDR(expression) != R_NilValue) {
+        printf("%s\n", "Multiple arguments index in cases.");
+        return false;
+    }
+
+    // this case should not be hard to handle
+    // the index should simply be evaluated
+    if (TYPEOF(index) == LANGSXP) {
+        printf("%s\n", "Index is language object in cases.");
+        return false;
+    }
+
+    if (TYPEOF(vector) == LANGSXP) {
+        printf("%s\n", "vector is language object in cases.");
+        return false;
+    }
+
+    // this case should not be hard to handle
+    if (TYPEOF(value) == SYMSXP) {
+        printf("%s\n", "Value is symbol in cases.");
+        return false;
+    }
+
+    // TODO handle the case when the index is null.
+    if (index == R_NilValue || vector == R_NilValue) {
+        printf("%s\n", "Null index in cases.");
+        return false;
+    }
+
+    // TODO handle indexing on the result of a function call.
+    if (CAR(vector) == symbol::Function) {
+        printf("%s\n", "Indexing on a function in cases.");
+        return false;
+    }
+
+    // TODO handle the case when the index is empty.
+    // In this case the vec is returned, using genericGetVar and only the
+    // "relevant" attributes of vec are retained.
+    if (TYPEOF(index) == SYMSXP && !strlen(CHAR(PRINTNAME(index)))) {
+        printf("%s\n", "Empty index in cases.");
+        return false;
+    }
+
+    return true;
+}
+
 /** Simple assignments (that is to a symbol) are compiled using the
  * genericSetVar intrinsic.
   */
 Value* Compiler::compileAssignment(SEXP e) {
 
+    // printf("%s\n", "compile assignment");
     SEXP expr = CDR(e);
+    SEXP lhs = CAR(expr);
+    SEXP rhs = CAR(CDDR(e));
 
-    if (TYPEOF(CAR(expr)) == LANGSXP) {
-        if (CAR(CAR(expr)) == symbol::Bracket) {
-            return compileAssignBracket2(CAR(expr), CAR(CDDR(e)));
-        }
-        if (CAR(CAR(expr)) == symbol::DoubleBracket) {
-            return compileAssignDoubleBracket2(CAR(expr), CAR(CDDR(e)));
+    if (TYPEOF(lhs) == LANGSXP) {
+        if (CAR(lhs) == symbol::Bracket) {
+            if (caseHandled(lhs, rhs)) {
+                return compileAssignBracket(lhs, rhs, false);
+            } else {
+                return nullptr;
+            }
+        } else if (CAR(lhs) == symbol::DoubleBracket) {
+            if (caseHandled(lhs, rhs)) {
+                return compileAssignDoubleBracket(lhs, rhs, false);
+            } else {
+                return nullptr;
+            }
+        } else {
+            return nullptr;
         }
     }
 
@@ -788,13 +651,34 @@ Value* Compiler::compileAssignment(SEXP e) {
 /** Super assignment is compiled as genericSetVarParentIntrinsic
  */
 Value* Compiler::compileSuperAssignment(SEXP e) {
-    e = CDR(e);
+
+    SEXP expr = CDR(e);
+    SEXP lhs = CAR(expr);
+    SEXP rhs = CAR(CDDR(e));
+
+    if (TYPEOF(lhs) == LANGSXP) {
+        if (CAR(lhs) == symbol::Bracket) {
+            if (caseHandled(lhs, rhs)) {
+                return compileAssignBracket(lhs, rhs, true);
+            } else {
+                return nullptr;
+            }
+        } else if (CAR(lhs) == symbol::DoubleBracket) {
+            if (caseHandled(lhs, rhs)) {
+                return compileAssignDoubleBracket(lhs, rhs, true);
+            } else {
+                return nullptr;
+            }
+        } else {
+            return nullptr;
+        }
+    }
 
     // intrinsic only handles simple assignments
-    if (TYPEOF(CAR(e)) != SYMSXP)
+    if (TYPEOF(CAR(expr)) != SYMSXP)
         return nullptr;
-    Value* v = compileExpression(CAR(CDR(e)));
-    ir::GenericSetVarParent::create(b, v, b.rho(), CAR(e));
+    Value* v = compileExpression(CAR(CDR(expr)));
+    ir::GenericSetVarParent::create(b, v, b.rho(), CAR(expr));
     b.setResultVisible(false);
     return v;
 }
