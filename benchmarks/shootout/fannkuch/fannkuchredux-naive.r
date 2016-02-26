@@ -74,7 +74,7 @@ execute <- function(n = 9L) {
 }
 execute(9L)
 jit.disableOSR()
-for(i in 1:10) {
+for(i in 1:100) {
     jit.startChrono()
     execute(9L)
     jit.endChrono()

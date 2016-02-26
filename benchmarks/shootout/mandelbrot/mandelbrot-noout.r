@@ -36,7 +36,7 @@ execute <- function(n = 3000L) {
 
 execute(3000L)
 jit.disableOSR()
-for(i in 1:10) {
+for(i in 1:100) {
     jit.startChrono()
     execute(3000L)
     jit.endChrono()

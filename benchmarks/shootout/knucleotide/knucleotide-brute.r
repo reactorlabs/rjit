@@ -104,7 +104,7 @@ execute <- function(n = "shootout/fasta/fasta3000.txt") {
 
 execute("../benchmarks/shootout/fasta/fasta3000.txt")
 jit.disableOSR()
-for(i in 1:10) {
+for(i in 1:100) {
     jit.startChrono()
     execute("../benchmarks/shootout/fasta/fasta3000.txt")
     jit.endChrono()

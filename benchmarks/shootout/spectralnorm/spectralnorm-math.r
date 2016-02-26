@@ -20,7 +20,7 @@ execute <- function(n = 250L) {
 }
 execute(250L)
 jit.disableOSR()
-for(i in 1:10) {
+for(i in 1:100) {
     jit.startChrono()
     execute(250L)
     jit.endChrono()
