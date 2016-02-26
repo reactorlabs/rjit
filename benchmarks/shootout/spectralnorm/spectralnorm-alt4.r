@@ -46,3 +46,9 @@ execute <- function(n = 250L) {
     spectralnorm_alt4(n)
 }
 execute(250L)
+jit.disableOSR()
+for(i in 1:10) {
+    jit.startChrono()
+    execute(250L)
+    jit.endChrono()
+}

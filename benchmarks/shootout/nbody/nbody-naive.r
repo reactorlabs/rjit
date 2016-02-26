@@ -132,3 +132,9 @@ execute <- function(n = 50000L) {
     nbody_naive(n)
 }
 execute(50000L)
+jit.disableOSR()
+for(i in 1:10) {
+    jit.startChrono()
+    execute(50000L)
+    jit.endChrono()
+}

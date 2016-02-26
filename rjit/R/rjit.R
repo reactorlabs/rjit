@@ -107,3 +107,17 @@ jit.disableOSR <- function() {
     res = .Call("disableOSR")
     res
 }
+
+jit.startChrono <- function() {
+    res = .Call("startChrono")
+    res
+}
+
+jit.endChrono <- function() {
+    res = .Call("endChrono")
+    res
+}
+jit.endRecord <- function() {
+    res = .Call("endRecord")
+    res
+}

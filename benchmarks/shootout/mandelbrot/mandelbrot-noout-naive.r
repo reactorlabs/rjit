@@ -34,3 +34,9 @@ execute <- function(n = 400L) {
     mandelbrot_noout_naive(n)
 }
 execute(400L)
+jit.disableOSR()
+for(i in 1:10) {
+    jit.startChrono()
+    execute(400L)
+    jit.endChrono()
+}

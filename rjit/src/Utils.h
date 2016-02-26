@@ -9,6 +9,13 @@
 #include <string>
 #include <sstream>
 
+#include <chrono>
+#include <iostream>
+#include <fstream>
+
+using namespace std;
+using namespace chrono;
+
 namespace osr {
 typedef std::vector<llvm::BasicBlock*> BB_Vector;
 
@@ -20,6 +27,10 @@ class Utils {
         return oss.str();
     }
 
+    /*For measurements*/
+    static high_resolution_clock::time_point start;
+    static high_resolution_clock::time_point end;
+
     /**
      * @brief      Put the f's basic blocks into a vector
      *
@@ -27,13 +38,13 @@ class Utils {
      *
      * @return     an std::vector of f's basic blocks
      */
-    static BB_Vector* getBBs(llvm::Function* f) {
+    /*static BB_Vector* getBBs(llvm::Function* f) {
         BB_Vector* res = new BB_Vector();
         for (auto it = f->begin(); it != f->end(); ++it) {
             res->push_back(it);
         }
         return res;
-    }
+    }*/
 
     /**
      * @brief      Creates a deep clone of the function f

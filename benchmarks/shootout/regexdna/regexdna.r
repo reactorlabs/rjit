@@ -61,3 +61,9 @@ execute <- function(n = "shootout/fasta/fasta500000.txt") {
     regexdna(n)
 }
 execute("../benchmarks/shootout/fasta/fasta500000.txt")
+jit.disableOSR()
+for(i in 1:10) {
+    jit.startChrono()
+    execute("../benchmarks/shootout/fasta/fasta500000.txt")
+    jit.endChrono()
+}

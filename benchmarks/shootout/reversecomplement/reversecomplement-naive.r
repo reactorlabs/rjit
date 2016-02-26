@@ -34,4 +34,11 @@ reversecomplement_naive <- function(args) {
 execute <- function(n = "shootout/fasta/fasta300000.txt") {
     reversecomplement_naive(n)
 }
+
 execute("../benchmarks/shootout/fasta/fasta300000.txt")
+jit.disableOSR()
+for(i in 1:10) {
+    jit.startChrono()
+    execute("../benchmarks/shootout/fasta/fasta300000.txt")
+    jit.endChrono()
+}

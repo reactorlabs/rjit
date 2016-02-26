@@ -1,4 +1,3 @@
-#include "Utils.h"
 #include "OSRInliner.h"
 #include "OSRHandler.h"
 #include <llvm/IR/BasicBlock.h>
@@ -206,7 +205,7 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     BasicBlock* continuation = deadBlock->splitBasicBlock(*it, "CONTINUATION");
 
     // Insert the blocks from toInline in toOpt.
-    std::vector<BasicBlock*>* blocks = Utils::getBBs(toInline);
+    std::vector<BasicBlock*>* blocks = getBBs(toInline);
     for (auto it = blocks->begin(); it != blocks->end(); ++it) {
         (*it)->removeFromParent();
         (*it)->insertInto(toOpt, deadBlock);

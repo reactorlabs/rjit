@@ -23,9 +23,15 @@
 #include "StateMap.hpp"
 #include <llvm/IR/Verifier.h>
 
+using namespace std;
+using namespace chrono;
+
 using namespace rjit;
 using namespace llvm;
 namespace osr {
+
+high_resolution_clock::time_point Utils::start;
+high_resolution_clock::time_point Utils::end;
 
 REXPORT SEXP printWithoutSP(SEXP expr) {
     Compiler c("module");
@@ -67,6 +73,32 @@ REXPORT SEXP enableOSR() {
 }
 REXPORT SEXP disableOSR() {
     OSR_INLINE = 0;
+    return R_NilValue;
+}
+
+REXPORT SEXP startChrono() {
+    // OSR_INLINE=0;
+    Utils::start = high_resolution_clock::now();
+    return R_NilValue;
+}
+
+REXPORT SEXP endChrono() {
+    // OSR_INLINE=0;
+    Utils::end = high_resolution_clock::now();
+    auto duration =
+        duration_cast<microseconds>(Utils::end - Utils::start).count();
+    ofstream file;
+    file.open("benchResults/result.out", ios::out | ios::app);
+    file << duration << " ";
+    file.close();
+    return R_NilValue;
+}
+
+REXPORT SEXP endRecord() {
+    ofstream file;
+    file.open("benchResults/result.out", ios::out | ios::app);
+    file << "\n";
+    file.close();
     return R_NilValue;
 }
 }

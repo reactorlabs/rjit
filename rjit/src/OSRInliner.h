@@ -16,6 +16,7 @@ typedef std::list<llvm::ReturnInst*> Return_List;
 typedef std::pair<SEXP, SEXP> ExitEntry;
 typedef std::list<FunctionCall*> Call_List;
 typedef std::map<SEXP, Call_List> Call_Map;
+typedef std::vector<BasicBlock*> BB_Vector;
 
 class OSRInliner {
   public:
@@ -69,6 +70,20 @@ class OSRInliner {
     static Inst_Vector* getOSRCondition(FunctionCall* fc);
     CallInst* createNewRho(FunctionCall* fc);
     Inst_Vector* createCompensation(SEXP fun, SEXP formals);
+    /**
+    * @brief      Put the f's basic blocks into a vector
+    *
+    * @param      f     llvm::Function*
+    *
+    * @return     an std::vector of f's basic blocks
+    */
+    static BB_Vector* getBBs(Function* f) {
+        BB_Vector* res = new BB_Vector();
+        for (auto it = f->begin(); it != f->end(); ++it) {
+            res->push_back(it);
+        }
+        return res;
+    }
 };
 
 } // namespace osr
