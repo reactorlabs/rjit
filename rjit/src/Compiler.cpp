@@ -359,10 +359,10 @@ Value* Compiler::compileBracket(SEXP call) {
         return nullptr;
     }
 
-    // if (TYPEOF(index) == LANGSXP) {
-    //     printf("%s\n", "Index is language object.");
-    //     return nullptr;
-    // }
+    if (TYPEOF(index) == LANGSXP) {
+        printf("%s\n", "Index is language object.");
+        return nullptr;
+    }
 
     // TODO handle the case when the index is null.
     if (index == R_NilValue || receiver == R_NilValue) {
@@ -487,7 +487,7 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
     assert(vector);
 
     Value* indexVal = compileExpression(index);
-    printf("%s\n", "double brackets");
+    // printf("%s\n", "double brackets");
     b.setResultVisible(true);
     return ir::GetDispatchValue2::create(b, vector, indexVal, b.rho(), call)
         ->result();
@@ -506,19 +506,23 @@ Value* Compiler::compileAssignBracket(SEXP call, SEXP value, bool super) {
 
     if (super) {
         printf("%s\n", "single bracket SUPER assignment");
-        return ir::SuperAssignDispatch::create(b, resultVector, resultIndex,
-                                               resultVal, b.rho(), call)
+        ir::SuperAssignDispatch::create(b, resultVector, resultIndex, resultVal,
+                                        b.rho(), call)
             ->result();
+        b.setResultVisible(false);
+        return resultVal;
     }
 
     b.setResultVisible(false);
     printf("%s\n", "single bracket assignment");
-    return ir::AssignDispatchValue::create(
-               b,
-               // ir::GetDispatchValue::create(b, resultVector, resultIndex,
-               // b.rho(), call) ->result(),
-               resultVector, resultIndex, resultVal, b.rho(), call)
+    ir::AssignDispatchValue::create(
+        b,
+        // ir::GetDispatchValue::create(b, resultVector, resultIndex,
+        // b.rho(), call) ->result(),
+        resultVector, resultIndex, resultVal, b.rho(), call)
         ->result();
+    b.setResultVisible(false);
+    return resultVal;
 }
 
 Value* Compiler::compileAssignDoubleBracket(SEXP call, SEXP value, bool super) {
@@ -534,16 +538,19 @@ Value* Compiler::compileAssignDoubleBracket(SEXP call, SEXP value, bool super) {
 
     if (super) {
         printf("%s\n", "double bracket SUPER assignment");
-        return ir::SuperAssignDispatch2::create(b, resultVector, resultIndex,
-                                                resultVal, b.rho(), call)
+        ir::SuperAssignDispatch2::create(b, resultVector, resultIndex,
+                                         resultVal, b.rho(), call)
             ->result();
+        b.setResultVisible(false);
+        return resultVal;
     }
 
-    b.setResultVisible(false);
     printf("%s\n", "double bracket assignment");
-    return ir::AssignDispatchValue2::create(b, resultVector, resultIndex,
-                                            resultVal, b.rho(), call)
+    ir::AssignDispatchValue2::create(b, resultVector, resultIndex, resultVal,
+                                     b.rho(), call)
         ->result();
+    b.setResultVisible(false);
+    return resultVal;
 }
 
 /** Similar to R bytecode compiler, only the body of the created function is
@@ -570,21 +577,15 @@ bool Compiler::caseHandled(SEXP call, SEXP value) {
 
     // this case should not be hard to handle
     // the index should simply be evaluated
-    // if (TYPEOF(index) == LANGSXP) {
-    //     printf("%s\n", "Index is language object in cases.");
-    //     return false;
-    // }
+    if (TYPEOF(index) == LANGSXP) {
+        printf("%s\n", "Index is language object in cases.");
+        return false;
+    }
 
     if (TYPEOF(vector) == LANGSXP) {
         printf("%s\n", "vector is language object in cases.");
         return false;
     }
-
-    // this case should not be hard to handle
-    // if (TYPEOF(value) == SYMSXP) {
-    //     printf("%s\n", "Value is symbol in cases.");
-    //     return false;
-    // }
 
     // TODO handle the case when the index is null.
     if (index == R_NilValue || vector == R_NilValue) {
@@ -675,8 +676,10 @@ Value* Compiler::compileSuperAssignment(SEXP e) {
     }
 
     // intrinsic only handles simple assignments
-    if (TYPEOF(CAR(expr)) != SYMSXP)
+    if (TYPEOF(CAR(expr)) != SYMSXP) {
         return nullptr;
+    }
+
     Value* v = compileExpression(CAR(CDR(expr)));
     ir::GenericSetVarParent::create(b, v, b.rho(), CAR(expr));
     b.setResultVisible(false);
