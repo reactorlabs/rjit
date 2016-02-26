@@ -133,9 +133,6 @@ case $key in
     BENCH_RUN=1
     BENCH_RUN_NUM="$2"
     shift;
-    if [[ "$BENCH_RUN_NUMBER" == "" ]]; then
-        BENCH_RUN_NUM=5
-    fi
     ;;
     *)
     echo "Flag $key unknown"
