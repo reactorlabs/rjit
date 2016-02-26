@@ -1093,6 +1093,11 @@ Value* Compiler::compileSwitch(SEXP call) {
 
 std::set<Compiler*> Compiler::_instances;
 
-/** The fast functions for
+/** The fast functions for vector (store) retrieval (x[a]).
+    If we know statically the type of x and a, and if a has
+    the correct type, then generate the LLVM native that
+    access the memory location of x at a.
 */
+
+Value* vectorRetr(SEXP vector, SEXP index) { return nullptr; }
 }

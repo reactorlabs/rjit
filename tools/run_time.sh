@@ -19,7 +19,7 @@ BENCH_DIR=${SRC_DIR}/benchmarks
 LOG_FILE_NAME="log"
 FRESH_R_DIR="${TARGET}/freshr"
 FRESH_R_VERS="3-2"
-BENCH_RUN_NUMBER=10
+BENCH_RUN_NUMBER=5
 SHOOT_DIR=${BENCH_DIR}/shootout/
 
 TIMEN=$(date +"%H-%M-%S_%F")
@@ -34,20 +34,22 @@ fi
 
 # build_freshr $FRESH_R_DIR $FRESH_R_VERSION "-O2"
 
-# FRESH_R_BIN=${FRESH_R_DIR}/R-${FRESH_R_VERS}-branch/bin/R
+FRESH_R_BIN=${FRESH_R_DIR}/R-${FRESH_R_VERS}-branch/bin/R
 
-# echo "-> installing ggplot2 to ${FRESH_R_VERS_F}"
-# ${FRESH_R_BIN} -e "install.packages(\"ggplot2\", repos=\"http://cran.rstudio.com/\")"
+echo "-> installing ggplot2 to ${FRESH_R_VERS_F}"
+${FRESH_R_BIN} -e "install.packages(\"ggplot2\", repos=\"http://cran.rstudio.com/\")"
 
 cd ${BENCH_DIR}
 
-# runbench
 echo "-> start running the shootout benchmark "
 for x in ` find ${SHOOT_DIR} -name "*.r" `; do
     echo "-> running $x"
-    R_LIBS_USER=${SRC_DIR}/packages R_ENABLE_JIT=5 ${R_HOME}/bin/R -e "source(\"${SRC_DIR}/benchmarks/run.r\");runbench(\"$x\", \"${LOG_FILE}\", \"rjit\", ${BENCH_RUN_NUM})" > /dev/null
-    R_ENABLE_JIT=3 ${FRESH_R_BIN} -e "source(\"${SRC_DIR}/benchmarks/run.r\");runbench(\"$x\", \"${LOG_FILE}\", \"gnur\", ${BENCH_RUN_NUM})" > /dev/null
+
+    R_LIBS_USER=${CURRENT_DIR}/packages R_ENABLE_JIT=5 ${TARGET}/gnur/bin/R -e "source(\"${SRC_DIR}/benchmarks/run.r\");runbench(\"$x\", \"${LOG_FILE}\", \"rjit\", ${BENCH_RUN_NUMBER})" > /dev/null
+
+    R_ENABLE_JIT=3 ${FRESH_R_BIN} -e "source(\"${SRC_DIR}/benchmarks/run.r\");runbench(\"$x\", \"${LOG_FILE}\", \"gnur\", ${BENCH_RUN_NUMBER})" > /dev/null
 done
+
 
 # calclog and graphlog
 echo "-> calcuting the log and generating the csv file for ${LOG_FILE}"
@@ -57,4 +59,4 @@ FOLDER="teamcity/execution"
 
 COMMIT_ID=`git rev-parse HEAD`
 
-${SCRIPTPATH}/dropbox_uploader.sh -f ${SCRIPTPATH}/.dropbox_uploader upload ${LOG_FILE} $FOLDER/${TIMEN}_${COMMIT_ID}.txt
+# ${SCRIPTPATH}/dropbox_uploader.sh -f ${SCRIPTPATH}/.dropbox_uploader upload ${LOG_FILE} $FOLDER/${TIMEN}_${COMMIT_ID}.txt

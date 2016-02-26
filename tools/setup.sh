@@ -30,7 +30,7 @@ LLVM_VERS="370"
 FRESH_R_VERS="3-2"
 CLANG=0
 BENCH_RUN=0
-BENCH_RUN_NUM=10
+BENCH_RUN_NUM=5
 RJIT_BUILD_TYPE="Debug"
 LLVM_TYPE=""
 LLVM_BUILD_TYPE="Debug"
@@ -134,7 +134,7 @@ case $key in
     BENCH_RUN_NUM="$2"
     shift;
     if [[ "$BENCH_RUN_NUMBER" == "" ]]; then
-        BENCH_RUN_NUM=10
+        BENCH_RUN_NUM=5
     fi
     ;;
     *)

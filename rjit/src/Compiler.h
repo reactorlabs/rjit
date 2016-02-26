@@ -249,6 +249,10 @@ class Compiler {
       */
     llvm::Value* compileUnary(llvm::Function* f, SEXP call);
 
+    /** Compile a fast version of store retrieval
+    */
+    llvm::Value* vectorRetr(SEXP vector, SEXP index);
+
     template <typename B, typename U>
     llvm::Value* compileBinaryOrUnary(SEXP call) {
         llvm::Value* lhs = compileExpression(CAR(CDR(call)));
