@@ -359,10 +359,10 @@ Value* Compiler::compileBracket(SEXP call) {
         return nullptr;
     }
 
-    if (TYPEOF(index) == LANGSXP) {
-        printf("%s\n", "Index is language object.");
-        return nullptr;
-    }
+    // if (TYPEOF(index) == LANGSXP) {
+    //     printf("%s\n", "Index is language object.");
+    //     return nullptr;
+    // }
 
     // TODO handle the case when the index is null.
     if (index == R_NilValue || receiver == R_NilValue) {
@@ -487,7 +487,7 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
     assert(vector);
 
     Value* indexVal = compileExpression(index);
-    // printf("%s\n", "double brackets");
+    printf("%s\n", "double brackets");
     b.setResultVisible(true);
     return ir::GetDispatchValue2::create(b, vector, indexVal, b.rho(), call)
         ->result();
@@ -570,10 +570,10 @@ bool Compiler::caseHandled(SEXP call, SEXP value) {
 
     // this case should not be hard to handle
     // the index should simply be evaluated
-    if (TYPEOF(index) == LANGSXP) {
-        printf("%s\n", "Index is language object in cases.");
-        return false;
-    }
+    // if (TYPEOF(index) == LANGSXP) {
+    //     printf("%s\n", "Index is language object in cases.");
+    //     return false;
+    // }
 
     if (TYPEOF(vector) == LANGSXP) {
         printf("%s\n", "vector is language object in cases.");
@@ -581,10 +581,10 @@ bool Compiler::caseHandled(SEXP call, SEXP value) {
     }
 
     // this case should not be hard to handle
-    if (TYPEOF(value) == SYMSXP) {
-        printf("%s\n", "Value is symbol in cases.");
-        return false;
-    }
+    // if (TYPEOF(value) == SYMSXP) {
+    //     printf("%s\n", "Value is symbol in cases.");
+    //     return false;
+    // }
 
     // TODO handle the case when the index is null.
     if (index == R_NilValue || vector == R_NilValue) {
