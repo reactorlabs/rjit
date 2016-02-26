@@ -152,7 +152,7 @@ bool ICCompiler::compileIc(SEXP inCall, SEXP inFun) {
         while (arg != R_NilValue && form != R_NilValue) {
             if (TAG(arg) != R_NilValue) {
                 if (!Flag::singleton().staticNamedArgMatch)
-                    return nullptr;
+                    return false;
                 namedArg[i] = TAG(arg);
             } else {
                 positionalArg.push_back(i);
