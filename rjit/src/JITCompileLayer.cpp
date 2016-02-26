@@ -29,6 +29,8 @@
 
 #include "llvm/IR/IRPrintingPasses.h"
 
+#include "Flags.h"
+
 using namespace llvm;
 
 namespace rjit {
@@ -60,9 +62,14 @@ ExecutionEngine* JITCompileLayer::finalize(JITModule* m) {
     // Make sure we can resolve symbols in the program as well. The zero arg
     legacy::PassManager pm;
 
+    if (Flag::singleton().printIR)
+        pm.add(createPrintModulePass(rso));
+
     pm.add(new analysis::TypeAndShape());
     pm.add(new optimization::Scalars());
-    // pm.add(createPrintModulePass(rso));
+
+    if (Flag::singleton().printOptIR)
+        pm.add(createPrintModulePass(rso));
 
     pm.add(new ir::VariableAnalysis());
     pm.add(new ir::ConstantLoadOptimization());
