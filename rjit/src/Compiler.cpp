@@ -155,7 +155,7 @@ Value* Compiler::compileSymbol(SEXP value) {
             ir::RecordType::create(b, value, res);
         } else {
             TypeInfo inf = tf->get(value);
-            if (!Flag::singleton().unsafeOpt && !inf.any() && inf != TypeInfo()) {
+            if (!Flag::singleton().unsafeOpt && !inf.isAny() && !inf.isBottom()) {
                 ir::CheckType::create(b, res,
                                       TypeFeedback::get(b.f())->get(value));
             }

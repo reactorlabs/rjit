@@ -39,7 +39,7 @@ public:
         if (state.has(symbol))
             state[dest] = state[symbol];
         else
-            state[dest] = Value(typeFeedback ? typeFeedback->get(symbol) : Value::Type::Any);
+            state[dest] = typeFeedback ? typeFeedback->get(symbol) : Value::any();
     }
 
     /** If we have incomming type & shape information, store it in the variable too. Otherwise do nothing (this means the variable will be assumed Top at read).
@@ -57,7 +57,7 @@ public:
 
      */
     match call(ir::ICStub * ins) {
-       state.invalidateVariables(Value(Value::Type::Any));
+       state.invalidateVariables(Value(Value::any()));
     }
 
     bool dispatch(llvm::BasicBlock::iterator& i) override;
