@@ -1093,6 +1093,16 @@ Value* Compiler::compileSwitch(SEXP call) {
 
 std::set<Compiler*> Compiler::_instances;
 
+void Compiler::gcCallback(void (*forward_node)(SEXP)) {
+    for (Compiler* c : _instances) {
+        c->doGcCallback(forward_node);
+    }
+}
+
+void Compiler::doGcCallback(void (*forward_node)(SEXP)) {
+    b.doGcCallback(forward_node);
+}
+
 /** The fast functions for vector (store) retrieval (x[a]).
     If we know statically the type of x and a, and if a has
     the correct type, then generate the LLVM native that
