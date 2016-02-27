@@ -1,27 +1,6 @@
 #ifndef IR_STATE_H
 #define IR_STATE_H
 
-/** State. All templated.
-
-
-  State must allow merge
-
-  I want to know:
-
-  - type:
-     Raw Logical Integer Double Complex Character List Closure Top ??others
-                   \        /
-                     Numeric
-      \              /                     /
-                 Vector
-  - subtype: (class?)
-     array, matrix,
-
-
-
-
-  */
-
 #include <memory>
 
 #include "llvm.h"
@@ -93,6 +72,7 @@ protected:
         bool result = false;
         for (auto their : theirMap)
             result = myMap[their.first].mergeWith(their.second) or result;
+        // we do not care about any values in ourselves that are not part of incomming as they will merge to themselves
         return result;
     }
 

@@ -30,11 +30,7 @@ public:
 class DeadAllocationRemoval: public ir::LinearDriver<DeadAllocationRemovalPass> {
 public:
 
-
 };
-
-
-
 
 } // namespace optimization
 } // namespace rjit
