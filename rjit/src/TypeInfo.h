@@ -20,9 +20,9 @@ class TypeInfo {
 
     enum class Type : int { Integer, Float, String, Vector, Bool, Any };
 
-    enum class Attrib : uint8_t { Unknown, Absent, Object, Any };
-
     enum class Size : uint8_t { Unknown, Scalar, Any };
+
+    enum class Attrib : uint8_t { Unknown, Absent, Object, Any };
 
     // -- Constructors
 

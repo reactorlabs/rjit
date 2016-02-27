@@ -28,9 +28,9 @@ public:
         auto l = ir::GetVectorElement::insertBefore(p, lhs, 0, scalarType);
         auto r = ir::GetVectorElement::insertBefore(p, rhs, 0, scalarType);
         auto op = T::insertBefore(p, l, r);
-        auto result = ir::AllocVector::insertBefore(p, s, 1);
-        ir::SetVectorElement::insertBefore(p, result, 0, op, scalarType);
+        auto result = ir::CreateAndSetScalar::insertBefore(p, op, scalarType == t::Double ? REALSXP : INTSXP);
         replaceAllUsesWith(p, result);
+        tsa().replaceWith(p, result);
         eraseFromParent(p);
     }
 
@@ -64,7 +64,6 @@ public:
     match add(ir::GenericDiv * p) {
         replaceWithScalar<ir::GenericDiv>(p);
     }
-
 
     bool dispatch(llvm::BasicBlock::iterator & i) override;
 

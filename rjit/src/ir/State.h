@@ -75,20 +75,24 @@ public:
             i->second = top;
     }
 
+    /** Moves information about the old register to the new register and and discards the old one.
+     */
+    void replaceWith(ir::Value old, ir::Value with) {
+        assert (registers_.find(with) == registers_.end() and "Target value is assumed to be new");
+        auto i = registers_.find(old);
+        if (i != registers_.end()) {
+            registers_[with] = registers_[old];
+            registers_.erase(i);
+        }
+    }
+
 protected:
 
     template<typename MAP>
     bool mergeMaps(MAP & myMap, MAP const & theirMap) {
         bool result = false;
-        for (auto their : theirMap) {
-            auto mine = myMap.find(their.first);
-            if (mine == myMap.end()) {
-                myMap[their.first] = their.second;
-                result = true;
-            } else {
-                result = mine->second.mergeWith(their.second) or result;
-            }
-        }
+        for (auto their : theirMap)
+            result = myMap[their.first].mergeWith(their.second) or result;
         // we do not care about any values in ourselves that are not part of incomming - this should not even be possible
         return result;
     }

@@ -868,6 +868,10 @@ public:
         return ins_->getPrevNode()->getOperand(1);
     }
 
+    llvm::Type * type() {
+        return ins_->getType();
+    }
+
     static GetVectorElement* insertBefore(llvm::Instruction* ins,
                                           ir::Value vector, ir::Value index, llvm::Type * elementType) {
         LLVMContext& c = ins->getContext();
@@ -930,6 +934,23 @@ public:
 
 class SetVectorElement : public Pattern {
 public:
+
+    llvm::Value * vector() {
+        return first()->getOperand(0);
+    }
+
+    llvm::Value * index() {
+        return ins_->getPrevNode()->getOperand(1);
+    }
+
+    llvm::Value * value() {
+        return ins_->getOperand(0);
+    }
+
+    llvm::Type * type() {
+        return value()->getType();
+    }
+
     static SetVectorElement * insertBefore(llvm::Instruction * ins, ir::Value vector, ir::Value index, ir::Value value, llvm::Type * elementType) {
         LLVMContext & c = ins->getContext();
         ConstantInt* int64_1 = ConstantInt::get(c, APInt(64, 1));

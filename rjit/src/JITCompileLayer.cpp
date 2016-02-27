@@ -23,8 +23,11 @@
 
 #include "ir/Analysis/VariableAnalysis.h"
 #include "ir/Analysis/TypeAndShape.h"
+#include "ir/Analysis/ScalarsTracking.h"
 #include "ir/Optimization/ConstantLoad.h"
 #include "ir/Optimization/Scalars.h"
+#include "ir/Optimization/BoxingRemoval.h"
+#include "ir/Optimization/DeadAllocationRemoval.h"
 
 using namespace llvm;
 
@@ -57,9 +60,13 @@ ExecutionEngine* JITCompileLayer::finalize(JITModule* m) {
 
     pm.add(new analysis::TypeAndShape());
     pm.add(new optimization::Scalars());
+    pm.add(new analysis::ScalarsTracking());
+    pm.add(new optimization::BoxingRemoval());
+    pm.add(new optimization::DeadAllocationRemoval());
+
 
     pm.add(new ir::VariableAnalysis());
-    //pm.add(new ir::ConstantLoadOptimization());
+    pm.add(new ir::ConstantLoadOptimization());
 
 
     pm.add(createTargetTransformInfoWrapperPass(TargetIRAnalysis()));
@@ -72,16 +79,30 @@ ExecutionEngine* JITCompileLayer::finalize(JITModule* m) {
     pm.add(rjit::createPlaceRJITSafepointsPass());
     pm.add(rjit::createRJITRewriteStatepointsForGCPass());
 
-/*    for (llvm::Function& f : m->getFunctionList()) {
+
+/*    std::cerr << "--------------------------------------" << std::endl;
+    std::cerr << "--------------------------------------" << std::endl;
+    std::cerr << "--------------------------------------" << std::endl;
+    std::cerr << "--------------------------------------" << std::endl;
+    std::cerr << "--------------------------------------" << std::endl;
+    std::cerr << "--------------------------------------" << std::endl;
+
+    for (llvm::Function& f : m->getFunctionList()) {
+        if (not f.isDeclaration()) {
+            std::cerr << "--------------------------------------" << std::endl;
+            f.dump();
+        }
+    }*/
+
+
+    pm.run(*m);
+
+    /*for (llvm::Function& f : m->getFunctionList()) {
         if (not f.isDeclaration()) {
             std::cerr << "--------------------------------------" << std::endl;
             f.dump();
         }
     } */
-
-
-    pm.run(*m);
-
 
 
     engine->finalizeObject();

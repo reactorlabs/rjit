@@ -64,6 +64,82 @@ protected:
 
 };
 
+/** Allocates space for a scalar vector of given type and sets its contents to given scalar.
+
+  This is now mostly copy & paste from AllocVector and SetVectorElement to make the scalar tracking analysis simple enoug.
+ */
+class CreateAndSetScalar : public ir::Pattern {
+public:
+
+    /** Returns the unboxed scalar used to initialize the value.
+     */
+    llvm::Value * scalar() {
+       return last()->getOperand(0);
+    }
+
+    llvm::Type * scalarType() {
+        return scalar()->getType();
+    }
+
+
+    static CreateAndSetScalar * insertBefore(llvm::Instruction * ins, ir::Value scalar, SEXPTYPE type) {
+        // get the allocator function
+        llvm::Function* a = ins->getModule()->getFunction(AllocVector::intrinsicName());
+        // if the intrinsic has not been declared, declare it
+        if (a == nullptr)
+            a = llvm::Function::Create(AllocVector::intrinsicType(),
+                                            llvm::GlobalValue::ExternalLinkage,
+                                            AllocVector::intrinsicName(), ins->getModule());
+        // allocate the memory
+        llvm::CallInst * alloc = llvm::CallInst::Create(a, { Builder::integer(type), Builder::integer(1) }, "", ins);
+        // determine the proper scalar type
+        assert ((type == INTSXP or type == REALSXP) and "Only doubles and integers are supported so far");
+        llvm::Type * elementType = type == REALSXP ? t::Double : t::Int;
+        // do the set vector element into the allocated vector
+        LLVMContext & c = ins->getContext();
+        ConstantInt* int64_1 = ConstantInt::get(c, APInt(64, 1));
+        auto realVector = new BitCastInst(alloc, PointerType::get(t::VECTOR_SEXPREC, 1), "", ins);
+        auto payload = GetElementPtrInst::Create(t::VECTOR_SEXPREC, realVector, std::vector<llvm::Value*>({int64_1}), "", ins);
+        auto payloadPtr = new BitCastInst(payload, PointerType::get(elementType, 1), "", ins);
+        GetElementPtrInst* el_ptr = GetElementPtrInst::Create(elementType, payloadPtr, {Builder::integer(0)}, "", ins);
+        auto store = new StoreInst(scalar, el_ptr, ins);
+        store->setAlignment(8);
+        return new CreateAndSetScalar(alloc, realVector, payload, payloadPtr, el_ptr, store);
+    }
+
+    static CreateAndSetScalar * insertBefore(Pattern * p, ir::Value scalar, SEXPTYPE type) {
+        return insertBefore(p->first(), scalar, type);
+    }
+
+    static CreateAndSetScalar * create(Builder & b, ir::Value scalar, SEXPTYPE type) {
+        Sentinel s(b);
+        return insertBefore(s, scalar, type);
+    }
+
+    static bool classof(Pattern const * s) {
+        return s-> kind == Kind::CreateAndSetScalar;
+    }
+
+    size_t length() const override {
+        return 6;
+    }
+
+    llvm::Instruction * last() const override {
+        return ins_->getNextNode()->getNextNode()->getNextNode()->getNextNode()->getNextNode();
+    }
+
+protected:
+    CreateAndSetScalar(llvm::Instruction * alloc, llvm::Instruction * realVector, llvm::Instruction * payload, llvm::Instruction * payloadPtr, llvm::Instruction * el_ptr, llvm::Instruction * store):
+        Pattern(alloc, Kind::CreateAndSetScalar) {
+        attach(realVector);
+        attach(payload);
+        attach(payloadPtr);
+        attach(el_ptr);
+        attach(store);
+    }
+
+};
+
 /** Base class for native operators.
 
   These should have their anchor instruction the native operator itself.

@@ -372,7 +372,7 @@ class CppClass:
                 if (child.tag == "basecompoundref"):
                     if (child.text.split("<")[0] == self.name):
                         self.subclasses.append(name)
-                        return
+                        break
 
     def includePath(self):
         """ Returns the include path of this file, i.e. what should go in the include statement.Some versions of doxygen don't generate absolute path, in that case rjit/src just need to be removed from the path."""
