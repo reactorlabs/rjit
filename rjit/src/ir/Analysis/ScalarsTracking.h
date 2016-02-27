@@ -15,42 +15,20 @@ namespace analysis {
 
 /** Scalar tracking
 
-  1) for each variable, keep llvm register in which the value already exists
-     - genericGetVar and genericSetVar update this info
-     - ICStub clears it
-  2) for each register that holds a variable or a sexp, keep register that has its unboxed scalar
-     - getvectorelement and setvectorelement update this as well as CreateAndSetScalar
+  For any vector, tracks if its scalar value is available in any of the registers.
 
-  Merging preserves the values if they are same, otherwise sets them to null.
+  Nullptr means the scalar is not available, any other value points to the unboxed scalar value.
 
-  Updating aleady existing value is a noop, i.e. getvar of a var we already have will keep the mirroring
-
+  Getting the scalar value again is a no-op as the first available register will always be used. Setting scalar value always sets the mapping as well, invalidating any previous one because the scalar value now changed.
  */
-
-
 class TrackingValue {
 public:
-    enum class Type {
-        Uninitialized,
-        ValuePtr,
-        ScalarPtr
-    };
-
     TrackingValue():
-        type_(Type::Uninitialized),
         ptr_(nullptr) {
     }
 
-    static TrackingValue valuePtr(ir::Value ptr) {
-        return TrackingValue(Type::ValuePtr, ptr);
-    }
-
-    static TrackingValue scalarPtr(ir::Value ptr) {
-        return TrackingValue(Type::ScalarPtr, ptr);
-    }
-
-    Type type() const {
-        return type_;
+    TrackingValue(ir::Value ptr):
+        ptr_(ptr) {
     }
 
     llvm::Value * ptr() const {
@@ -58,33 +36,25 @@ public:
     }
 
     bool mergeWith(TrackingValue const & other) {
-        // merging uninitialized with anything else is always unintitialized
-        if (type_ == Type::Uninitialized)
+        if (ptr_ == other.ptr_) {
             return false;
-        if (type_ == other.type_ and ptr_ == other.ptr_)
-            return false;
-        type_ = Type::Uninitialized;
-        ptr_ = nullptr;
-        return true;
-    }
-
-    void update(Type type, ir::Value ptr) {
-        if (ptr_ == nullptr) {
-            type_ = type;
-            ptr_ = ptr;
         } else {
-            assert(type_ == type and "It should be impossible to change tracking type");
+            ptr_ = nullptr;
+            return true;
         }
     }
 
-private:
-
-    TrackingValue(Type type, llvm::Value * ptr):
-        type_(type),
-        ptr_(ptr) {
+    TrackingValue & operator = (ir::Value const & value) {
+        ptr_ = value;
+        return *this;
     }
 
-    Type type_;
+    void update(ir::Value ptr) {
+        if (ptr_ == nullptr)
+            ptr_ = ptr;
+    }
+
+private:
 
     llvm::Value * ptr_;
 
@@ -96,26 +66,6 @@ public:
     typedef TrackingValue Value;
     typedef ir::AState<Value> State;
 
-    /** getvar makes the link between its result and the variable it was read from.
-     */
-    match getVariable(ir::GenericGetVar * p) {
-        SEXP v = p->symbolValue();
-        state[v].update(Value::Type::ValuePtr, p);
-    }
-
-    /** setvar links the target variable t the source register.
-     */
-    match setVariable(ir::GenericSetVar * p) {
-        SEXP v = p->symbolValue();
-        state[v] = Value::valuePtr(p->value());
-    }
-
-    /** user call invalidates all variable links since we can't assume they will hold the same values after the call.
-     */
-    match userCall(ir::ICStub * p) {
-        state.invalidateVariables(Value());
-    }
-
     /** we are only interested in getting 0th element of a vector that is sexp of either double or integer.
 
       TODO this can be relaxed for any types as the optimization would still work but I am keeping it simple for now.
@@ -125,7 +75,7 @@ public:
         llvm::Type * type = p->type();
         if (llvm::isa<llvm::ConstantInt>(index) and ir::Builder::integer(index) == 0)
             if (type == t::Double or type == t::Int)
-                state[p->vector()].update(Value::Type::ScalarPtr, p->result());
+                state[p->vector()].update(p->result());
     }
 
 
@@ -136,13 +86,13 @@ public:
         llvm::Type * type = p->type();
         if (llvm::isa<llvm::ConstantInt>(index) and ir::Builder::integer(index) == 0)
             if (type == t::Double or type == t::Int)
-                state[p->vector()] = Value::scalarPtr(p->value());
+                state[p->vector()] = p->value();
     }
 
     /** Links the result SEXP to the scalar it is initialized with.
      */
     match createAndSetScalar(ir::CreateAndSetScalar * p) {
-        state[p].update(Value::Type::ScalarPtr, p->scalar());
+        state[p].update(p->scalar());
     }
 
 
@@ -154,10 +104,6 @@ public:
     typedef TrackingValue Value;
     typedef ir::AState<Value> State;
 };
-
-
-
-
 
 } // namespace analysis
 } // namespace rjit

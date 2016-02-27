@@ -10,30 +10,18 @@ namespace optimization {
 class BoxingRemoval;
 
 
+/** Removes scalar unboxing (get element ptr) when the scalar is already present in a register.
+ */
 class BoxingRemovalPass : public ir::Pass, public ir::Optimization {
 public:
     typedef analysis::ScalarsTracking::Value Value;
 
-
-    /** Getting a variable can be replaced with register holding its value.
-     */
-    match variableGet(ir::GenericGetVar * p) {
-        Value & v = st()[p->symbolValue()];
-        //std::cout << CHAR(PRINTNAME(p->symbolValue())) << std::endl;
-        if (v.ptr() != nullptr and v.ptr() != p->result()) {
-            //std::cout << "removed" << std::endl;
-            assert(v.type() == Value::Type::ValuePtr and "Tracking type of variables should be value.");
-            replaceAllUsesWith(p, v.ptr());
-            eraseFromParent(p);
-        }
-    }
 
     /** Getting a scalar we already know can be replaced with the original register.
      */
     match getElement(ir::GetVectorElement * p) {
         Value & v = st()[p->vector()];
         if (v.ptr() != nullptr and v.ptr() != p->result()) {
-            assert(v.type() == Value::Type::ScalarPtr and "Tracking type of non variables should be scalar.");
             replaceAllUsesWith(p, v.ptr());
             eraseFromParent(p);
         }

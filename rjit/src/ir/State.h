@@ -93,7 +93,6 @@ protected:
         bool result = false;
         for (auto their : theirMap)
             result = myMap[their.first].mergeWith(their.second) or result;
-        // we do not care about any values in ourselves that are not part of incomming - this should not even be possible
         return result;
     }
 
