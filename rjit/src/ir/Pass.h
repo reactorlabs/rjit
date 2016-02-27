@@ -78,6 +78,12 @@ public:
         return state[index];
     }
 
+    /** Shortand for returning an abstract value associated with given SEXP (variable) from current state.
+     */
+    typename ASTATE::Value & operator [] (SEXP name) {
+        return state[name];
+    }
+
     /** During the optimization phase, sets the current state to the stored incomming state of the given basic block and returns true if successful.
 
       If the block does not have any incomming state, false is returned, indicating that the optimization should skip this basic block as it was not visited during the analysis and is therefore a dead code.
@@ -93,6 +99,14 @@ public:
     void setFunction(llvm::Function * f) override {
         ir::Pass::setFunction(f);
         states_.clear();
+    }
+    /** Moves information about the old register to the new register and and discards the old one.
+       Performs the replacement in current state and in all stored incomming ones.
+     */
+    void replaceWith(ir::Value old, ir::Value with) {
+        state.replaceWith(old, with);
+        for (auto i = states_.begin(), e = states_.end(); i != e; ++i)
+            i->second.replaceWith(old, with);
     }
 
 protected:
@@ -148,14 +162,14 @@ public:
         return changed_;
     }
   protected:
-    void replaceAllUsesWith(llvm::Instruction* o, llvm::Instruction* n) {
+    void replaceAllUsesWith(llvm::Value* o, llvm::Value* n) {
         changed_ = true;
         o->replaceAllUsesWith(n);
     }
 
-    void replaceAllUsesWith(llvm::Instruction* o, Pattern* n);
+    void replaceAllUsesWith(llvm::Value* o, Pattern* n);
 
-    void replaceAllUsesWith(Pattern* o, llvm::Instruction* n);
+    void replaceAllUsesWith(Pattern* o, llvm::Value* n);
 
     void replaceAllUsesWith(Pattern* o, Pattern* n);
 

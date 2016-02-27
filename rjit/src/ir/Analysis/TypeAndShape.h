@@ -27,7 +27,10 @@ public:
     match binops(ir::BinaryOperator * p) {
         auto lhs = p->lhs();
         auto rhs = p->rhs();
-        state[p->pattern()] = Value::merge(state[lhs], state[rhs]);
+        auto l = state[lhs];
+        auto r = state[rhs];
+        state[p->pattern()] = Value::merge(l, r);
+        //state[p->pattern()] = Value::merge(state[lhs], state[rhs]);
     }
 
     /** If we have information about the variable, store it to the register, otherwise initialize the register to top.
@@ -50,10 +53,18 @@ public:
             state[symbol] = state[src];
     }
 
+    /** When creating the scallar, the result is a scalar of the element's appropriate type.
+     */
+    match scalarAlloc(ir::CreateAndSetScalar * p) {
+        if (p->scalarType() == t::Double) {
+            state[p] = Value(Value::Type::Float, Value::Size::Scalar, Value::Attrib::Absent);
+        } else {
+            assert(p->scalarType() == t::Int and "Only integers and doubles are supported");
+            state[p] = Value(Value::Type::Integer, Value::Size::Scalar, Value::Attrib::Absent);
+        }
+    }
+
     /** A call to ICStub invalidates all variables.
-
-      TODO call to ICStub should be its own pattern
-
      */
     match call(ir::ICStub * ins) {
        state.invalidateVariables(Value(Value::Type::Any));
