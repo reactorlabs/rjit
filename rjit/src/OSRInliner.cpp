@@ -58,12 +58,17 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
 
     SEXP innerFunc = R_NilValue;
 
-    // to Instrument here implies we always exit to the base function.
-    Function* toInstrument = OSRHandler::getToInstrument(toOpt);
-    SEXP toInstrSexp = OSRHandler::cloneSEXP(fSexp, toInstrument);
-    OSRHandler::resetSafepoints(toInstrSexp, c);
-    c->getBuilder()->module()->fixRelocations(formals, toInstrSexp,
-                                              toInstrument);
+    Function* toInstrument = nullptr;
+    SEXP toInstrSexp = R_NilValue;
+
+    if (!calls.empty()) {
+        // to Instrument here implies we always exit to the base function.
+        Function* toInstrument = OSRHandler::getToInstrument(toOpt);
+        SEXP toInstrSexp = OSRHandler::cloneSEXP(fSexp, toInstrument);
+        OSRHandler::resetSafepoints(toInstrSexp, c);
+        c->getBuilder()->module()->fixRelocations(formals, toInstrSexp,
+                                                  toInstrument);
+    }
 
     for (auto it = calls.begin(); it != calls.end(); ++it) {
         SEXP innerClosure = it->first;
