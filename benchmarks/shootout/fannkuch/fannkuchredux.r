@@ -75,10 +75,6 @@ execute <- function(n = 9L) {
     fannkuchredux(n)
 }
 
+jit.startChrono()
 execute(9L)
-jit.disableOSR()
-for(i in 1:10) {
-    jit.startChrono()
-    execute(9L)
-    jit.endChrono()
-}
+jit.endChrono()

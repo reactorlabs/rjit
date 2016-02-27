@@ -102,10 +102,6 @@ execute <- function(n = "shootout/fasta/fasta3000.txt") {
     knucleotide_brute(n)
 }
 
+jit.startChrono()
 execute("../benchmarks/shootout/fasta/fasta3000.txt")
-jit.disableOSR()
-for(i in 1:10) {
-    jit.startChrono()
-    execute("../benchmarks/shootout/fasta/fasta3000.txt")
-    jit.endChrono()
-}
+jit.endChrono()

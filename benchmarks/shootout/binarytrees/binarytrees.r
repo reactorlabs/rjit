@@ -48,10 +48,8 @@ binarytrees <- function(args) {
 execute <- function(n = 13L) {
     binarytrees(n)
 }
+
+jit.startChrono()
 execute(13L)
-jit.disableOSR()
-for(i in 1:10) {
-    jit.startChrono()
-    execute(13L)
-    jit.endChrono()
-}
+jit.endChrono()
+

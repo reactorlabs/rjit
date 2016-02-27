@@ -114,10 +114,6 @@ execute <- function(n = 150000L) {
     fastaredux_naive(n)
 }
 
+jit.startChrono()
 execute(150000L)
-jit.disableOSR()
-for(i in 1:10) {
-    jit.startChrono()
-    execute(150000L)
-    jit.endChrono()
-}
+jit.endChrono()

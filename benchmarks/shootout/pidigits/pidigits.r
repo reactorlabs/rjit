@@ -402,10 +402,6 @@ execute <- function(n = 150L) {
     pidigits(n)
 }
 
+jit.startChrono()
 execute(150L)
-jit.disableOSR()
-for(i in 1:10) {
-    jit.startChrono()
-    execute(150L)
-    jit.endChrono()
-}
+jit.endChrono()

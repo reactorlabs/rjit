@@ -35,10 +35,7 @@ mandelbrot <- function(args) {
 execute <- function(n = 3000L) {
     mandelbrot(n)
 }
+
+jit.startChrono()
 execute(3000L)
-jit.disableOSR()
-for(i in 1:10) {
-    jit.startChrono()
-    execute(3000L)
-    jit.endChrono()
-}
+jit.endChrono()

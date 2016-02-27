@@ -18,10 +18,7 @@ spectralnorm_math <- function(args) {
 execute <- function(n = 250L) {
     spectralnorm_math(n)
 }
+
+jit.startChrono()
 execute(250L)
-jit.disableOSR()
-for(i in 1:10) {
-    jit.startChrono()
-    execute(250L)
-    jit.endChrono()
-}
+jit.endChrono()
