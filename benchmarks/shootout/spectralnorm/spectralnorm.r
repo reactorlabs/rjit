@@ -53,7 +53,7 @@ spectralnorm <- function(args) {
     }
 execute(250L)
 jit.disableOSR()
-for(i in 1:100) {
+for(i in 1:10) {
     jit.startChrono()
     execute(250L)
     jit.endChrono()
