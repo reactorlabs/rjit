@@ -101,7 +101,8 @@ class Compiler {
     /** Index operator for assignment for vector access of double bracket [[]].
      *
      */
-    llvm::Value* compileAssignBracket(SEXP call, SEXP value, bool super);
+    llvm::Value* compileAssignBracket(SEXP call, SEXP vector, SEXP index,
+                                      SEXP value, bool super);
 
     /** Index operator for assignment for vector access of double bracket [[]].
      *
@@ -111,7 +112,8 @@ class Compiler {
     /** Index operator for assignment for vector access of double bracket [[]].
      *
      */
-    llvm::Value* compileAssignDoubleBracket(SEXP call, SEXP value, bool super);
+    llvm::Value* compileAssignDoubleBracket(SEXP call, SEXP vector, SEXP index,
+                                            SEXP value, bool super);
 
     /** Index operator for assignment for vector access of double bracket [[]].
      *
@@ -204,7 +206,10 @@ class Compiler {
 
     bool canSkipLoopContextList(SEXP ast, bool breakOK);
 
-    bool caseHandled(SEXP call, SEXP value);
+    /** Helper function to determine which case store assignment and retrieval
+        can handle.
+    */
+    bool caseHandled(SEXP store, SEXP vector, SEXP index);
 
     /** Compiles the switch statement.
 

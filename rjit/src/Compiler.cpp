@@ -349,76 +349,21 @@ Value* Compiler::compileParenthesis(SEXP arg) {
 Value* Compiler::compileBracket(SEXP call) {
 
     SEXP value = CDR(call);
-    SEXP receiver = CAR(value);
+    SEXP vector = CAR(value);
     SEXP index = CAR(CDR(value));
 
-    // TODO handle the case when there are multiple arguments in the index, ie.
-    // "..." or ":".
-    if (CDDR(value) != R_NilValue) {
-        printf("%s\n", "Multiple arguments index.");
+    if (caseHandled(call, vector, index)) {
+        Value* resultVector = compileExpression(vector);
+        assert(vector);
+
+        Value* resultIndex = compileExpression(index);
+        b.setResultVisible(true);
+        return ir::GetDispatchValue::create(b, resultVector, resultIndex,
+                                            b.rho(), call)
+            ->result();
+    } else {
         return nullptr;
     }
-
-    if (TYPEOF(index) == LANGSXP) {
-        printf("%s\n", "Index is language object.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is null.
-    if (index == R_NilValue || receiver == R_NilValue) {
-        printf("%s\n", "Null index.");
-        return nullptr;
-    }
-
-    // TODO handle indexing on the result of a function call.
-    if (CAR(receiver) == symbol::Function) {
-        printf("%s\n", "Indexing on a function.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is empty.
-    // In this case the vec is returned, using genericGetVar and only the
-    // "relevant" attributes of vec are retained.
-    if (TYPEOF(index) == SYMSXP && !strlen(CHAR(PRINTNAME(index)))) {
-        printf("%s\n", "Empty index.");
-        return nullptr;
-
-        // Value* res = ir::GenericGetVar::create(b, b.rho(), receiver);
-
-        // have to set the relevant attributes of vec
-
-        /*
-        AttributeSet PAL;
-        {
-            SmallVector<AttributeSet, 4> Attrs;
-            AttributeSet PAS;
-            {
-                AttrBuilder B;
-                B.addAttribute("statepoint-id", std::to_string(smid));
-                B.addAttribute("statepoint-num-patch-bytes",
-                               std::to_string(patchpointSize));
-                PAS = AttributeSet::get(b.getContext(), ~0U, B);
-            }
-            Attrs.push_back(PAS);
-            PAL = AttributeSet::get(b.getContext(), Attrs);
-        }
-        res->setAttributes(PAL);
-
-        */
-
-        // return res;
-    }
-
-    // There probably a couple of special cases that I'm missing.
-
-    Value* vector = compileExpression(receiver);
-    assert(vector);
-
-    Value* indexVal = compileExpression(index);
-    // printf("%s\n", "single brackets");
-    b.setResultVisible(true);
-    return ir::GetDispatchValue::create(b, vector, indexVal, b.rho(), call)
-        ->result();
 }
 
 /** Compiles an index operator (double bracket).
@@ -427,85 +372,32 @@ Value* Compiler::compileBracket(SEXP call) {
 Value* Compiler::compileDoubleBracket(SEXP call) {
 
     SEXP value = CDR(call);
-    SEXP receiver = CAR(value);
+    SEXP vector = CAR(value);
     SEXP index = CAR(CDR(value));
 
-    // The index for [[ must have a single element, it can't have
-    // cases where the index has multiple arguments, ie. "..." or ":".
-    // the case when the index is a language object is really weird,
-    // and it's something that I should handle
-    if (CDDR(value) != R_NilValue) {
-        printf("%s\n", "Multiple arguments index in double bracket.");
+    if (caseHandled(call, vector, index)) {
+        Value* resultVector = compileExpression(vector);
+        assert(resultVector);
+
+        Value* resultIndex = compileExpression(index);
+        b.setResultVisible(true);
+        return ir::GetDispatchValue2::create(b, resultVector, resultIndex,
+                                             b.rho(), call)
+            ->result();
+    } else {
         return nullptr;
     }
-
-    if (TYPEOF(index) == LANGSXP) {
-        printf("%s\n", "Index is language object in double bracket.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is null.
-    if (index == R_NilValue || receiver == R_NilValue) {
-        printf("%s\n", "Null index in the double bracket.");
-        return nullptr;
-    }
-
-    // TODO handle the case when the index is empty.
-    // In this case the vec is returned, using genericGetVar and only the
-    // "relevant" attributes of vec are retained.
-    if (TYPEOF(index) == SYMSXP && !strlen(CHAR(PRINTNAME(index)))) {
-        printf("%s\n", "Empty index in the double bracket.");
-        return nullptr;
-
-        // Value* res = ir::GenericGetVar::create(b, b.rho(), receiver);
-
-        // have to set the relevant attributes of vec
-
-        /*
-        AttributeSet PAL;
-        {
-            SmallVector<AttributeSet, 4> Attrs;
-            AttributeSet PAS;
-            {
-                AttrBuilder B;
-                B.addAttribute("statepoint-id", std::to_string(smid));
-                B.addAttribute("statepoint-num-patch-bytes",
-                               std::to_string(patchpointSize));
-                PAS = AttributeSet::get(b.getContext(), ~0U, B);
-            }
-            Attrs.push_back(PAS);
-            PAL = AttributeSet::get(b.getContext(), Attrs);
-        }
-        res->setAttributes(PAL);
-
-        */
-
-        // return res;
-    }
-
-    Value* vector = compileExpression(receiver);
-    assert(vector);
-
-    Value* indexVal = compileExpression(index);
-    // printf("%s\n", "double brackets");
-    b.setResultVisible(true);
-    return ir::GetDispatchValue2::create(b, vector, indexVal, b.rho(), call)
-        ->result();
 }
 
-Value* Compiler::compileAssignBracket(SEXP call, SEXP value, bool super) {
-    SEXP expression = CDR(call);
-
-    SEXP vector = CAR(expression);
-    SEXP index = CAR(CDR(expression));
+Value* Compiler::compileAssignBracket(SEXP call, SEXP vector, SEXP index,
+                                      SEXP value, bool super) {
 
     Value* resultVal = compileExpression(value);
-
     Value* resultIndex = compileExpression(index);
     Value* resultVector = compileExpression(vector);
+    assert(resultVector);
 
     if (super) {
-        printf("%s\n", "single bracket SUPER assignment");
         ir::SuperAssignDispatch::create(b, resultVector, resultIndex, resultVal,
                                         b.rho(), call)
             ->result();
@@ -514,30 +406,22 @@ Value* Compiler::compileAssignBracket(SEXP call, SEXP value, bool super) {
     }
 
     b.setResultVisible(false);
-    printf("%s\n", "single bracket assignment");
-    ir::AssignDispatchValue::create(
-        b,
-        // ir::GetDispatchValue::create(b, resultVector, resultIndex,
-        // b.rho(), call) ->result(),
-        resultVector, resultIndex, resultVal, b.rho(), call)
+    ir::AssignDispatchValue::create(b, resultVector, resultIndex, resultVal,
+                                    b.rho(), call)
         ->result();
     b.setResultVisible(false);
     return resultVal;
 }
 
-Value* Compiler::compileAssignDoubleBracket(SEXP call, SEXP value, bool super) {
-
-    SEXP expression = CDR(call);
-
-    SEXP vector = CAR(expression);
-    SEXP index = CAR(CDR(expression));
+Value* Compiler::compileAssignDoubleBracket(SEXP call, SEXP vector, SEXP index,
+                                            SEXP value, bool super) {
 
     Value* resultVal = compileExpression(value);
     Value* resultIndex = compileExpression(index);
     Value* resultVector = compileExpression(vector);
+    assert(resultVector);
 
     if (super) {
-        printf("%s\n", "double bracket SUPER assignment");
         ir::SuperAssignDispatch2::create(b, resultVector, resultIndex,
                                          resultVal, b.rho(), call)
             ->result();
@@ -545,7 +429,6 @@ Value* Compiler::compileAssignDoubleBracket(SEXP call, SEXP value, bool super) {
         return resultVal;
     }
 
-    printf("%s\n", "double bracket assignment");
     ir::AssignDispatchValue2::create(b, resultVector, resultIndex, resultVal,
                                      b.rho(), call)
         ->result();
@@ -564,38 +447,43 @@ Value* Compiler::compileFunctionDefinition(SEXP fdef) {
     return ir::CreateClosure::create(b, b.rho(), forms, body)->result();
 }
 
-bool Compiler::caseHandled(SEXP call, SEXP value) {
+bool Compiler::caseHandled(SEXP store, SEXP vector, SEXP index) {
 
-    SEXP expression = CDR(call);
-    SEXP vector = CAR(expression);
-    SEXP index = CAR(CDR(expression));
-
-    if (CDDR(expression) != R_NilValue) {
-        printf("%s\n", "Multiple arguments index in cases.");
+    // The index for [[ must have a single element, it can't have
+    // cases where the index has multiple arguments, ie. "..." or ":".
+    // the case when the index is a language object is really weird,
+    // and it's something that I should handle
+    if (CDDR(store) != R_NilValue) {
+        printf("%s\n", "Multiple arguments index.");
         return false;
     }
 
     // this case should not be hard to handle
     // the index should simply be evaluated
     if (TYPEOF(index) == LANGSXP) {
-        printf("%s\n", "Index is language object in cases.");
+        printf("%s\n", "Index is language object.");
         return false;
     }
 
     if (TYPEOF(vector) == LANGSXP) {
-        printf("%s\n", "vector is language object in cases.");
+        printf("%s\n", "Vector is language object.");
+        return false;
+    }
+
+    if (vector == R_NilValue) {
+        printf("%s\n", "Null vector.");
         return false;
     }
 
     // TODO handle the case when the index is null.
-    if (index == R_NilValue || vector == R_NilValue) {
-        printf("%s\n", "Null index in cases.");
+    if (index == R_NilValue) {
+        printf("%s\n", "Null index.");
         return false;
     }
 
     // TODO handle indexing on the result of a function call.
     if (CAR(vector) == symbol::Function) {
-        printf("%s\n", "Indexing on a function in cases.");
+        printf("%s\n", "Vector is a function.");
         return false;
     }
 
@@ -603,7 +491,7 @@ bool Compiler::caseHandled(SEXP call, SEXP value) {
     // In this case the vec is returned, using genericGetVar and only the
     // "relevant" attributes of vec are retained.
     if (TYPEOF(index) == SYMSXP && !strlen(CHAR(PRINTNAME(index)))) {
-        printf("%s\n", "Empty index in cases.");
+        printf("%s\n", "Empty index.");
         return false;
     }
 
@@ -618,18 +506,21 @@ Value* Compiler::compileAssignment(SEXP e) {
     // printf("%s\n", "compile assignment");
     SEXP expr = CDR(e);
     SEXP lhs = CAR(expr);
+    SEXP vector = CAR(lhs);
+    SEXP index = CAR(CDR(lhs));
     SEXP rhs = CAR(CDDR(e));
 
     if (TYPEOF(lhs) == LANGSXP) {
         if (CAR(lhs) == symbol::Bracket) {
-            if (caseHandled(lhs, rhs)) {
-                return compileAssignBracket(lhs, rhs, false);
+            if (caseHandled(lhs, vector, index)) {
+                return compileAssignBracket(lhs, vector, index, rhs, false);
             } else {
                 return nullptr;
             }
         } else if (CAR(lhs) == symbol::DoubleBracket) {
-            if (caseHandled(lhs, rhs)) {
-                return compileAssignDoubleBracket(lhs, rhs, false);
+            if (caseHandled(lhs, vector, index)) {
+                return compileAssignDoubleBracket(lhs, vector, index, rhs,
+                                                  false);
             } else {
                 return nullptr;
             }
@@ -655,18 +546,21 @@ Value* Compiler::compileSuperAssignment(SEXP e) {
 
     SEXP expr = CDR(e);
     SEXP lhs = CAR(expr);
+    SEXP vector = CAR(lhs);
+    SEXP index = CAR(CDR(lhs));
     SEXP rhs = CAR(CDDR(e));
 
     if (TYPEOF(lhs) == LANGSXP) {
         if (CAR(lhs) == symbol::Bracket) {
-            if (caseHandled(lhs, rhs)) {
-                return compileAssignBracket(lhs, rhs, true);
+            if (caseHandled(lhs, vector, index)) {
+                return compileAssignBracket(lhs, vector, index, rhs, true);
             } else {
                 return nullptr;
             }
         } else if (CAR(lhs) == symbol::DoubleBracket) {
-            if (caseHandled(lhs, rhs)) {
-                return compileAssignDoubleBracket(lhs, rhs, true);
+            if (caseHandled(lhs, vector, index)) {
+                return compileAssignDoubleBracket(lhs, vector, index, rhs,
+                                                  true);
             } else {
                 return nullptr;
             }
