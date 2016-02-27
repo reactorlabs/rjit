@@ -86,7 +86,7 @@ REXPORT SEXP endChrono() {
     // OSR_INLINE=0;
     Utils::end = high_resolution_clock::now();
     auto duration =
-        duration_cast<microseconds>(Utils::end - Utils::start).count();
+        duration_cast<milliseconds>(Utils::end - Utils::start).count();
     ofstream file;
     file.open("benchResults/result.out", ios::out | ios::app);
     file << duration << " ";
