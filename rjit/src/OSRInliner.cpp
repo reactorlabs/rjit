@@ -63,8 +63,8 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
 
     if (!calls.empty()) {
         // to Instrument here implies we always exit to the base function.
-        Function* toInstrument = OSRHandler::getToInstrument(toOpt);
-        SEXP toInstrSexp = OSRHandler::cloneSEXP(fSexp, toInstrument);
+        toInstrument = OSRHandler::getToInstrument(toOpt);
+        toInstrSexp = OSRHandler::cloneSEXP(fSexp, toInstrument);
         OSRHandler::resetSafepoints(toInstrSexp, c);
         c->getBuilder()->module()->fixRelocations(formals, toInstrSexp,
                                                   toInstrument);
