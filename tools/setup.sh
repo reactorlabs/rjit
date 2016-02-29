@@ -30,7 +30,9 @@ LLVM_VERS="370"
 FRESH_R_VERS="3-2"
 CLANG=0
 BENCH_RUN=0
-BENCH_RUN_NUM=2
+BENCH_TEST=0
+BENCH_TEST_NUM=1
+BENCH_RUN_NUM=5
 RJIT_BUILD_TYPE="Debug"
 LLVM_TYPE=""
 LLVM_BUILD_TYPE="Debug"
@@ -145,7 +147,6 @@ case $key in
     LLVM_BUILD_TYPE="Release"
     OPT="-O2"
     BENCH_TEST=1
-    BENCH_RUN_NUM=1
     ;;
     *)
     echo "Flag $key unknown"
@@ -385,7 +386,7 @@ if [ $BENCH_TEST -eq 1 ]; then
         echo "-> start running the shootout benchmark "
         for x in ` find ${SHOOT_DIR} -name "*.r" `; do
             echo "-> running $x"
-            R_LIBS_USER=${CURRENT_DIR}/packages R_ENABLE_JIT=5 ${TARGET}/gnur/bin/R -e "source(\"${SRC_DIR}/benchmarks/run.r\");runbench(\"$x\", \"${LOG_FILE}\", \"rjit\", ${BENCH_RUN_NUM})" > /dev/null
+            R_LIBS_USER=${CURRENT_DIR}/packages R_ENABLE_JIT=5 ${TARGET}/gnur/bin/R -e "source(\"${SRC_DIR}/benchmarks/run.r\");runbench(\"$x\", \"${LOG_FILE}\", \"rjit\", ${BENCH_TEST_NUM})" > /dev/null
         done
     fi
 fi

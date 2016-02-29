@@ -251,18 +251,9 @@ Value* Compiler::compileIntrinsic(SEXP call) {
                          ir::Constant::create(b, R_NilValue)->result())
                    : compileReturn(compileExpression(CAR(CDR(call))));
     }
-    CASE(symbol::Assign) {
-        // assignBeforeDispatch = true;
-        return compileAssignment(call);
-    }
-    CASE(symbol::Assign2) {
-        // assignBeforeDispatch = true
-        return compileAssignment(call);
-    }
-    CASE(symbol::SuperAssign) {
-        // assignBeforeDispatch = true;
-        return compileSuperAssignment(call);
-    }
+    CASE(symbol::Assign) { return compileAssignment(call); }
+    CASE(symbol::Assign2) { return compileAssignment(call); }
+    CASE(symbol::SuperAssign) { return compileSuperAssignment(call); }
     CASE(symbol::If)
     return compileCondition(call);
     CASE(symbol::Break)
@@ -348,11 +339,11 @@ Value* Compiler::compileParenthesis(SEXP arg) {
   */
 Value* Compiler::compileBracket(SEXP call) {
 
-    SEXP value = CDR(call);
-    SEXP vector = CAR(value);
-    SEXP index = CAR(CDR(value));
+    SEXP expression = CDR(call);
+    SEXP vector = CAR(expression);
+    SEXP index = CAR(CDR(expression));
 
-    if (caseHandled(call, vector, index)) {
+    if (caseHandled(expression, vector, index)) {
         Value* resultVector = compileExpression(vector);
         assert(vector);
 
@@ -371,11 +362,11 @@ Value* Compiler::compileBracket(SEXP call) {
 */
 Value* Compiler::compileDoubleBracket(SEXP call) {
 
-    SEXP value = CDR(call);
-    SEXP vector = CAR(value);
-    SEXP index = CAR(CDR(value));
+    SEXP expression = CDR(call);
+    SEXP vector = CAR(expression);
+    SEXP index = CAR(CDR(expression));
 
-    if (caseHandled(call, vector, index)) {
+    if (caseHandled(expression, vector, index)) {
         Value* resultVector = compileExpression(vector);
         assert(resultVector);
 
@@ -505,7 +496,7 @@ Value* Compiler::compileAssignment(SEXP e) {
 
     // printf("%s\n", "compile assignment");
     SEXP expr = CDR(e);
-    SEXP lhs = CAR(expr);
+    SEXP lhs = CDR(CAR(expr));
     SEXP vector = CAR(lhs);
     SEXP index = CAR(CDR(lhs));
     SEXP rhs = CAR(CDDR(e));
@@ -545,7 +536,7 @@ Value* Compiler::compileAssignment(SEXP e) {
 Value* Compiler::compileSuperAssignment(SEXP e) {
 
     SEXP expr = CDR(e);
-    SEXP lhs = CAR(expr);
+    SEXP lhs = CDR(CAR(expr));
     SEXP vector = CAR(lhs);
     SEXP index = CAR(CDR(lhs));
     SEXP rhs = CAR(CDDR(e));
