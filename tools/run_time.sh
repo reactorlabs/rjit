@@ -19,7 +19,7 @@ BENCH_DIR=${SRC_DIR}/benchmarks
 LOG_FILE_NAME="log"
 FRESH_R_DIR="${TARGET}/freshr"
 FRESH_R_VERS="3-2"
-BENCH_RUN_NUMBER=6
+BENCH_RUN_NUMBER=5
 SHOOT_DIR=${BENCH_DIR}/shootout/
 
 TIMEN=$(date +"%H-%M-%S_%F")
