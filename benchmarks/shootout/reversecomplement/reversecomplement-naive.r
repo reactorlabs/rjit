@@ -35,6 +35,6 @@ execute <- function(n = "shootout/fasta/fasta300000.txt") {
     reversecomplement_naive(n)
 }
 
-jit.startChrono()
+#jit.startChrono()
 execute("../benchmarks/shootout/fasta/fasta300000.txt")
-jit.endChrono()
+#jit.endChrono()

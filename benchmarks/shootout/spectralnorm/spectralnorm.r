@@ -52,6 +52,6 @@ spectralnorm <- function(args) {
         spectralnorm(n)
     }
 
-jit.startChrono()
+#jit.startChrono()
 execute(250L)
-jit.endChrono()
+#jit.endChrono()

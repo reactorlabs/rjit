@@ -47,6 +47,6 @@ execute <- function(n = 13L) {
 
 
 
-jit.startChrono()
+#jit.startChrono()
 execute(13L)
-jit.endChrono()
+#jit.endChrono()

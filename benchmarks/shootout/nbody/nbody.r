@@ -108,6 +108,6 @@ execute <- function(n = 50000L) {
     nbody(n)
 }
 
-jit.startChrono()
+#jit.startChrono()
 execute(50000L)
-jit.endChrono()
+#jit.endChrono()

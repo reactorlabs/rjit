@@ -49,7 +49,7 @@ execute <- function(n = 13L) {
     binarytrees(n)
 }
 
-jit.startChrono()
+#jit.startChrono()
 execute(13L)
-jit.endChrono()
+#jit.endChrono()
 

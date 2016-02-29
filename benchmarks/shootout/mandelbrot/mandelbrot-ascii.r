@@ -34,6 +34,6 @@ execute <- function(n = 3000L) {
     mandelbrot(n)
 }
 
-jit.startChrono()
+#jit.startChrono()
 execute(3000L)
-jit.endChrono()
+#jit.endChrono()

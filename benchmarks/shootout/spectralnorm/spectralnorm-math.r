@@ -19,6 +19,6 @@ execute <- function(n = 250L) {
     spectralnorm_math(n)
 }
 
-jit.startChrono()
+#jit.startChrono()
 execute(250L)
-jit.endChrono()
+#jit.endChrono()
