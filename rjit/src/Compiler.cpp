@@ -496,20 +496,20 @@ Value* Compiler::compileAssignment(SEXP e) {
 
     // printf("%s\n", "compile assignment");
     SEXP expr = CDR(e);
-    SEXP lhs = CDR(CAR(expr));
-    SEXP vector = CAR(lhs);
-    SEXP index = CAR(CDR(lhs));
+    SEXP lhs = CAR(expr);
+    SEXP vector = CAR(CDR(lhs));
+    SEXP index = CAR(CDDR(lhs));
     SEXP rhs = CAR(CDDR(e));
 
     if (TYPEOF(lhs) == LANGSXP) {
         if (CAR(lhs) == symbol::Bracket) {
-            if (caseHandled(lhs, vector, index)) {
+            if (caseHandled(CDR(lhs), vector, index)) {
                 return compileAssignBracket(lhs, vector, index, rhs, false);
             } else {
                 return nullptr;
             }
         } else if (CAR(lhs) == symbol::DoubleBracket) {
-            if (caseHandled(lhs, vector, index)) {
+            if (caseHandled(CDR(lhs), vector, index)) {
                 return compileAssignDoubleBracket(lhs, vector, index, rhs,
                                                   false);
             } else {
@@ -536,20 +536,20 @@ Value* Compiler::compileAssignment(SEXP e) {
 Value* Compiler::compileSuperAssignment(SEXP e) {
 
     SEXP expr = CDR(e);
-    SEXP lhs = CDR(CAR(expr));
-    SEXP vector = CAR(lhs);
-    SEXP index = CAR(CDR(lhs));
+    SEXP lhs = CAR(expr);
+    SEXP vector = CAR(CDR(lhs));
+    SEXP index = CAR(CDDR(lhs));
     SEXP rhs = CAR(CDDR(e));
 
     if (TYPEOF(lhs) == LANGSXP) {
         if (CAR(lhs) == symbol::Bracket) {
-            if (caseHandled(lhs, vector, index)) {
+            if (caseHandled(CDR(lhs), vector, index)) {
                 return compileAssignBracket(lhs, vector, index, rhs, true);
             } else {
                 return nullptr;
             }
         } else if (CAR(lhs) == symbol::DoubleBracket) {
-            if (caseHandled(lhs, vector, index)) {
+            if (caseHandled(CDR(lhs), vector, index)) {
                 return compileAssignDoubleBracket(lhs, vector, index, rhs,
                                                   true);
             } else {
