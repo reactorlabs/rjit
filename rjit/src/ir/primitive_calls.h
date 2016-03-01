@@ -1,8 +1,13 @@
 #ifndef INTRINSICS_H_
 #define INTRINSICS_H_
 
+#include <iostream>
+
 #include "Ir.h"
 #include "Builder.h"
+#include "Properties.h"
+
+#include "ir/IrScalars.h"
 
 namespace rjit {
 namespace ir {
@@ -954,11 +959,13 @@ class UserLiteral : public PrimitiveCall {
     llvm::Value* constantPool() { return getValue(0); }
 
     int index() { return getValueInt(1); }
+
     SEXP indexValue() {
         llvm::Function* f = ins()->getParent()->getParent();
         JITModule* m = static_cast<JITModule*>(f->getParent());
         return VECTOR_ELT(m->constPool(f), index());
     }
+
     SEXP index(Builder const& b) { return b.constantPool(index()); }
 
     UserLiteral(llvm::Instruction* ins)
@@ -2406,22 +2413,39 @@ class GenericUnaryPlus : public PrimitiveCall {
     }
 };
 
-class GenericAdd : public PrimitiveCall {
+/** Binary operator represented by a primitive call.
+ */
+class PrimitiveBinaryOperator : public PrimitiveCall,
+                                public ir::BinaryOperator {
   public:
-    llvm::Value* lhs() { return getValue(0); }
-    llvm::Value* rhs() { return getValue(1); }
+    llvm::Instruction* first() const override { return Pattern::first(); }
+
+    llvm::Instruction* last() const override { return Pattern::last(); }
+
+    llvm::Value* lhs() override { return getValue(0); }
+    llvm::Value* rhs() override { return getValue(1); }
     llvm::Value* rho() { return getValue(2); }
     llvm::Value* constantPool() { return getValue(3); }
 
     int call() { return getValueInt(4); }
+
     SEXP callValue() {
         llvm::Function* f = ins()->getParent()->getParent();
         JITModule* m = static_cast<JITModule*>(f->getParent());
         return VECTOR_ELT(m->constPool(f), call());
     }
+
     SEXP call(Builder const& b) { return b.constantPool(call()); }
 
-    GenericAdd(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericAdd) {}
+  protected:
+    PrimitiveBinaryOperator(llvm::Instruction* ins, Kind k)
+        : PrimitiveCall(ins, k) {}
+};
+
+class GenericAdd : public ir::PrimitiveBinaryOperator {
+  public:
+    typedef ir::FAdd ScalarDouble;
+    typedef ir::Add ScalarInt;
 
     static GenericAdd* create(Builder& b, ir::Value lhs, ir::Value rhs,
                               llvm::Value* rho, SEXP call) {
@@ -2464,24 +2488,16 @@ class GenericAdd : public PrimitiveCall {
     static bool classof(Pattern const* s) {
         return s->getKind() == Kind::GenericAdd;
     }
+
+  protected:
+    GenericAdd(llvm::Instruction* ins)
+        : PrimitiveBinaryOperator(ins, Kind::GenericAdd) {}
 };
 
-class GenericSub : public PrimitiveCall {
+class GenericSub : public ir::PrimitiveBinaryOperator {
   public:
-    llvm::Value* lhs() { return getValue(0); }
-    llvm::Value* rhs() { return getValue(1); }
-    llvm::Value* rho() { return getValue(2); }
-    llvm::Value* constantPool() { return getValue(3); }
-
-    int call() { return getValueInt(4); }
-    SEXP callValue() {
-        llvm::Function* f = ins()->getParent()->getParent();
-        JITModule* m = static_cast<JITModule*>(f->getParent());
-        return VECTOR_ELT(m->constPool(f), call());
-    }
-    SEXP call(Builder const& b) { return b.constantPool(call()); }
-
-    GenericSub(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericSub) {}
+    typedef ir::FSub ScalarDouble;
+    typedef ir::Sub ScalarInt;
 
     static GenericSub* create(Builder& b, ir::Value lhs, ir::Value rhs,
                               llvm::Value* rho, SEXP call) {
@@ -2524,24 +2540,16 @@ class GenericSub : public PrimitiveCall {
     static bool classof(Pattern const* s) {
         return s->getKind() == Kind::GenericSub;
     }
+
+  protected:
+    GenericSub(llvm::Instruction* ins)
+        : PrimitiveBinaryOperator(ins, Kind::GenericSub) {}
 };
 
-class GenericMul : public PrimitiveCall {
+class GenericMul : public ir::PrimitiveBinaryOperator {
   public:
-    llvm::Value* lhs() { return getValue(0); }
-    llvm::Value* rhs() { return getValue(1); }
-    llvm::Value* rho() { return getValue(2); }
-    llvm::Value* constantPool() { return getValue(3); }
-
-    int call() { return getValueInt(4); }
-    SEXP callValue() {
-        llvm::Function* f = ins()->getParent()->getParent();
-        JITModule* m = static_cast<JITModule*>(f->getParent());
-        return VECTOR_ELT(m->constPool(f), call());
-    }
-    SEXP call(Builder const& b) { return b.constantPool(call()); }
-
-    GenericMul(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericMul) {}
+    typedef ir::FMul ScalarDouble;
+    typedef ir::Mul ScalarInt;
 
     static GenericMul* create(Builder& b, ir::Value lhs, ir::Value rhs,
                               llvm::Value* rho, SEXP call) {
@@ -2584,24 +2592,16 @@ class GenericMul : public PrimitiveCall {
     static bool classof(Pattern const* s) {
         return s->getKind() == Kind::GenericMul;
     }
+
+  protected:
+    GenericMul(llvm::Instruction* ins)
+        : PrimitiveBinaryOperator(ins, Kind::GenericMul) {}
 };
 
-class GenericDiv : public PrimitiveCall {
+class GenericDiv : public ir::PrimitiveBinaryOperator {
   public:
-    llvm::Value* lhs() { return getValue(0); }
-    llvm::Value* rhs() { return getValue(1); }
-    llvm::Value* rho() { return getValue(2); }
-    llvm::Value* constantPool() { return getValue(3); }
-
-    int call() { return getValueInt(4); }
-    SEXP callValue() {
-        llvm::Function* f = ins()->getParent()->getParent();
-        JITModule* m = static_cast<JITModule*>(f->getParent());
-        return VECTOR_ELT(m->constPool(f), call());
-    }
-    SEXP call(Builder const& b) { return b.constantPool(call()); }
-
-    GenericDiv(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::GenericDiv) {}
+    typedef ir::FDiv ScalarDouble;
+    typedef ir::Div ScalarInt;
 
     static GenericDiv* create(Builder& b, ir::Value lhs, ir::Value rhs,
                               llvm::Value* rho, SEXP call) {
@@ -2644,6 +2644,10 @@ class GenericDiv : public PrimitiveCall {
     static bool classof(Pattern const* s) {
         return s->getKind() == Kind::GenericDiv;
     }
+
+  protected:
+    GenericDiv(llvm::Instruction* ins)
+        : PrimitiveBinaryOperator(ins, Kind::GenericDiv) {}
 };
 
 class GenericPow : public PrimitiveCall {
@@ -3663,6 +3667,79 @@ class ReturnJump : public PrimitiveCall {
 
     static bool classof(Pattern const* s) {
         return s->getKind() == Kind::ReturnJump;
+    }
+};
+
+class Recompile : public PrimitiveCall {
+  public:
+    Recompile(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::Recompile) {}
+
+    static Recompile* create(Builder& b, ir::Value closure, ir::Value caller,
+                             ir::Value consts, ir::Value rho) {
+        Sentinel s(b);
+        return insertBefore(s, closure, caller, consts, rho);
+    }
+
+    static Recompile* insertBefore(llvm::Instruction* ins, ir::Value closure,
+                                   ir::Value caller, ir::Value consts,
+                                   ir::Value rho) {
+        std::vector<llvm::Value*> args_;
+        args_.push_back(closure);
+        args_.push_back(caller);
+        args_.push_back(consts);
+        args_.push_back(rho);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<Recompile>(ins->getModule()), args_, "", ins);
+
+        Builder::markSafepoint(i);
+        return new Recompile(i);
+    }
+
+    static char const* intrinsicName() { return "recompileFunction"; }
+
+    static llvm::FunctionType* intrinsicType() {
+        return llvm::FunctionType::get(
+            t::SEXP, {t::SEXP, t::nativeFunctionPtr_t, t::SEXP, t::SEXP},
+            false);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::Recompile;
+    }
+};
+
+class CheckType : public PrimitiveCall {
+  public:
+    CheckType(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::CheckType) {}
+
+    static CheckType* create(Builder& b, ir::Value value, TypeInfo expected) {
+        Sentinel s(b);
+        return insertBefore(s, value, expected);
+    }
+
+    static CheckType* insertBefore(llvm::Instruction* ins, ir::Value value,
+                                   TypeInfo expected) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(value);
+        args_.push_back(Builder::integer(static_cast<int>(expected)));
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<CheckType>(ins->getModule()), args_, "", ins);
+
+        Builder::markSafepoint(i);
+        return new CheckType(i);
+    }
+
+    static char const* intrinsicName() { return "checkType"; }
+
+    static llvm::FunctionType* intrinsicType() {
+        return llvm::FunctionType::get(t::Void, {t::SEXP, t::Int}, false);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::CheckType;
     }
 };
 

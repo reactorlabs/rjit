@@ -1,15 +1,17 @@
 #include "TypeInfo.h"
 #include "RIntlns.h"
+#include "Flags.h"
 
 namespace rjit {
 
 void TypeInfo::mergeAll(SEXP value) {
-    addType(TYPEOF(value));
+    addType(value);
     mergeAttrib(value);
     mergeSize(value);
 }
 
-const EnumBitset<TypeInfo::Type> TypeInfo::addType(int sexpType) {
+const EnumBitset<TypeInfo::Type> TypeInfo::addType(SEXP value) {
+    int sexpType = TYPEOF(value);
     Type t = Type::Any;
     switch (sexpType) {
     case INTSXP:
@@ -37,22 +39,21 @@ const EnumBitset<TypeInfo::Type> TypeInfo::addType(int sexpType) {
 
 void TypeInfo::mergeAttrib(SEXP value) {
     // TODO: find out if value is an object
-    Attrib a = ATTRIB(value) == R_NilValue ? Attrib::Absent : Attrib::Present;
+    Attrib a = ATTRIB(value) == R_NilValue ? Attrib::Absent : Attrib::Any;
     mergeAttrib(a);
 }
 
 void TypeInfo::mergeSize(SEXP value) {
-    Size s = Size::Unknown;
+    Size s = Size::Any;
     switch (TYPEOF(value)) {
-    case INTSXP:
     case REALSXP:
     case STRSXP:
     case VECSXP:
+    case INTSXP:
     case LGLSXP:
         if (XLENGTH(value) == 1)
             s = Size::Scalar;
-        else
-            s = Size::Any;
+        break;
     default:
         break;
     }
@@ -99,7 +100,7 @@ std::ostream& operator<<(std::ostream& out, TypeInfo& info) {
     case TypeInfo::Attrib::Absent:
         out << "~";
         break;
-    case TypeInfo::Attrib::Present:
+    case TypeInfo::Attrib::Any:
         out << "attr";
         break;
     case TypeInfo::Attrib::Object:

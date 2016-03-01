@@ -17,7 +17,10 @@ class Compiler {
         _instances.insert(this);
     }
 
-    ~Compiler() { _instances.erase(this); }
+    ~Compiler() {
+        assert(finalized);
+        _instances.erase(this);
+    }
 
     static std::set<Compiler*> _instances;
     static void gcCallback(void (*forward_node)(SEXP));
@@ -29,13 +32,17 @@ class Compiler {
     }
 
     SEXP compilePromise(std::string const& name, SEXP ast);
-    SEXP compileFunction(std::string const& name, SEXP ast, SEXP formals);
+    SEXP compileFunction(std::string const& name, SEXP ast, SEXP formals,
+                         bool optimize = false);
 
-    SEXP finalizeCompile(SEXP ast);
+    void finalizeCompile(SEXP ast);
 
     void finalize();
 
   private:
+    // Keeps track when finalize was called
+    bool finalized = false;
+
     /** Compiles an expression.
 
       The expression as a result is always visible by default, which can be

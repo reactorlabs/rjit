@@ -76,3 +76,5 @@ jit.printWithoutSP <- function(what) {
 
 jit.enable <- function() .Call("jitEnable");
 jit.disable <- function() .Call("jitDisable");
+
+jit.setFlag <- function(flag, value) .Call("setFlag", flag, value)

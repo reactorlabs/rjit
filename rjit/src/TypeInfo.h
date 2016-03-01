@@ -20,28 +20,63 @@ class TypeInfo {
 
     enum class Type : int { Integer, Float, String, Vector, Bool, Any };
 
-    enum class Attrib : uint8_t { Unknown, Absent, Object, Present };
-
     enum class Size : uint8_t { Unknown, Scalar, Any };
+
+    enum class Attrib : uint8_t { Unknown, Absent, Object, Any };
 
     // -- Constructors
 
-    TypeInfo() {
+    // Init unused bits to zero
+    TypeInfo() : TypeInfo(0) {
         store.types_ = EnumBitset<Type>();
         store.size_ = Size::Unknown;
         store.attrib_ = Attrib::Unknown;
     }
+
+    TypeInfo(Type type, Size size, Attrib attrib) : TypeInfo(0) {
+        store.types_ = EnumBitset<Type>(type);
+        store.size_ = size;
+        store.attrib_ = attrib;
+    }
+
+    TypeInfo(SEXP from) : TypeInfo() { mergeAll(from); }
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 
     TypeInfo(int base) { *reinterpret_cast<int*>(&store) = base; }
 
-    operator int() { return *reinterpret_cast<int*>(&store); }
+    explicit operator int() { return *reinterpret_cast<int*>(&store); }
 
 #pragma GCC diagnostic pop
 
+    // This only works if we make sure to zero initialize the unused values!
+    bool operator!=(TypeInfo& other) {
+        return static_cast<int>(*this) != static_cast<int>(other);
+    }
+
+    bool operator==(TypeInfo& other) {
+        return static_cast<int>(*this) == static_cast<int>(other);
+    }
+
     // -- getters
+    static TypeInfo any() {
+        TypeInfo any;
+        any.addType(Type::Any);
+        any.store.size_ = Size::Any;
+        any.store.attrib_ = Attrib::Any;
+        return any;
+    }
+
+    bool isBottom() {
+        return types().empty() && attrib() == Attrib::Unknown &&
+               size() == Size::Unknown;
+    }
+
+    bool isAny() {
+        return types().has(Type::Any) && attrib() == Attrib::Any &&
+               size() == Size::Any;
+    }
 
     const EnumBitset<Type> types() { return EnumBitset<Type>(store.types_); }
 
@@ -52,6 +87,10 @@ class TypeInfo {
     // -- setters
 
     bool hasType(Type t) { return types().has(t) || types().has(Type::Any); }
+
+    bool hasOnlyType(Type t) const {
+        return store.types_ == 1 << static_cast<int>(t);
+    }
 
     const EnumBitset<Type> types(EnumBitset<Type> t) {
         store.types_ = t;
@@ -65,43 +104,70 @@ class TypeInfo {
     }
 
     Attrib attrib(Attrib a) {
-        assert(a > Attrib::Unknown && a <= Attrib::Present);
+        assert(a > Attrib::Unknown && a <= Attrib::Any);
         store.attrib_ = a;
         return a;
     }
 
     // -- record a new runtime type instance
 
-    const EnumBitset<Type> addType(int sexpType);
+    const EnumBitset<Type> addType(SEXP value);
     void mergeAttrib(SEXP v);
     void mergeSize(SEXP v);
     void mergeAll(SEXP s);
 
     // -- merge two typeinfos
 
-    void mergeTypes(TypeInfo other) { mergeTypes(other.types()); }
-    void mergeAttrib(TypeInfo other) { mergeAttrib(other.attrib()); }
-    void mergeSize(TypeInfo other) { mergeSize(other.size()); }
+    bool mergeTypes(TypeInfo other) { return mergeTypes(other.types()); }
+    bool mergeAttrib(TypeInfo other) { return mergeAttrib(other.attrib()); }
+    bool mergeSize(TypeInfo other) { return mergeSize(other.size()); }
 
-  private:
-    // -- merge helpers
-
-    void mergeAttrib(Attrib a) {
-        if (a > attrib())
-            attrib(a);
+    bool mergeWith(TypeInfo other) {
+        bool result = mergeTypes(other);
+        result = mergeAttrib(other) or result;
+        return mergeSize(other) or result;
     }
 
-    void mergeSize(Size s) {
-        if (s > size())
-            size(s);
+    static TypeInfo merge(TypeInfo l, TypeInfo r) {
+        TypeInfo result(l);
+        result.mergeWith(r);
+        return result;
     }
-
-    void mergeTypes(EnumBitset<Type> t) { types(t | types()); }
 
     const EnumBitset<Type> addType(Type type) {
         auto t = types();
         t.insert(type);
         return types(t);
+    }
+
+  private:
+    // -- merge helpers
+
+    bool mergeAttrib(Attrib a) {
+        if (a > attrib()) {
+            attrib(a);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    bool mergeSize(Size s) {
+        if (s > size()) {
+            size(s);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    bool mergeTypes(EnumBitset<Type> t) {
+        if ((t | types()) != types()) {
+            types(t | types());
+            return true;
+        } else {
+            return false;
+        }
     }
 
     friend std::ostream& operator<<(std::ostream& out, TypeInfo& t);

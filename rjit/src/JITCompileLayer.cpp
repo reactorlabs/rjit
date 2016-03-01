@@ -7,6 +7,7 @@
 #include "JITSymbolResolver.h"
 #include "StackMap.h"
 #include "CodeCache.h"
+#include "Instrumentation.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
@@ -22,7 +23,16 @@
 #include "llvm/Support/DynamicLibrary.h"
 
 #include "ir/Analysis/VariableAnalysis.h"
+#include "ir/Analysis/TypeAndShape.h"
+#include "ir/Analysis/ScalarsTracking.h"
 #include "ir/Optimization/ConstantLoad.h"
+#include "ir/Optimization/Scalars.h"
+#include "ir/Optimization/BoxingRemoval.h"
+#include "ir/Optimization/DeadAllocationRemoval.h"
+
+#include "llvm/IR/IRPrintingPasses.h"
+
+#include "Flags.h"
 
 using namespace llvm;
 
@@ -49,12 +59,26 @@ ExecutionEngine* JITCompileLayer::finalize(JITModule* m) {
         exit(1);
     }
 
+    std::string str;
+    llvm::raw_string_ostream rso(str);
+
     // Make sure we can resolve symbols in the program as well. The zero arg
     legacy::PassManager pm;
 
-    pm.add(new ir::VariableAnalysis());
+    if (Flag::singleton().printIR)
+        pm.add(createPrintModulePass(rso));
 
+    pm.add(new analysis::TypeAndShape());
+    pm.add(new optimization::Scalars());
+    pm.add(new analysis::ScalarsTracking());
+    pm.add(new optimization::BoxingRemoval());
+    pm.add(new optimization::DeadAllocationRemoval());
+
+    pm.add(new ir::VariableAnalysis());
     pm.add(new ir::ConstantLoadOptimization());
+
+    if (Flag::singleton().printOptIR)
+        pm.add(createPrintModulePass(rso));
 
     pm.add(createTargetTransformInfoWrapperPass(TargetIRAnalysis()));
 
@@ -66,18 +90,17 @@ ExecutionEngine* JITCompileLayer::finalize(JITModule* m) {
     pm.add(rjit::createPlaceRJITSafepointsPass());
     pm.add(rjit::createRJITRewriteStatepointsForGCPass());
 
-    /*for (llvm::Function& f : m->getFunctionList()) {
-        std::cerr << "--------------------------------------" << std::endl;
-        f.dump();
-    }*/
-
     pm.run(*m);
+
+    std::cout << rso.str();
 
     engine->finalizeObject();
     m->finalizeNativeSEXPs(engine);
 
     // Fill in addresses for cached code
     for (llvm::Function& f : m->getFunctionList()) {
+        TypeFeedback::detach(&f);
+
         if (CodeCache::missingAddress(f.getName())) {
             CodeCache::setAddress(f.getName(),
                                   (uint64_t)engine->getPointerToFunction(&f));

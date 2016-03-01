@@ -33,6 +33,7 @@
 #include "JITCompileLayer.h"
 #include "api.h"
 
+#include "Flags.h"
 #include "RIntlns.h"
 
 #include <sstream>
@@ -150,6 +151,8 @@ bool ICCompiler::compileIc(SEXP inCall, SEXP inFun) {
         unsigned i = 0;
         while (arg != R_NilValue && form != R_NilValue) {
             if (TAG(arg) != R_NilValue) {
+                if (!Flag::singleton().staticNamedArgMatch)
+                    return false;
                 namedArg[i] = TAG(arg);
             } else {
                 positionalArg.push_back(i);
@@ -352,7 +355,7 @@ Value* ICCompiler::compileArguments(SEXP argAsts, bool eager) {
             // first only get the first dots arg to get the top of the list
             arglist = ir::AddEllipsisArgumentHead::create(
                           b, arglist, rho(),
-                          eager ? b.integer(TRUE) : b.integer(FALSE))
+                          eager ? b.integer(TRUE, 1) : b.integer(FALSE, 1))
                           ->result();
             if (!arglistHead)
                 arglistHead = arglist;
@@ -360,7 +363,7 @@ Value* ICCompiler::compileArguments(SEXP argAsts, bool eager) {
             // then add the rest
             arglist = ir::AddEllipsisArgumentTail::create(
                           b, arglist, rho(),
-                          eager ? b.integer(TRUE) : b.integer(FALSE))
+                          eager ? b.integer(TRUE, 1) : b.integer(FALSE, 1))
                           ->result();
             argnum++;
         } else {
