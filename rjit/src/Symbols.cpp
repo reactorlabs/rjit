@@ -42,6 +42,8 @@ DECLARE(BitAnd, "&");
 DECLARE(BitOr, "|");
 DECLARE(Not, "!");
 DECLARE(Ellipsis, "...");
+DECLARE(Colon, ":");
+DECLARE(Comma, ",");
 
 #undef DECLARE
 } // namespace symbol
