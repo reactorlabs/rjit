@@ -393,7 +393,7 @@ class LoopSequenceLength : public PrimitiveCall {
 };
 
 // Given the for loop sequence, and index, returns the index-th value of
-// the sequence. TODO Note that this always allocates for vectors.
+// the sequence.
 class GetForLoopValue : public PrimitiveCall {
   public:
     llvm::Value* seq() { return getValue(0); }

@@ -809,7 +809,6 @@ Value* Compiler::compileForLoop(SEXP ast) {
 
     control->addIncoming(b.integer(0), forStart);
     index->addIncoming(cInit, forStart);
-
     // now check if control is smaller than length
     auto test = ir::UnsignedIntegerLessThan::create(b, control, seqLength);
     BranchInst::Create(forBody, b.breakTarget(), test->result(), b);
