@@ -272,8 +272,8 @@ Value* Compiler::compileIntrinsic(SEXP call) {
 #define CASE(sym) if (CAR(call) == sym)
     CASE(symbol::Block)
     return compileBlock(CDR(call));
-    //    CASE(symbol::Bracket)
-    //    return compileBracket(call);
+    CASE(symbol::Bracket)
+    return compileBracket(call);
     CASE(symbol::DoubleBracket)
     return compileDoubleBracket(call);
     CASE(symbol::Parenthesis)
@@ -373,17 +373,20 @@ Value* Compiler::compileParenthesis(SEXP arg) {
 /** Compiles an index operator for single brackets.
   */
 Value* Compiler::compileBracket(SEXP call) {
-    //    if (b.getAssignmentLHS())
-    return nullptr;
+    if (b.getAssignmentLHS())
+        return nullptr;
 
-    //    SEXP expression = CDR(call);
-    //    SEXP vector = CAR(expression);
-    //    SEXP index = CAR(CDR(expression));
-    //
-    //    Value * v =  compile(vector);
-    //    Value * i = compile(index);
-    //
-    //    return ir::GetDispatchValue::create(b, v, i, b.rho(), call);
+    SEXP expression = CDR(call);
+    SEXP vector = CAR(expression);
+    SEXP index = CAR(CDR(expression));
+
+    if (!caseHandled(expression, vector, index))
+        return nullptr;
+
+    Value* v = compileExpression(vector);
+    Value* i = compileExpression(index);
+
+    return ir::GetDispatchValue::create(b, v, i, b.rho(), call)->result();
 }
 
 /** Compiles an index operator (double bracket).
@@ -397,6 +400,9 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
     SEXP vector = CAR(expression);
     SEXP index = CAR(CDR(expression));
 
+    if (!caseHandled(expression, vector, index))
+        return nullptr;
+
     Value* v = compileExpression(vector);
     Value* i = compileExpression(index);
 
@@ -405,6 +411,9 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
 
 Value* Compiler::compileAssignBracket(SEXP call, SEXP vector, SEXP index,
                                       SEXP value, bool super) {
+
+    if (!caseHandled(call, vector, index))
+        return nullptr;
 
     Value* resultVal = compileExpression(value);
     Value* resultIndex = compileExpression(index);
@@ -429,6 +438,9 @@ Value* Compiler::compileAssignBracket(SEXP call, SEXP vector, SEXP index,
 
 Value* Compiler::compileAssignDoubleBracket(SEXP call, SEXP vector, SEXP index,
                                             SEXP value, bool super) {
+
+    if (!caseHandled(call, vector, index))
+        return nullptr;
 
     Value* resultVal = compileExpression(value);
     Value* resultIndex = compileExpression(index);
@@ -467,45 +479,44 @@ bool Compiler::caseHandled(SEXP store, SEXP vector, SEXP index) {
     // cases where the index has multiple arguments, ie. "..." or ":".
     // the case when the index is a language object is really weird,
     // and it's something that I should handle
-    if (CDDR(store) != R_NilValue) {
-        printf("%s\n", "Multiple arguments index.");
-        return false;
-    }
-
-    // this case should not be hard to handle
-    // the index should simply be evaluated
-    if (TYPEOF(index) == LANGSXP) {
-        printf("%s\n", "Index is language object.");
-        return false;
-    }
-
-    if (TYPEOF(vector) == LANGSXP) {
-        printf("%s\n", "Vector is language object.");
-        return false;
-    }
-
-    if (vector == R_NilValue) {
-        printf("%s\n", "Null vector.");
-        return false;
-    }
-
-    // TODO handle the case when the index is null.
-    if (index == R_NilValue) {
-        printf("%s\n", "Null index.");
-        return false;
-    }
-
-    // TODO handle indexing on the result of a function call.
-    if (CAR(vector) == symbol::Function) {
-        printf("%s\n", "Vector is a function.");
-        return false;
-    }
+    //    if (CDDR(store) != R_NilValue) {
+    //        printf("%s\n", "Multiple arguments index.");
+    //        return false;
+    //    }
+    //
+    //    // this case should not be hard to handle
+    //    // the index should simply be evaluated
+    //    if (TYPEOF(index) == LANGSXP) {
+    //        printf("%s\n", "Index is language object.");
+    //        return false;
+    //    }
+    //
+    //    if (TYPEOF(vector) == LANGSXP) {
+    //        printf("%s\n", "Vector is language object.");
+    //        return false;
+    //    }
+    //
+    //    if (vector == R_NilValue) {
+    //        printf("%s\n", "Null vector.");
+    //        return false;
+    //    }
+    //
+    //    // TODO handle the case when the index is null.
+    //    if (index == R_NilValue) {
+    //        printf("%s\n", "Null index.");
+    //        return false;
+    //    }
+    //
+    //    // TODO handle indexing on the result of a function call.
+    //    if (CAR(vector) == symbol::Function) {
+    //        printf("%s\n", "Vector is a function.");
+    //        return false;
+    //    }
 
     // TODO handle the case when the index is empty.
     // In this case the vec is returned, using genericGetVar and only the
     // "relevant" attributes of vec are retained.
     if (TYPEOF(index) == SYMSXP && !strlen(CHAR(PRINTNAME(index)))) {
-        printf("%s\n", "Empty index.");
         return false;
     }
 
@@ -543,6 +554,9 @@ Value* Compiler::compileAssignment(SEXP e) {
         SEXP index = CAR(CDDR(lhs));
         SEXP rhs = CAR(CDR(expr));
 
+        if (lhsFunction == symbol::Bracket) {
+            return compileAssignBracket(lhs, vector, index, rhs, false);
+        }
         if (lhsFunction == symbol::DoubleBracket) {
             return compileAssignDoubleBracket(lhs, vector, index, rhs, false);
         }
