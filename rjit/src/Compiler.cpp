@@ -272,8 +272,8 @@ Value* Compiler::compileIntrinsic(SEXP call) {
 #define CASE(sym) if (CAR(call) == sym)
     CASE(symbol::Block)
     return compileBlock(CDR(call));
-    CASE(symbol::Bracket)
-    return compileBracket(call);
+    //    CASE(symbol::Bracket)
+    //    return compileBracket(call);
     CASE(symbol::DoubleBracket)
     return compileDoubleBracket(call);
     CASE(symbol::Parenthesis)
@@ -288,7 +288,7 @@ Value* Compiler::compileIntrinsic(SEXP call) {
     }
     CASE(symbol::Assign) { return compileAssignment(call); }
     CASE(symbol::Assign2) { return compileAssignment(call); }
-    CASE(symbol::SuperAssign) { return compileSuperAssignment(call); }
+    //    CASE(symbol::SuperAssign) { return compileSuperAssignment(call); }
     CASE(symbol::If)
     return compileCondition(call);
     CASE(symbol::Break)
@@ -373,46 +373,34 @@ Value* Compiler::compileParenthesis(SEXP arg) {
 /** Compiles an index operator for single brackets.
   */
 Value* Compiler::compileBracket(SEXP call) {
+    //    if (b.getAssignmentLHS())
+    return nullptr;
 
-    SEXP expression = CDR(call);
-    SEXP vector = CAR(expression);
-    SEXP index = CAR(CDR(expression));
-
-    if (caseHandled(expression, vector, index)) {
-        Value* resultVector = compileExpression(vector);
-        assert(vector);
-
-        Value* resultIndex = compileExpression(index);
-        b.setResultVisible(true);
-        return ir::GetDispatchValue::create(b, resultVector, resultIndex,
-                                            b.rho(), call)
-            ->result();
-    } else {
-        return nullptr;
-    }
+    //    SEXP expression = CDR(call);
+    //    SEXP vector = CAR(expression);
+    //    SEXP index = CAR(CDR(expression));
+    //
+    //    Value * v =  compile(vector);
+    //    Value * i = compile(index);
+    //
+    //    return ir::GetDispatchValue::create(b, v, i, b.rho(), call);
 }
 
 /** Compiles an index operator (double bracket).
 *
 */
 Value* Compiler::compileDoubleBracket(SEXP call) {
+    if (b.getAssignmentLHS())
+        return nullptr;
 
     SEXP expression = CDR(call);
     SEXP vector = CAR(expression);
     SEXP index = CAR(CDR(expression));
 
-    if (caseHandled(expression, vector, index)) {
-        Value* resultVector = compileExpression(vector);
-        assert(resultVector);
+    Value* v = compileExpression(vector);
+    Value* i = compileExpression(index);
 
-        Value* resultIndex = compileExpression(index);
-        b.setResultVisible(true);
-        return ir::GetDispatchValue2::create(b, resultVector, resultIndex,
-                                             b.rho(), call)
-            ->result();
-    } else {
-        return nullptr;
-    }
+    return ir::GetDispatchValue2::create(b, v, i, b.rho(), call)->result();
 }
 
 Value* Compiler::compileAssignBracket(SEXP call, SEXP vector, SEXP index,
@@ -528,42 +516,42 @@ bool Compiler::caseHandled(SEXP store, SEXP vector, SEXP index) {
  * genericSetVar intrinsic.
   */
 Value* Compiler::compileAssignment(SEXP e) {
+    if (b.getAssignmentLHS())
+        return nullptr;
 
-    // printf("%s\n", "compile assignment");
     SEXP expr = CDR(e);
-    SEXP lhs = CAR(expr);
-    SEXP vector = CAR(CDR(lhs));
-    SEXP index = CAR(CDDR(lhs));
-    SEXP rhs = CAR(CDDR(e));
 
-    if (TYPEOF(lhs) == LANGSXP) {
-        if (CAR(lhs) == symbol::Bracket) {
-            if (caseHandled(CDR(lhs), vector, index)) {
-                return compileAssignBracket(lhs, vector, index, rhs, false);
-            } else {
-                return nullptr;
-            }
-        } else if (CAR(lhs) == symbol::DoubleBracket) {
-            if (caseHandled(CDR(lhs), vector, index)) {
-                return compileAssignDoubleBracket(lhs, vector, index, rhs,
-                                                  false);
-            } else {
-                return nullptr;
-            }
-        } else {
+    // Simple assignment
+    if (TYPEOF(CAR(expr)) == SYMSXP) {
+        Value* v = compileExpression(CAR(CDR(expr)));
+        ir::GenericSetVar::create(b, v, b.rho(), CAR(expr));
+        b.setResultVisible(false);
+        return v;
+    }
+
+    SEXP lhs = CAR(expr);
+    if (TYPEOF(lhs) != LANGSXP)
+        return nullptr;
+
+    if (CDR(lhs) && CDDR(lhs) && CDDDR(lhs) == R_NilValue) {
+        SEXP lhsFunction = CAR(lhs);
+
+        SEXP vector = CAR(CDR(lhs));
+        if (TYPEOF(vector) != SYMSXP)
             return nullptr;
+
+        SEXP index = CAR(CDDR(lhs));
+        SEXP rhs = CAR(CDR(expr));
+
+        if (lhsFunction == symbol::DoubleBracket) {
+            return compileAssignDoubleBracket(lhs, vector, index, rhs, false);
         }
     }
 
-    // intrinsic only handles simple assignments
-    if (TYPEOF(CAR(expr)) != SYMSXP) {
-        return nullptr;
-    }
-
-    Value* v = compileExpression(CAR(CDR(expr)));
-    ir::GenericSetVar::create(b, v, b.rho(), CAR(expr));
-    b.setResultVisible(false);
-    return v;
+    b.setAssignmentLHS(true);
+    Value* result = compileExpression(e);
+    b.setAssignmentLHS(false);
+    return result;
 }
 
 /** Super assignment is compiled as genericSetVarParentIntrinsic
