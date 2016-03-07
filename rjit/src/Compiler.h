@@ -40,6 +40,8 @@ class Compiler {
     void finalize();
 
   private:
+    bool assignment = false;
+
     // Keeps track when finalize was called
     bool finalized = false;
 

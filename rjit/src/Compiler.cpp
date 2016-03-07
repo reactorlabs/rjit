@@ -288,7 +288,7 @@ Value* Compiler::compileIntrinsic(SEXP call) {
     }
     CASE(symbol::Assign) { return compileAssignment(call); }
     CASE(symbol::Assign2) { return compileAssignment(call); }
-    //    CASE(symbol::SuperAssign) { return compileSuperAssignment(call); }
+    CASE(symbol::SuperAssign) { return compileSuperAssignment(call); }
     CASE(symbol::If)
     return compileCondition(call);
     CASE(symbol::Break)
@@ -373,12 +373,20 @@ Value* Compiler::compileParenthesis(SEXP arg) {
 /** Compiles an index operator for single brackets.
   */
 Value* Compiler::compileBracket(SEXP call) {
-    if (b.getAssignmentLHS())
+    if (assignment)
         return nullptr;
 
     SEXP expression = CDR(call);
+
+    if (!CDR(expression) || CDDR(expression) != R_NilValue)
+        return nullptr;
+
     SEXP vector = CAR(expression);
-    SEXP index = CAR(CDR(expression));
+    SEXP indexArg = CDR(expression);
+    SEXP index = CAR(indexArg);
+
+    if (TAG(indexArg) != R_NilValue)
+        return nullptr;
 
     if (!caseHandled(expression, vector, index))
         return nullptr;
@@ -393,12 +401,20 @@ Value* Compiler::compileBracket(SEXP call) {
 *
 */
 Value* Compiler::compileDoubleBracket(SEXP call) {
-    if (b.getAssignmentLHS())
+    if (assignment)
         return nullptr;
 
     SEXP expression = CDR(call);
+
+    if (!CDR(expression) || CDDR(expression) != R_NilValue)
+        return nullptr;
+
     SEXP vector = CAR(expression);
-    SEXP index = CAR(CDR(expression));
+    SEXP indexArg = CDR(expression);
+    SEXP index = CAR(indexArg);
+
+    if (TAG(indexArg) != R_NilValue)
+        return nullptr;
 
     if (!caseHandled(expression, vector, index))
         return nullptr;
@@ -412,52 +428,49 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
 Value* Compiler::compileAssignBracket(SEXP call, SEXP vector, SEXP index,
                                       SEXP value, bool super) {
 
-    if (!caseHandled(call, vector, index))
-        return nullptr;
-
     Value* resultVal = compileExpression(value);
     Value* resultIndex = compileExpression(index);
     Value* resultVector = compileExpression(vector);
     assert(resultVector);
 
-    if (super) {
-        ir::SuperAssignDispatch::create(b, resultVector, resultIndex, resultVal,
-                                        b.rho(), call)
-            ->result();
-        b.setResultVisible(false);
-        return resultVal;
-    }
+    assert(!super);
+    //    if (super) {
+    //        ir::SuperAssignDispatch::create(b, resultVector, resultIndex,
+    //        resultVal,
+    //                                        b.rho(), call)
+    //            ->result();
+    //        b.setResultVisible(false);
+    //        return resultVal;
+    //    }
+
+    ir::AssignDispatchValue::create(b, resultVector, resultIndex, resultVal,
+                                    b.rho(), call);
 
     b.setResultVisible(false);
-    ir::AssignDispatchValue::create(b, resultVector, resultIndex, resultVal,
-                                    b.rho(), call)
-        ->result();
-    b.setResultVisible(false);
+
     return resultVal;
 }
 
 Value* Compiler::compileAssignDoubleBracket(SEXP call, SEXP vector, SEXP index,
                                             SEXP value, bool super) {
 
-    if (!caseHandled(call, vector, index))
-        return nullptr;
-
     Value* resultVal = compileExpression(value);
     Value* resultIndex = compileExpression(index);
     Value* resultVector = compileExpression(vector);
     assert(resultVector);
 
-    if (super) {
-        ir::SuperAssignDispatch2::create(b, resultVector, resultIndex,
-                                         resultVal, b.rho(), call)
-            ->result();
-        b.setResultVisible(false);
-        return resultVal;
-    }
+    assert(!super);
+    // if (super) {
+    //     ir::SuperAssignDispatch2::create(b, resultVector, resultIndex,
+    //                                      resultVal, b.rho(), call)
+    //         ->result();
+    //     b.setResultVisible(false);
+    //     return resultVal;
+    // }
 
     ir::AssignDispatchValue2::create(b, resultVector, resultIndex, resultVal,
-                                     b.rho(), call)
-        ->result();
+                                     b.rho(), call);
+
     b.setResultVisible(false);
     return resultVal;
 }
@@ -527,7 +540,7 @@ bool Compiler::caseHandled(SEXP store, SEXP vector, SEXP index) {
  * genericSetVar intrinsic.
   */
 Value* Compiler::compileAssignment(SEXP e) {
-    if (b.getAssignmentLHS())
+    if (assignment)
         return nullptr;
 
     SEXP expr = CDR(e);
@@ -541,36 +554,49 @@ Value* Compiler::compileAssignment(SEXP e) {
     }
 
     SEXP lhs = CAR(expr);
-    if (TYPEOF(lhs) != LANGSXP)
-        return nullptr;
 
-    if (CDR(lhs) && CDDR(lhs) && CDDDR(lhs) == R_NilValue) {
+    if (TYPEOF(lhs) == LANGSXP && CDR(lhs) && CDDR(lhs) &&
+        CDDDR(lhs) == R_NilValue) {
         SEXP lhsFunction = CAR(lhs);
 
         SEXP vector = CAR(CDR(lhs));
-        if (TYPEOF(vector) != SYMSXP)
-            return nullptr;
+        if (TYPEOF(vector) == SYMSXP) {
+            SEXP indexAst = CDDR(lhs);
+            if (CDR(indexAst) == R_NilValue) {
+                SEXP index = CAR(indexAst);
+                SEXP rhs = CAR(CDR(expr));
 
-        SEXP index = CAR(CDDR(lhs));
-        SEXP rhs = CAR(CDR(expr));
-
-        if (lhsFunction == symbol::Bracket) {
-            return compileAssignBracket(lhs, vector, index, rhs, false);
-        }
-        if (lhsFunction == symbol::DoubleBracket) {
-            return compileAssignDoubleBracket(lhs, vector, index, rhs, false);
+                if (caseHandled(expr, vector, index)) {
+                    if (lhsFunction == symbol::Bracket) {
+                        return compileAssignBracket(expr, vector, index, rhs,
+                                                    false);
+                    }
+                    if (lhsFunction == symbol::DoubleBracket) {
+                        return compileAssignDoubleBracket(expr, vector, index,
+                                                          rhs, false);
+                    }
+                }
+            }
         }
     }
 
-    b.setAssignmentLHS(true);
+    assignment = true;
     Value* result = compileExpression(e);
-    b.setAssignmentLHS(false);
+    assignment = false;
     return result;
 }
 
 /** Super assignment is compiled as genericSetVarParentIntrinsic
  */
 Value* Compiler::compileSuperAssignment(SEXP e) {
+
+    if (assignment)
+        return nullptr;
+
+    assignment = true;
+    Value* result = compileExpression(e);
+    assignment = false;
+    return result;
 
     SEXP expr = CDR(e);
     SEXP lhs = CAR(expr);
