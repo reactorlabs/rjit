@@ -33,11 +33,9 @@ REXPORT SEXP jitSwapForNative(SEXP original, SEXP native) {
     return original;
 }
 
-// TODO aghosn
 REXPORT SEXP testOSR(SEXP outer, SEXP env) {
     Compiler c("module");
     OSR_INLINE = 1;
-    // return jitAst(BODY(outer), FORMALS(outer), env);
     osr::OSRInliner inliner(&c);
     SEXP res = inliner.inlineCalls(outer);
     c.jitAll();
@@ -112,10 +110,9 @@ int R_ENABLE_JIT = getenv("R_ENABLE_JIT") ? atoi(getenv("R_ENABLE_JIT")) : 0;
 
 int RJIT_DEBUG = getenv("RJIT_DEBUG") ? atoi(getenv("RJIT_DEBUG")) : 0;
 
-// TODO aghosn
+// For inlining
 int OSR_INLINE = getenv("OSR_INLINE") ? atoi(getenv("OSR_INLINE")) : 0;
 int INLINE_ALL = getenv("INLINE_ALL") ? atoi(getenv("INLINE_ALL")) : 0;
-int NO_REPLACE = getenv("NO_REPLACE") ? atoi(getenv("NO_REPLACE")) : 0;
 
 REXPORT SEXP jitDisable(SEXP expression) {
     RJIT_COMPILE = false;
@@ -127,9 +124,7 @@ REXPORT SEXP jitEnable(SEXP expression) {
     return R_NilValue;
 }
 
-// TODO aghosn
 REXPORT void fixClosure(uint64_t bim) {
     auto f = osr::OSRInliner::exits[bim];
-    // GET_LLVM(f.second)->dump();
     SETCDR(f.first, f.second);
 }

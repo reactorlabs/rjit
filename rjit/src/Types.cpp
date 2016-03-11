@@ -88,7 +88,7 @@ PointerType* initializeTypes() {
     DECLARE(void_cntxtsexp, t_void, t::cntxtPtr, t::SEXP);
     DECLARE(void_cntxtsexpsexp, t_void, t::cntxtPtr, t::SEXP, t::SEXP);
     DECLARE(sexp_contxtsexpsexp, t::SEXP, t::cntxtPtr, t::SEXP, t::SEXP);
-    // TODO aghosn
+    // aghosn: for compensation code in the inliner.
     DECLARE(fixclosure_t, t::t_void, t::t_i64);
 #undef DECLARE
 

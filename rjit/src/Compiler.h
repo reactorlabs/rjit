@@ -25,7 +25,7 @@ class Compiler {
 
     void jitAll();
 
-    // TODO aghosn
+    // aghosn: Added access to builder.
     ir::Builder* getBuilder() { return &b; }
 
   private:

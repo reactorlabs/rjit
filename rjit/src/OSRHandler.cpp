@@ -78,7 +78,7 @@ void OSRHandler::updateEntry(Func_Pair key, Value* phi, Value* stub) {
     map->registerOneToOneValue(phi, stubInstr, true);
 }
 
-SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
+SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c) {
     assert(TYPEOF(closure) == CLOSXP && "getFreshIR requires a closure.");
 
     SEXP body = BODY(closure);
@@ -90,8 +90,7 @@ SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
             func = body;
         } else {
             func = c->compile("rfunction", body, FORMALS(closure));
-            if (!NO_REPLACE)
-                SETCDR(closure, func);
+            SETCDR(closure, func);
         }
 
         ValueToValueMapTy VMap;
@@ -105,13 +104,6 @@ SEXP OSRHandler::getFreshIR(SEXP closure, rjit::Compiler* c, bool compile) {
     Function* workingCopy = CloneFunction(GET_LLVM(entry), VMap, false);
 
     func = cloneSEXP(entry, workingCopy);
-    // Adding the result to the relocations.
-    if (compile) {
-        c->getBuilder()->module()->getFunctionList().push_back(workingCopy);
-        c->getBuilder()->module()->fixRelocations(FORMALS(closure), func,
-                                                  workingCopy);
-        resetSafepoints(func, c);
-    }
 
     return func;
 }
@@ -127,7 +119,6 @@ void OSRHandler::addSexpToModule(SEXP f, Module* m) {
     m->getFunctionList().push_back(GET_LLVM(f));
 }
 
-// TODO rename
 SEXP OSRHandler::resetSafepoints(SEXP func, rjit::Compiler* c) {
     assert(TYPEOF(func) == NATIVESXP && GET_LLVM(func) && "Invalid function.");
     Function* f = GET_LLVM(func);

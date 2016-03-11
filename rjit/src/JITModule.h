@@ -20,7 +20,7 @@ class JITModule : public llvm::Module {
     SEXP constPool(llvm::Function* f);
     SEXP formals(llvm::Function* f);
 
-    // TODO aghosn
+    // aghosn: Added to register new mappings.
     void fixRelocations(SEXP formals, SEXP fun, llvm::Function* f);
 
   private:

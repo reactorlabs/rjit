@@ -45,9 +45,8 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
     SEXP env = TAG(f);
     assert(TYPEOF(env) == ENVSXP && "Cannot extract environment.");
 
-    SEXP fSexp = OSRHandler::getFreshIR(f, c, false);
-    if (NO_REPLACE)
-        SETCDR(f, fSexp);
+    SEXP fSexp = OSRHandler::getFreshIR(f, c);
+    SETCDR(f, fSexp);
     OSRHandler::addSexpToModule(fSexp, c->getBuilder()->module());
 
     Function* toOpt = GET_LLVM(fSexp);
@@ -73,7 +72,7 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
     for (auto it = calls.begin(); it != calls.end(); ++it) {
         SEXP innerClosure = it->first;
         if (!INLINE_ALL)
-            innerFunc = OSRHandler::getFreshIR(innerClosure, c, false);
+            innerFunc = OSRHandler::getFreshIR(innerClosure, c);
         else {
             innerClosure = inlineCalls(innerClosure);
             ValueToValueMapTy VMap;
@@ -97,14 +96,13 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
             auto res = OSRHandler::insertOSRExit(
                 toOpt, toInstrument, (*call)->getConsts(),
                 getOSRCondition(*call), compensation);
-            // VERIFYFUN2(res.second);
+
             res.second->setGC("rjit");
             ret.clear();
         }
         setCP(fSexp, innerFunc);
     }
     OSRHandler::resetSafepoints(fSexp, c);
-    // VERIFYFUN2(GET_LLVM(fSexp));
     SETCDR(f, fSexp);
     return f;
 }
@@ -136,16 +134,11 @@ void OSRInliner::updateCPAccess(CallInst* call, int offset) {
     }
 }
 
-// TODO aghosn I am not inlining the print function because it generates a type
-// Problem. FIXME
 SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     SEXP symb = VECTOR_ELT(cp, symbol);
     SEXP fSexp = findVar(symb, env);
-    // std::string name = CHAR(PRINTNAME(symb));
-    if (TYPEOF(fSexp) != CLOSXP || TYPEOF(TAG(fSexp)) != ENVSXP /*||
-        (TAG(fSexp) != R_GlobalEnv)*/)
+    if (TYPEOF(fSexp) != CLOSXP || TYPEOF(TAG(fSexp)) != ENVSXP)
         return nullptr;
-    // printf("\n\n\nWE INLINE %s\n\n\n", name.c_str());
     return fSexp;
 }
 
@@ -163,7 +156,6 @@ Call_Map OSRInliner::sortCalls(FunctionCalls* calls, SEXP outer) {
             continue;
 
         (*it)->setInPtr(c, inner);
-        //(*it)->fixPromises(cp, inner, c);
         map[inner].push_back(*it);
     }
     return map;
@@ -261,15 +253,6 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     // toInline->removeFromParent();
     delete deadBlock;
     delete toInline;
-}
-
-Inst_Vector* OSRInliner::getTrueCondition() {
-    Inst_Vector* res = new Inst_Vector();
-    ConstantInt* one = ConstantInt::get(getGlobalContext(), APInt(32, 1));
-    // ConstantInt* zero = ConstantInt::get(getGlobalContext(), APInt(32, 0));
-    ICmpInst* cond = new ICmpInst(ICmpInst::ICMP_EQ, one, one /*zero*/);
-    res->push_back(cond);
-    return res;
 }
 
 Inst_Vector* OSRInliner::getOSRCondition(FunctionCall* fc) {

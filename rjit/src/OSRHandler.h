@@ -62,10 +62,27 @@ class OSRHandler : public OSRLibrary {
      */
     static void removeEntry(Function* opt, Function* instrument, Value* val);
 
+    /**
+     * @brief      Registers a new mapping between map(stub) and phi.
+     * USE IT FOR OSR INLINER, NEED A MORE GENERAL IMPL FOR OTHER CASES.
+     *
+     * @param[in]  key   Function pair key for transitive maps.
+     * @param      phi   The phi replacing the function call.
+     * @param      stub  The stub call that is being removed.
+     */
     static void updateEntry(Func_Pair key, Value* phi, Value* stub);
 
-    static SEXP getFreshIR(SEXP closure, rjit::Compiler* c,
-                           bool compile = true);
+    /**
+     * @brief      Returns a fresh, non-instrumented IR for the input closure.
+     * If the function
+     *
+     * @param[in]  closure  The closure containing the function SEXP we want to
+     * copy.
+     * @param      c        The compiler instance.
+     *
+     * @return     { description_of_the_return_value }
+     */
+    static SEXP getFreshIR(SEXP closure, rjit::Compiler* c);
 
     static SEXP cloneSEXP(SEXP func, Function* llvm);
 

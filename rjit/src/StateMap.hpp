@@ -219,7 +219,7 @@ class StateMap {
         }
     }
 
-    /*TODO AGHOSN my constructor*/
+    /*TODO aghosn my constructor*/
     StateMap(llvm::Function* F1, StateMap* sm1, llvm::Function* F2,
              StateMap* sm2)
         : F1(F1), F2(F2), F1_LA(LivenessAnalysis(F1)),
@@ -408,7 +408,7 @@ class StateMap {
     typedef std::map<llvm::Instruction*, std::vector<llvm::Value*>>
         ValuesToSetCache;
 
-    llvm::Function* F1, *F2;
+    llvm::Function *F1, *F2;
     OneToOneValueMap defaultOneToOneMap;
     LocMap landingPadMap;
     LocPairInfoMap locPairInfoMap;
