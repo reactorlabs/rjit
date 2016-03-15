@@ -18,9 +18,29 @@ namespace rjit {
 
 namespace ir {
 
+class Nop;
+
 /** Helper class that aids with building and modifying LLVM IR for functions.
 
   The interface provided is intended for the intrinsic wrappers.
+
+  <b>Sentinels</b>
+
+  The builder inserts a sentinel (ir::Nop) to each basic block when they are
+  created. The sentinel is then used by create() methods of all patterns so that
+  they can route to insertBefore() methods and we do not have to deal with code
+  duplication in these two methods (create effectively becomes insertBefore
+  sentinel).
+
+  However adding the sentinels creates problems for llvm as it means that
+  terminators are not last instructions in a bb. So closing functions for ICs
+  and functions now call removeSentinels() which removes the sentinels from all
+  basic blocks in the function. Of course after this, the create methods may no
+  longer be used on the function.
+
+  When adding llvm instructions manually one has to be aware of this and instead
+  of llvm::BasicBlock * atEnd functions, insertBefore ones should be used, where
+  Builder.blockSentinel()->first() gives the instruction to insert before.
 
   */
 class Builder {
@@ -64,13 +84,9 @@ class Builder {
         return c_->nextTarget;
     }
 
-    llvm::BasicBlock* createBasicBlock() {
-        return llvm::BasicBlock::Create(m_->getContext(), "", c_->f);
-    }
+    llvm::BasicBlock* createBasicBlock();
 
-    llvm::BasicBlock* createBasicBlock(std::string const& name) {
-        return llvm::BasicBlock::Create(m_->getContext(), name, c_->f);
-    }
+    llvm::BasicBlock* createBasicBlock(std::string const& name);
 
     /** Returns the environment of the current context.
      */
@@ -95,10 +111,11 @@ class Builder {
     void openFunction(std::string const& name, SEXP ast, SEXP formals);
 
     void openIC(std::string const& name, FunctionType* ty) {
-        if (c_ != nullptr)
-            contextStack_.push(c_);
+        assert(contextStack_.empty());
         c_ = new ICContext(name, m_, ty);
     }
+
+    llvm::Function* closeIC();
 
     /** Creates new context for a loop. Initializes the basic blocks for break
      * and next targets. */
@@ -135,29 +152,15 @@ class Builder {
       will be added at the time the module is jitted. The function's SEXP is
       therefore automatically added to the relocations for the module.
      */
-    SEXP closeFunction() {
-        assert((contextStack_.empty() or (contextStack_.top()->f != c_->f)) and
-               "Not a function context");
-
-        ClosureContext* cc = dynamic_cast<ClosureContext*>(c_);
-        SEXP result =
-            module()->getNativeSXP(cc->formals, c_->cp[0], c_->cp, c_->f);
-        // c_->f->dump();
-        delete c_;
-        if (contextStack_.empty()) {
-            c_ = nullptr;
-        } else {
-            c_ = contextStack_.top();
-            contextStack_.pop();
-        }
-        return result;
-    }
+    SEXP closeFunction();
 
     /** Returns the llvm::Function corresponding to the intrinsic of given name.
       If such intrinsic is not present in the module yet, it is declared using
       the given type.
 
       NOTE that this function assumes that the intrinsic does not use varargs.
+
+      TODO deprecated, use PrimitiveCall::primitiveFunction instead.
      */
     template <typename INTRINSIC> llvm::Function* intrinsic() {
         llvm::Function* result = m_->getFunction(INTRINSIC::intrinsicName());
@@ -181,15 +184,15 @@ class Builder {
 
     /** Given a call instruction, sets its attributes wrt stack map statepoints.
      */
-    llvm::CallInst* insertCall(llvm::CallInst* f) {
+    static llvm::CallInst* markSafepoint(llvm::CallInst* f) {
+        llvm::Module* m_ = f->getModule();
         llvm::AttributeSet PAL;
         {
             llvm::SmallVector<llvm::AttributeSet, 4> Attrs;
             llvm::AttributeSet PAS;
             {
                 llvm::AttrBuilder B;
-                auto id = JITCompileLayer::singleton.getSafepointId(this->f());
-                B.addAttribute("statepoint-id", std::to_string(id));
+                B.addAttribute("needs-statepoint");
                 PAS = llvm::AttributeSet::get(m_->getContext(), ~0U, B);
             }
             Attrs.push_back(PAS);

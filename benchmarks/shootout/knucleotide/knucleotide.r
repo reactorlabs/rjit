@@ -86,4 +86,6 @@ execute <- function(n = "shootout/fasta/fasta3000.txt") {
     knucleotide(n)
 }
 
+#jit.startChrono()
 execute("../benchmarks/shootout/fasta/fasta3000.txt")
+#jit.endChrono()

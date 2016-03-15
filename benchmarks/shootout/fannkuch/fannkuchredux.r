@@ -75,3 +75,6 @@ execute <- function(n = 9L) {
     fannkuchredux(n)
 }
 
+#jit.startChrono()
+execute(9L)
+#jit.endChrono()

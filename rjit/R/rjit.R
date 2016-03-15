@@ -19,6 +19,14 @@ jit.compile <- function(what, env = environment(what)) {
     }
 }
 
+jit.compileInPlace <- function(what, env = environment(what)) {
+    #nat = .Internal(bodyCode(jit.compile(what, env)))
+    nat = jit.compile(what, env)
+    invisible(.Call("jitSwapForNative", what, nat))
+}
+
+jit.compileInPlace
+
 jit.constants <- function(what) {
     if (typeof(what) == "closure")
         what = .Internal(bodyCode(what));
@@ -79,10 +87,37 @@ jit.testOSR <- function(what, whut, env=environment(what)) {
     }
 }
 
-jit.testme <- function(what) {
-    res = .Call("testme", what)
+jit.getFresh <- function(what) {
+    res = .Call("getFresh", what)
     result = .Internal(bcClose(formals(what), res, environment(what)))
     result
 }
 
+jit.clearHandler <- function() {
+    res = .Call("clearHandler")
+    res
+}
 
+jit.enableOSR <- function() {
+    res =.Call("enableOSR")
+    res
+}
+
+jit.disableOSR <- function() {
+    res = .Call("disableOSR")
+    res
+}
+
+jit.startChrono <- function() {
+    res = .Call("startChrono")
+    res
+}
+
+jit.endChrono <- function() {
+    res = .Call("endChrono")
+    res
+}
+jit.endRecord <- function() {
+    res = .Call("endRecord")
+    res
+}

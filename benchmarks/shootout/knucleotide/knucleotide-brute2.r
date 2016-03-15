@@ -94,3 +94,6 @@ execute <- function(n = "shootout/fasta/fasta3000.txt") {
     knucleotide_brute2(n)
 }
 
+#jit.startChrono()
+execute("../benchmarks/shootout/fasta/fasta3000.txt")
+#jit.endChrono()

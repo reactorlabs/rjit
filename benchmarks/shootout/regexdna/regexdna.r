@@ -60,3 +60,7 @@ regexdna <- function(args) {
 execute <- function(n = "shootout/fasta/fasta500000.txt") {
     regexdna(n)
 }
+
+#jit.startChrono()
+execute("../benchmarks/shootout/fasta/fasta500000.txt")
+#jit.endChrono()

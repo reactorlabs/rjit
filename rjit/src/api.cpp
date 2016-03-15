@@ -1,3 +1,8 @@
+/** Enables the use of R internals for us so that we can manipulate R structures
+ * in low level.
+ */
+#define USE_RINTERNALS 1
+
 #include <llvm/IR/Module.h>
 
 #include "Compiler.h"
@@ -8,14 +13,12 @@
 
 #include "ir/Ir.h"
 #include "ir/Builder.h"
-#include "ir/Intrinsics.h"
+#include "ir/primitive_calls.h"
 #include "OSRInliner.h"
 #include "OSRHandler.h"
-
 using namespace rjit;
 
-/** Compiles given ast and returns the NATIVESXP for it.
- */
+/** Compiles given ast and returns the NATIVESXP for it.*/
 REXPORT SEXP jitAst(SEXP ast, SEXP formals, SEXP rho) {
     Compiler c("module");
     SEXP result = c.compile("rfunction", ast, formals);
@@ -23,14 +26,20 @@ REXPORT SEXP jitAst(SEXP ast, SEXP formals, SEXP rho) {
     return result;
 }
 
-// TODO aghosn
+REXPORT SEXP jitSwapForNative(SEXP original, SEXP native) {
+    CAR(original) = CAR(native);
+    CDR(original) = CDR(native);
+    TAG(original) = TAG(native);
+    return original;
+}
+
 REXPORT SEXP testOSR(SEXP outer, SEXP env) {
     Compiler c("module");
     OSR_INLINE = 1;
-    // return jitAst(BODY(outer), FORMALS(outer), env);
     osr::OSRInliner inliner(&c);
     SEXP res = inliner.inlineCalls(outer);
     c.jitAll();
+    OSR_INLINE = 0;
     return res;
 }
 
@@ -101,10 +110,9 @@ int R_ENABLE_JIT = getenv("R_ENABLE_JIT") ? atoi(getenv("R_ENABLE_JIT")) : 0;
 
 int RJIT_DEBUG = getenv("RJIT_DEBUG") ? atoi(getenv("RJIT_DEBUG")) : 0;
 
-// TODO aghosn
+// For inlining
 int OSR_INLINE = getenv("OSR_INLINE") ? atoi(getenv("OSR_INLINE")) : 0;
 int INLINE_ALL = getenv("INLINE_ALL") ? atoi(getenv("INLINE_ALL")) : 0;
-int ONLY_GLOBAL = getenv("ONLY_GLOBAL") ? atoi(getenv("ONLY_GLOBAL")) : 0;
 
 REXPORT SEXP jitDisable(SEXP expression) {
     RJIT_COMPILE = false;
@@ -116,10 +124,7 @@ REXPORT SEXP jitEnable(SEXP expression) {
     return R_NilValue;
 }
 
-// TODO aghosn
 REXPORT void fixClosure(uint64_t bim) {
-    printf("I'am here %d\n", (int)bim);
     auto f = osr::OSRInliner::exits[bim];
-    // GET_LLVM(f.second)->dump();
     SETCDR(f.first, f.second);
 }

@@ -2,7 +2,7 @@
 
 #include "FunctionCall.h"
 #include "Utils.h"
-#include "ir/Intrinsics.h"
+#include "ir/primitive_calls.h"
 #include "JITCompileLayer.h"
 #include "Runtime.h"
 
@@ -25,8 +25,7 @@ FunctionCall::FunctionCall(CallInst* icStub) : icStub(icStub) {
     assert(consts && "Cannot convert consts to Instruction.");
     ++i;
     getFunc = dynamic_cast<CallInst*>(icStub->getArgOperand(i));
-    assert(getFunc && IS_GET_FUNCTION(getFunc) &&
-           "Could not find the getFunc.");
+    assert(getFunc && "Could not find the getFunc.");
     inPtr = nullptr;
 }
 
@@ -56,18 +55,38 @@ int FunctionCall::getFunctionSymbol() {
     return cst->getSExtValue();
 }
 
-void FunctionCall::fixPromises(SEXP cp, SEXP inFun, rjit::Compiler* c) {
+bool FunctionCall::tryFix(SEXP cp, SEXP inFun, rjit::Compiler* c) {
+    // Obtain the call.
     ConstantInt* callIdx = dynamic_cast<ConstantInt*>(consts->getArgOperand(1));
     assert(callIdx);
+    assert(TYPEOF(inFun) == CLOSXP);
     SEXP call = VECTOR_ELT(cp, callIdx->getSExtValue());
+    unsigned size = args.size();
+
+    // Check for named arguments and promises.
+    std::vector<bool> promarg(size, false);
+    std::vector<long> positionalArg;
+    std::unordered_map<long, SEXP> namedArg;
+    std::unordered_map<SEXP, long> formals;
 
     SEXP arg = CDR(call);
     SEXP form = FORMALS(inFun);
     unsigned i = 0;
+
     while (arg != R_NilValue && form != R_NilValue) {
-        assert(TAG(arg) == R_NilValue);
-        assert(CAR(arg) != R_DotsSymbol && TAG(form) != R_DotsSymbol);
-        assert(CAR(arg) != R_MissingArg);
+        if (TAG(arg) != R_NilValue)
+            namedArg[i] = TAG(arg);
+        else
+            positionalArg.push_back(i);
+        formals[TAG(form)] = i;
+
+        // Ellipsis.
+        if (CAR(arg) == R_DotsSymbol || TAG(form) == R_DotsSymbol)
+            return false;
+
+        if (CAR(arg) == R_MissingArg)
+            return false;
+
         switch (TYPEOF(CAR(arg))) {
         case LGLSXP:
         case INTSXP:
@@ -76,43 +95,65 @@ void FunctionCall::fixPromises(SEXP cp, SEXP inFun, rjit::Compiler* c) {
         case STRSXP:
             break;
         default:
-            Instruction* promiseInst = args.at(i);
-            std::vector<Value*> args_;
-            args_.push_back(promiseInst);
-            args_.push_back(getRho());
-            CallInst* promise = CallInst::Create(
-                c->getBuilder()->intrinsic<rjit::ir::CreatePromise>(), args_,
-                "");
-            promise->insertAfter(args.at(i));
-            AttributeSet PAL;
-            {
-                SmallVector<AttributeSet, 4> Attrs;
-                AttributeSet PAS;
-                {
-                    AttrBuilder B;
-                    auto id = rjit::JITCompileLayer::singleton.getSafepointId(
-                        getFunction());
-                    B.addAttribute("statepoint-id", std::to_string(id));
-                    PAS = AttributeSet::get(getGlobalContext(), ~0U, B);
-                }
-                Attrs.push_back(PAS);
-                PAL = AttributeSet::get(getGlobalContext(), Attrs);
-            }
-            promise->setAttributes(PAL);
-
-            args.at(i)
-                ->replaceUsesOutsideBlock(promise, args.at(i)->getParent());
-            args.at(i) = promise;
+            promarg[i] = true;
         }
-        ++i;
+        i++;
         arg = CDR(arg);
         form = CDR(form);
     }
+
+    // number of args != number of formal args
+    if (form != R_NilValue || i != size)
+        return false;
+
+    std::vector<long> argOrder(size, -1);
+    for (auto p : namedArg) {
+        long argnum = std::get<0>(p);
+        SEXP name = std::get<1>(p);
+        if (!formals.count(name)) {
+            return false; // named argument does not match formal.
+        }
+        long pos = formals[name];
+        argOrder[pos] = argnum;
+    }
+
+    unsigned position = 0;
+    for (long argnum : positionalArg) {
+        while (position < size && argOrder[position] != -1)
+            ++position;
+        assert(position < size);
+        argOrder[position] = argnum;
+    }
+
+    // Copy of args.
+    std::vector<Instruction*> args_ = args;
+
+    // Sorting the args and creating promises.
+    for (unsigned i = 0; i < size; ++i) {
+        long pos = argOrder[i];
+        Instruction* arg = args_[pos];
+        if (promarg[pos]) {
+            Instruction* promiseInst = arg;
+            std::vector<Value*> _args_;
+            _args_.push_back(promiseInst);
+            _args_.push_back(getRho());
+            CallInst* promise = CallInst::Create(
+                c->getBuilder()->intrinsic<rjit::ir::CreatePromise>(), _args_,
+                "");
+            promise->insertAfter(arg);
+            arg->replaceUsesOutsideBlock(promise, arg->getParent());
+            args.at(i) = promise;
+        } else {
+            args.at(i) = arg;
+        }
+    }
+    return true;
 }
 
 Value* FunctionCall::getRho() {
     Function* fun = this->getFunction();
     assert(fun && "The function for this fc is null.");
+    // TODO CHANGE THIS ?
     for (auto RI = fun->arg_begin(), EI = fun->arg_end(); RI != EI; ++RI) {
         if (NAME_CONTAINS(&(*RI), "rho"))
             return &(*RI);
@@ -127,37 +168,5 @@ void FunctionCall::setInPtr(rjit::Compiler* c, SEXP addr) {
 Value* FunctionCall::getInPtr() { return inPtr; }
 
 Instruction* FunctionCall::getArg_back() { return args.back(); }
-
-void FunctionCall::fixIcStubs(Function* f) {
-    FunctionCalls* calls = getFunctionCalls(f);
-    for (auto it = calls->begin(); it != (calls->end()); ++it) {
-        unsigned index = (*it)->getIcStub()->getNumArgOperands() - 2;
-        if ((*it)->getIcStub()->getArgOperand(index) != f) {
-            (*it)->getIcStub()->setArgOperand(index, f);
-            uint64_t smid = JITCompileLayer::singleton.getSafepointId(f);
-            (*it)->getIcStub()->setArgOperand(
-                index + 1,
-                ConstantInt::get(getGlobalContext(), APInt(64, smid)));
-            unsigned size = (*it)->getArgs()->size();
-            JITCompileLayer::singleton.setPatchpoint(smid, size);
-            AttributeSet PAL;
-            {
-                SmallVector<AttributeSet, 4> Attrs;
-                AttributeSet PAS;
-                {
-                    AttrBuilder B;
-                    B.addAttribute("statepoint-id", std::to_string(smid));
-                    B.addAttribute("statepoint-num-patch-bytes",
-                                   std::to_string(patchpointSize));
-                    PAS = AttributeSet::get(f->getContext(), ~0U, B);
-                }
-                Attrs.push_back(PAS);
-                PAL = AttributeSet::get(f->getContext(), Attrs);
-            }
-
-            (*it)->getIcStub()->setAttributes(PAL);
-        }
-    }
-}
 
 } // namespace osr

@@ -402,3 +402,6 @@ execute <- function(n = 150L) {
     pidigits(n)
 }
 
+#jit.startChrono()
+execute(150L)
+#jit.endChrono()

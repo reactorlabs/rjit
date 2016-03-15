@@ -55,38 +55,11 @@ class ICCompiler {
 
     llvm::Value* constant(SEXP value);
 
-    template <typename... Values>
-    llvm::Value* INTRINSIC_NO_SAFEPOINT(llvm::Value* fun, Values... args) {
-        return INTRINSIC_NO_SAFEPOINT(fun,
-                                      std::vector<llvm::Value*>({args...}));
-    }
-
-    llvm::Value* INTRINSIC_NO_SAFEPOINT(llvm::Value* fun,
-                                        std::vector<llvm::Value*> args);
-
-    template <typename... Values>
-    llvm::Value* INTRINSIC(llvm::Value* fun, Values... args) {
-        return INTRINSIC(fun, std::vector<llvm::Value*>({args...}));
-    }
-
-    llvm::Value* INTRINSIC(llvm::Value* fun, std::vector<llvm::Value*> args);
-
     llvm::FunctionType* ic_t;
 
     ir::Builder& b;
     unsigned size;
     std::string name;
-
-#define DECLARE(name) llvm::Function* name
-    DECLARE(CONS_NR);
-    DECLARE(closureQuickArgumentAdaptor);
-    DECLARE(initClosureContext);
-    DECLARE(endClosureContext);
-    DECLARE(closureNativeCallTrampoline);
-    DECLARE(compileIC);
-    DECLARE(patchIC);
-    DECLARE(callNative);
-#undef DECLARE
 };
 
 } // namespace rjit

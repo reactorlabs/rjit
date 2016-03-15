@@ -31,3 +31,7 @@ spectralnorm_alt2 <- function(args) {
 execute <- function(n = 250L) {
     spectralnorm_alt2(n)
 }
+
+#jit.startChrono()
+execute(250L)
+#jit.endChrono()

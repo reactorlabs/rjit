@@ -104,3 +104,7 @@ fasta_3 <- function(args) {
 execute <- function(n = 150000L) {
     fasta_3(n)
 }
+
+#jit.startChrono()
+execute(150000L)
+#jit.endChrono()

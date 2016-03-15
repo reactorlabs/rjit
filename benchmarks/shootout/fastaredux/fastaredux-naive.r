@@ -113,3 +113,7 @@ fastaredux_naive <- function(args) {
 execute <- function(n = 150000L) {
     fastaredux_naive(n)
 }
+
+#jit.startChrono()
+execute(150000L)
+#jit.endChrono()

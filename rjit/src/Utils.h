@@ -9,31 +9,20 @@
 #include <string>
 #include <sstream>
 
+#include <chrono>
+#include <iostream>
+#include <fstream>
+
+using namespace std;
+using namespace chrono;
+
 namespace osr {
-typedef std::vector<llvm::BasicBlock*> BB_Vector;
 
 class Utils {
   public:
-    static std::string getIcStubName(unsigned int i) {
-        std::ostringstream oss;
-        oss << "icStub_" << (i);
-        return oss.str();
-    }
-
-    /**
-     * @brief      Put the f's basic blocks into a vector
-     *
-     * @param      f     llvm::Function*
-     *
-     * @return     an std::vector of f's basic blocks
-     */
-    static BB_Vector* getBBs(llvm::Function* f) {
-        BB_Vector* res = new BB_Vector();
-        for (auto it = f->begin(); it != f->end(); ++it) {
-            res->push_back(it);
-        }
-        return res;
-    }
+    /*For measurements*/
+    static high_resolution_clock::time_point start;
+    static high_resolution_clock::time_point end;
 
     /**
      * @brief      Creates a deep clone of the function f

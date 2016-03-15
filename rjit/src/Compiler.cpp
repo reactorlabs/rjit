@@ -20,7 +20,7 @@
 #include "Symbols.h"
 #include "Runtime.h"
 #include "ir/Builder.h"
-#include "ir/Intrinsics.h"
+#include "ir/primitive_calls.h"
 #include "ir/Ir.h"
 
 #include "api.h"
@@ -89,7 +89,7 @@ Value* Compiler::compileExpression(SEXP value) {
     case NILSXP:
     case CLOSXP:
     case INTSXP: {
-        return ir::UserLiteral::create(b, value)->r();
+        return ir::UserLiteral::create(b, value)->result();
     }
     case BCODESXP:
     // TODO: reuse the compiled fun
@@ -108,7 +108,7 @@ Value* Compiler::compileSymbol(SEXP value) {
     assert(TYPEOF(value) == SYMSXP);
     auto name = CHAR(PRINTNAME(value));
     assert(strlen(name));
-    Value* res = ir::GenericGetVar::create(b, b.rho(), value)->r();
+    Value* res = ir::GenericGetVar::create(b, b.rho(), value)->result();
     res->setName(name);
     return res;
 }
@@ -119,8 +119,6 @@ Value* Compiler::compileSymbol(SEXP value) {
 
 Value* Compiler::compileICCallStub(Value* call, Value* op,
                                    std::vector<Value*>& callArgs) {
-    uint64_t smid = JITCompileLayer::singleton.getSafepointId(b.f());
-
     auto size = callArgs.size();
 
     Function* ic_stub;
@@ -128,7 +126,6 @@ Value* Compiler::compileICCallStub(Value* call, Value* op,
         ir::Builder b_(b.module());
         ic_stub = ICCompiler::getStub(callArgs.size(), b_);
     }
-    JITCompileLayer::singleton.setPatchpoint(smid, size);
 
     std::vector<Value*> ic_args;
     // Closure arguments
@@ -141,18 +138,16 @@ Value* Compiler::compileICCallStub(Value* call, Value* op,
     ic_args.push_back(op);
     ic_args.push_back(b.rho());
     ic_args.push_back(b.f());
-    ic_args.push_back(ConstantInt::get(getGlobalContext(), APInt(64, smid)));
+    ic_args.push_back(ConstantInt::get(getGlobalContext(), APInt(64, 0)));
 
-    auto res = CallInst::Create(ic_stub, ic_args, "", b.block());
+    auto res = CallInst::Create(ic_stub, ic_args, "", b);
     AttributeSet PAL;
     {
         SmallVector<AttributeSet, 4> Attrs;
         AttributeSet PAS;
         {
             AttrBuilder B;
-            B.addAttribute("statepoint-id", std::to_string(smid));
-            B.addAttribute("statepoint-num-patch-bytes",
-                           std::to_string(patchpointSize));
+            B.addAttribute("ic-stub", std::to_string(size));
             PAS = AttributeSet::get(b.getContext(), ~0U, B);
         }
         Attrs.push_back(PAS);
@@ -177,14 +172,14 @@ Value* Compiler::compileCall(SEXP call) {
         if (f != nullptr)
             return f;
         // otherwise just do get function
-        f = ir::GetFunction::create(b, b.rho(), CAR(call))->r();
+        f = ir::GetFunction::create(b, b.rho(), CAR(call))->result();
         f->setName(CHAR(PRINTNAME(CAR(call))));
     }
 
     std::vector<Value*> args;
     compileArguments(CDR(call), args);
 
-    return compileICCallStub(ir::Constant::create(b, call)->r(), f, args);
+    return compileICCallStub(ir::Constant::create(b, call)->result(), f, args);
 }
 
 void Compiler::compileArguments(SEXP argAsts, std::vector<Value*>& res) {
@@ -203,13 +198,13 @@ Value* Compiler::compileArgument(SEXP arg, SEXP name) {
     case STRSXP:
     case NILSXP:
         // literals are self-evaluating
-        return ir::UserLiteral::create(b, arg)->r();
+        return ir::UserLiteral::create(b, arg)->result();
     case SYMSXP:
         if (arg == R_DotsSymbol) {
-            return ir::Constant::create(b, arg)->r();
+            return ir::Constant::create(b, arg)->result();
         }
         if (arg == R_MissingArg) {
-            return ir::Constant::create(b, arg)->r();
+            return ir::Constant::create(b, arg)->result();
         }
     default: {
         SEXP code = compilePromise("promise", arg);
@@ -217,7 +212,7 @@ Value* Compiler::compileArgument(SEXP arg, SEXP name) {
         // not needed with new API, compile constant adds automaatically if not
         // present yet
         // b.addConstantPoolObject(code);
-        return ir::UserLiteral::create(b, code)->r();
+        return ir::UserLiteral::create(b, code)->result();
     }
     }
 }
@@ -244,7 +239,8 @@ Value* Compiler::compileIntrinsic(SEXP call) {
     return compileFunctionDefinition(CDR(call));
     CASE(symbol::Return) {
         return (CDR(call) == R_NilValue)
-                   ? compileReturn(ir::Constant::create(b, R_NilValue)->r())
+                   ? compileReturn(
+                         ir::Constant::create(b, R_NilValue)->result())
                    : compileReturn(compileExpression(CAR(CDR(call))));
     }
     CASE(symbol::Assign)
@@ -315,7 +311,7 @@ Value* Compiler::compileBlock(SEXP block) {
         block = CDR(block);
     }
     if (result == nullptr)
-        result = ir::Constant::create(b, R_NilValue)->r();
+        result = ir::Constant::create(b, R_NilValue)->result();
     return result;
 }
 
@@ -342,7 +338,7 @@ Value* Compiler::compileParenthesis(SEXP arg) {
 Value* Compiler::compileFunctionDefinition(SEXP fdef) {
     SEXP forms = CAR(fdef);
     SEXP body = compileFunction("function", CAR(CDR(fdef)), forms);
-    return ir::CreateClosure::create(b, b.rho(), forms, body)->r();
+    return ir::CreateClosure::create(b, b.rho(), forms, body)->result();
 }
 
 /** Simple assignments (that is to a symbol) are compiled using the
@@ -396,9 +392,9 @@ Value* Compiler::compileReturn(Value* value, bool tail) {
         ir::ReturnJump::create(b, value, b.rho());
         // we need to have a return instruction as well to fool LLVM into
         // believing the basic block has a terminating instruction
-        ir::Return::create(b, ir::Constant::create(b, R_NilValue)->r())->r();
+        ir::Return::create(b, ir::Constant::create(b, R_NilValue)->result());
     } else {
-        ir::Return::create(b, value)->r();
+        ir::Return::create(b, value);
     }
     // this is here to allow compilation of wrong code where statements are even
     // after return
@@ -419,7 +415,7 @@ Value* Compiler::compileCondition(SEXP e) {
     e = CDR(e);
     SEXP falseAst = (e != R_NilValue) ? CAR(e) : nullptr;
     Value* cond2 = compileExpression(condAst);
-    Value* cond = ir::ConvertToLogicalNoNA::create(b, cond2, condAst)->r();
+    Value* cond = ir::ConvertToLogicalNoNA::create(b, cond2, condAst)->result();
     BasicBlock* ifTrue = b.createBasicBlock("ifTrue");
     BasicBlock* ifFalse = b.createBasicBlock("ifFalse");
     BasicBlock* next = b.createBasicBlock("next");
@@ -436,7 +432,7 @@ Value* Compiler::compileCondition(SEXP e) {
     b.setBlock(ifFalse);
     Value* falseResult;
     if (falseAst == nullptr) {
-        falseResult = ir::Constant::create(b, R_NilValue)->r();
+        falseResult = ir::Constant::create(b, R_NilValue)->result();
         b.setResultVisible(false);
     } else {
         falseResult = compileExpression(falseAst);
@@ -464,7 +460,7 @@ Value* Compiler::compileBreak(SEXP ast) {
     // TODO this is really simple, but fine for us - dead code elimination will
     // remove the block if required
     b.setBlock(b.createBasicBlock("deadcode"));
-    return ir::Constant::create(b, R_NilValue)->r();
+    return ir::Constant::create(b, R_NilValue)->result();
 }
 
 /** Compiles next. Whenever we see next in the compiler, we know it is for a
@@ -479,7 +475,7 @@ Value* Compiler::compileNext(SEXP ast) {
     // TODO this is really simple, but fine for us - dead code elimination will
     // remove the block if required
     b.setBlock(b.createBasicBlock("deadcode"));
-    return ir::Constant::create(b, R_NilValue)->r();
+    return ir::Constant::create(b, R_NilValue)->result();
 }
 
 /** Compiles repeat loop. This is simple infinite loop. Only break can exit it.
@@ -504,7 +500,7 @@ Value* Compiler::compileRepeatLoop(SEXP ast) {
     b.closeLoop();
     // return R_NilValue
     b.setResultVisible(false);
-    return ir::Constant::create(b, R_NilValue)->r();
+    return ir::Constant::create(b, R_NilValue)->result();
 }
 
 /** Compiles while loop.
@@ -524,7 +520,7 @@ Value* Compiler::compileWhileLoop(SEXP ast) {
     b.setBlock(b.nextTarget());
     // compile the condition
     Value* cond2 = compileExpression(condAst);
-    Value* cond = ir::ConvertToLogicalNoNA::create(b, cond2, condAst)->r();
+    Value* cond = ir::ConvertToLogicalNoNA::create(b, cond2, condAst)->result();
     BasicBlock* whileBody = b.createBasicBlock("whileBody");
     ir::Cbr::create(b, cond, whileBody, b.breakTarget());
     // compile the body
@@ -536,7 +532,7 @@ Value* Compiler::compileWhileLoop(SEXP ast) {
     b.closeLoop();
     // return R_NilValue
     b.setResultVisible(false);
-    return ir::Constant::create(b, R_NilValue)->r();
+    return ir::Constant::create(b, R_NilValue)->result();
 }
 
 /** For loop is compiled into the following structure:
@@ -576,21 +572,22 @@ Value* Compiler::compileForLoop(SEXP ast) {
     BasicBlock* forBody = b.createBasicBlock("forBody");
     // now initialize the loop control structures
     Value* seq2 = compileExpression(seqAst);
-    Value* seq = ir::StartFor::create(b, seq2, b.rho())->r();
-    Value* seqLength = ir::LoopSequenceLength::create(b, seq, ast)->r();
+    Value* seq = ir::StartFor::create(b, seq2, b.rho())->result();
+    Value* seqLength = ir::LoopSequenceLength::create(b, seq, ast)->result();
     BasicBlock* forStart = b.block();
-    ir::Branch::create(b, forCond)->r();
+    ir::Branch::create(b, forCond);
     b.setBlock(forCond);
-    PHINode* control = PHINode::Create(t::Int, 2, "loopControl", b.block());
+    PHINode* control = PHINode::Create(t::Int, 2, "loopControl", b);
     control->addIncoming(b.integer(0), forStart);
     // now check if control is smaller than length
-    ICmpInst* test = ir::UnsignedIntegerLessThan::create(b, control, seqLength);
-    BranchInst::Create(forBody, b.breakTarget(), test, b.block());
+    auto test = ir::UnsignedIntegerLessThan::create(b, control, seqLength);
+    BranchInst::Create(forBody, b.breakTarget(), test->result(), b);
 
     // move to the for loop body, where we have to set the control variable
     // properly
     b.setBlock(forBody);
-    Value* controlValue = ir::GetForLoopValue::create(b, seq, control)->r();
+    Value* controlValue =
+        ir::GetForLoopValue::create(b, seq, control)->result();
     ir::GenericSetVar::create(b, controlValue, b.rho(), controlAst);
     // now compile the body of the loop
     compileExpression(bodyAst);
@@ -600,7 +597,8 @@ Value* Compiler::compileForLoop(SEXP ast) {
     b.setBlock(b.nextTarget());
 
     // TODO: Need an intrinsic function for BinaryOperator
-    Value* control1 = ir::IntegerAdd::create(b, control, b.integer(1))->r();
+    Value* control1 =
+        ir::IntegerAdd::create(b, control, b.integer(1))->result();
     control->addIncoming(control1, b.nextTarget());
 
     ir::Branch::create(b, forCond);
@@ -609,7 +607,7 @@ Value* Compiler::compileForLoop(SEXP ast) {
     b.closeLoop();
     // return R_NilValue
     b.setResultVisible(false);
-    return ir::Constant::create(b, R_NilValue)->r();
+    return ir::Constant::create(b, R_NilValue)->result();
 }
 
 /** Determines whether we can skip creation of the loop context or not. The code
@@ -711,19 +709,19 @@ Value* Compiler::compileSwitch(SEXP call) {
     }
 
     ir::CheckSwitchControl::create(b, control, call);
-    Value* ctype = ir::SexpType::create(b, control)->r();
-    ICmpInst* cond = ir::IntegerEquals::create(b, ctype, b.integer(STRSXP));
+    Value* ctype = ir::SexpType::create(b, control)->result();
+    auto cond = ir::IntegerEquals::create(b, ctype, b.integer(STRSXP));
     BasicBlock* switchIntegral = b.createBasicBlock("switchIntegral");
     BasicBlock* switchCharacter = b.createBasicBlock("switchCharacter");
     BasicBlock* switchNext = b.createBasicBlock("switchNext");
 
-    BranchInst::Create(switchCharacter, switchIntegral, cond, b.block());
+    BranchInst::Create(switchCharacter, switchIntegral, cond->result(), b);
 
     // integral switch is simple
     b.setBlock(switchIntegral);
 
     Value* caseIntegral =
-        ir::SwitchControlInteger::create(b, control, caseAsts.size())->r();
+        ir::SwitchControlInteger::create(b, control, caseAsts.size())->result();
     auto swInt =
         ir::Switch::create(b, caseIntegral, switchNext, caseAsts.size());
     // for character switch we need to construct the vector,
@@ -739,13 +737,13 @@ Value* Compiler::compileSwitch(SEXP call) {
     //
     b.addConstantPoolObject(cases);
     Value* caseCharacter =
-        ir::SwitchControlCharacter::create(b, control, call, cases)->r();
+        ir::SwitchControlCharacter::create(b, control, call, cases)->result();
 
     auto swChar =
         ir::Switch::create(b, caseCharacter, switchNext, caseAsts.size());
     // create the phi node at the end
     b.setBlock(switchNext);
-    PHINode* result = PHINode::Create(t::SEXP, caseAsts.size(), "", b.block());
+    PHINode* result = PHINode::Create(t::SEXP, caseAsts.size(), "", b);
     // walk the cases and create their blocks, add them to switches and their
     // results to the phi node
     // TODO: fix empty switch
@@ -780,7 +778,7 @@ Value* Compiler::compileSwitch(SEXP call) {
         swChar->setDefaultDest(last);
     swInt->setDefaultDest(last);
     if (fallThrough != nullptr) {
-        result->addIncoming(ir::Constant::create(b, R_NilValue)->r(),
+        result->addIncoming(ir::Constant::create(b, R_NilValue)->result(),
                             b.block());
         ir::Branch::create(b, switchNext);
     }

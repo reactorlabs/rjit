@@ -19,11 +19,7 @@
 
 #define IS_GET_FUNCTION(x)                                                     \
     IS_NAMED(((x)->getCalledFunction()), GETFUNCTION_NAME)
-#define IS_GET_VAR(x) IS_NAMED((x)->getCalledFunction(), GET_VAR_NAME)
-#define IS_CALL_NAMED(x, y) IS_NAMED((x)->getCalledFunction(), (y))
 #define IS_STUB(x) NAME_CONTAINS((x)->getCalledFunction(), ICSTUB_NAME)
-#define IS_CONSTANT_CALL(x) IS_CALL_NAMED((x), CONSTANT_NAME)
-#define IS_USERLIT(x) IS_NAMED((x)->getCalledFunction(), USR_LIT)
 
 using namespace llvm;
 namespace osr {
@@ -50,15 +46,13 @@ class FunctionCall {
     CallInst* getIcStub() { return icStub; }
     Instruction* getConsts() { return consts; }
     Function* getFunction();
-    void fixPromises(SEXP cp, SEXP inFun, rjit::Compiler* c);
+    bool tryFix(SEXP cp, SEXP inFun, rjit::Compiler* c);
 
     int getFunctionSymbol();
 
     void setInPtr(rjit::Compiler* c, SEXP addr);
     Value* getInPtr();
     Instruction* getArg_back();
-
-    static void fixIcStubs(Function* f);
 
   private:
     CallInst* getFunc;

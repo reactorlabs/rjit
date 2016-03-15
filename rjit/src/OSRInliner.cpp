@@ -1,4 +1,3 @@
-#include "Utils.h"
 #include "OSRInliner.h"
 #include "OSRHandler.h"
 #include <llvm/IR/BasicBlock.h>
@@ -6,6 +5,7 @@
 #include "api.h"
 #include "ir/Builder.h"
 #include <llvm/IR/Verifier.h>
+#include <llvm/Transforms/Utils/Cloning.h>
 
 using namespace llvm;
 
@@ -45,73 +45,64 @@ SEXP OSRInliner::inlineCalls(SEXP f) {
     SEXP env = TAG(f);
     assert(TYPEOF(env) == ENVSXP && "Cannot extract environment.");
 
-    SEXP fSexp = OSRHandler::getFreshIR(f, c, false);
+    SEXP fSexp = OSRHandler::getFreshIR(f, c);
+    SETCDR(f, fSexp);
     OSRHandler::addSexpToModule(fSexp, c->getBuilder()->module());
 
     Function* toOpt = GET_LLVM(fSexp);
     c->getBuilder()->module()->fixRelocations(formals, fSexp, toOpt);
 
     /*Get the function calls inside f*/
-    FunctionCalls* calls = FunctionCall::getFunctionCalls(toOpt);
+    Call_Map calls = sortCalls(FunctionCall::getFunctionCalls(toOpt), f);
 
-    for (auto it = calls->begin(); it != calls->end(); ++it) {
-        // Get the callee
-        SEXP constantPool = CDR(fSexp);
-        SEXP toInlineClosure =
-            getFunction(constantPool, (*it)->getFunctionSymbol(), env);
+    SEXP innerFunc = R_NilValue;
 
-        // Function not found or arguments are missing, or recursive call.
-        if (!toInlineClosure ||
-            isMissingArgs(FORMALS(toInlineClosure), (*it)) ||
-            f == toInlineClosure)
-            continue;
+    Function* toInstrument = nullptr;
+    SEXP toInstrSexp = R_NilValue;
 
-        // For the OSR condition.
-        (*it)->setInPtr(c, toInlineClosure);
-
-        // For the promises.
-        (*it)->fixPromises(constantPool, toInlineClosure, c);
-
-        // Get the LLVM IR for the function to Inline.
-        SEXP toInlineFunc = R_NilValue;
-        if (!INLINE_ALL) {
-            toInlineFunc = OSRHandler::getFreshIR(toInlineClosure, c, false);
-        } else {
-            toInlineClosure = inlineCalls(toInlineClosure);
-            toInlineFunc = OSRHandler::getFreshIR(toInlineClosure, c, false);
-        }
-        // TODO because of verifier
-        /*OSRHandler::addSexpToModule(toInlineFunc, c->getBuilder()->module());
-        OSRHandler::resetSafepoints(toInlineFunc, c);*/
-
-        Function* toInline = GET_LLVM(toInlineFunc);
-
-        Function* toInstrument = OSRHandler::getToInstrument(toOpt);
-        SEXP toInstrSexp = OSRHandler::cloneSEXP(fSexp, toInstrument);
+    if (!calls.empty()) {
+        // to Instrument here implies we always exit to the base function.
+        toInstrument = OSRHandler::getToInstrument(toOpt);
+        toInstrSexp = OSRHandler::cloneSEXP(fSexp, toInstrument);
         OSRHandler::resetSafepoints(toInstrSexp, c);
         c->getBuilder()->module()->fixRelocations(formals, toInstrSexp,
                                                   toInstrument);
-        Inst_Vector* compensation = createCompensation(toInstrSexp, f);
+    }
 
-        auto newrho = createNewRho((*it));
+    for (auto it = calls.begin(); it != calls.end(); ++it) {
+        SEXP innerClosure = it->first;
+        if (!INLINE_ALL)
+            innerFunc = OSRHandler::getFreshIR(innerClosure, c);
+        else {
+            innerClosure = inlineCalls(innerClosure);
+            ValueToValueMapTy VMap;
+            Function* inLLVM =
+                CloneFunction(GET_LLVM(BODY(innerClosure)), VMap, false);
+            innerFunc = OSRHandler::cloneSEXP(BODY(innerClosure), inLLVM);
+        }
 
-        // Replace constant pool accesses and argument uses.
-        Return_List ret;
-        prepareCodeToInline(toInline, *it, newrho, LENGTH(CDR(fSexp)), &ret);
-        // TODO because of verifier
-        // OSRHandler::resetSafepoints(fSexp, c);
-        insertBody(toOpt, toInline, toInstrument, *it, &ret);
-        auto res =
-            OSRHandler::insertOSRExit(toOpt, toInstrument, (*it)->getConsts(),
-                                      getOSRCondition(*it), compensation);
-        // clean up
-        VERIFYFUN2(res.second);
-        ret.clear();
-        // Set the constant pool.
-        setCP(fSexp, toInlineFunc);
+        for (auto call = it->second.begin(); call != it->second.end(); ++call) {
+            ValueToValueMapTy VMap;
+            Function* toInline =
+                (*call == it->second.back())
+                    ? GET_LLVM(innerFunc)
+                    : CloneFunction(GET_LLVM(innerFunc), VMap, false);
+            auto newrho = createNewRho(*call);
+            Return_List ret;
+            prepareCodeToInline(toInline, *call, newrho, LENGTH(CDR(fSexp)),
+                                &ret);
+            insertBody(toOpt, toInline, toInstrument, *call, &ret);
+            Inst_Vector* compensation = createCompensation(toInstrSexp, f);
+            auto res = OSRHandler::insertOSRExit(
+                toOpt, toInstrument, (*call)->getConsts(),
+                getOSRCondition(*call), compensation);
+
+            res.second->setGC("rjit");
+            ret.clear();
+        }
+        setCP(fSexp, innerFunc);
     }
     OSRHandler::resetSafepoints(fSexp, c);
-    VERIFYFUN2(GET_LLVM(fSexp));
     SETCDR(f, fSexp);
     return f;
 }
@@ -143,33 +134,31 @@ void OSRInliner::updateCPAccess(CallInst* call, int offset) {
     }
 }
 
-// TODO aghosn I am not inlining the print function because it generates a type
-// Problem. FIXME
 SEXP OSRInliner::getFunction(SEXP cp, int symbol, SEXP env) {
     SEXP symb = VECTOR_ELT(cp, symbol);
-    SEXP fSexp = findFun(symb, env);
-    std::string name = CHAR(PRINTNAME(symb));
-    if (TYPEOF(fSexp) != CLOSXP || TYPEOF(TAG(fSexp)) != ENVSXP ||
-        (TAG(fSexp) != R_GlobalEnv && ONLY_GLOBAL))
+    SEXP fSexp = findVar(symb, env);
+    if (TYPEOF(fSexp) != CLOSXP || TYPEOF(TAG(fSexp)) != ENVSXP)
         return nullptr;
-    SEXP formals = FORMALS(fSexp);
-    while (formals != R_NilValue) {
-        if (TAG(formals) == R_DotsSymbol)
-            return nullptr;
-        formals = CDR(formals);
-    }
-    printf("\n\n\nWE INLINE %s\n\n\n", name.c_str());
     return fSexp;
 }
 
-bool OSRInliner::isMissingArgs(SEXP formals, FunctionCall* fc) {
-    SEXP form = formals;
-    unsigned i = 0;
-    while (form != R_NilValue) {
-        ++i;
-        form = CDR(form);
+Call_Map OSRInliner::sortCalls(FunctionCalls* calls, SEXP outer) {
+    Call_Map map;
+    SEXP cp = CDR(BODY(outer));
+    SEXP env = TAG(outer);
+    for (auto it = calls->begin(); it != calls->end(); ++it) {
+        if (!IS_GET_FUNCTION((*it)->getGetFunc()))
+            continue;
+
+        SEXP inner = getFunction(cp, (*it)->getFunctionSymbol(), env);
+        // Function not found or arguments are missing, or recursive call.
+        if (!inner || outer == inner || !((*it)->tryFix(cp, inner, c)))
+            continue;
+
+        (*it)->setInPtr(c, inner);
+        map[inner].push_back(*it);
     }
-    return (i != fc->getArgs()->size());
+    return map;
 }
 
 void OSRInliner::prepareCodeToInline(Function* toInline, FunctionCall* fc,
@@ -213,7 +202,7 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     BasicBlock* continuation = deadBlock->splitBasicBlock(*it, "CONTINUATION");
 
     // Insert the blocks from toInline in toOpt.
-    std::vector<BasicBlock*>* blocks = Utils::getBBs(toInline);
+    std::vector<BasicBlock*>* blocks = getBBs(toInline);
     for (auto it = blocks->begin(); it != blocks->end(); ++it) {
         (*it)->removeFromParent();
         (*it)->insertInto(toOpt, deadBlock);
@@ -249,8 +238,11 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
             delete split;
         }
 
-        if (node)
+        if (node) {
             fc->getIcStub()->replaceAllUsesWith(node);
+            OSRHandler::updateEntry(Func_Pair(toOpt, toInstrument), node,
+                                    fc->getIcStub());
+        }
     }
 
     // Clean up.
@@ -261,21 +253,8 @@ void OSRInliner::insertBody(Function* toOpt, Function* toInline,
     // toInline->removeFromParent();
     delete deadBlock;
     delete toInline;
-
-    /*OSRHandler::insertOSRExit(toOpt, toInstrument, fc->getConsts(),
-                              getOSRCondition(fc), compensation);*/
 }
 
-Inst_Vector* OSRInliner::getTrueCondition() {
-    Inst_Vector* res = new Inst_Vector();
-    ConstantInt* one = ConstantInt::get(getGlobalContext(), APInt(32, 1));
-    // ConstantInt* zero = ConstantInt::get(getGlobalContext(), APInt(32, 0));
-    ICmpInst* cond = new ICmpInst(ICmpInst::ICMP_EQ, one, one /*zero*/);
-    res->push_back(cond);
-    return res;
-}
-
-// TODO do the sexp
 Inst_Vector* OSRInliner::getOSRCondition(FunctionCall* fc) {
     Inst_Vector* res = new Inst_Vector();
     assert(fc->getInPtr() && "The function address has not been set.");
@@ -287,17 +266,13 @@ Inst_Vector* OSRInliner::getOSRCondition(FunctionCall* fc) {
 
 CallInst* OSRInliner::createNewRho(FunctionCall* fc) {
     Value* arglist = rjit::ir::Builder::convertToPointer(R_NilValue);
-
     auto args = fc->getArgs();
-    // TODO aghosn clean that
     for (auto it = args->begin(); it != (args->end()); ++it) {
         Value* arg = (*it);
         std::vector<Value*> f_arg;
         f_arg.push_back(arg);
         f_arg.push_back(arglist);
-        CallInst* inter =
-            CallInst::Create(CONS_NR, f_arg,
-                             ""); // TODO aghosn add somewhere in function.
+        CallInst* inter = CallInst::Create(CONS_NR, f_arg, "");
         arglist = inter;
         inter->insertBefore(fc->getIcStub());
     }

@@ -25,7 +25,7 @@ class Compiler {
 
     void jitAll();
 
-    // TODO aghosn
+    // aghosn: Added access to builder.
     ir::Builder* getBuilder() { return &b; }
 
   private:
@@ -215,21 +215,21 @@ class Compiler {
         llvm::Value* lhs = compileExpression(CAR(CDR(call)));
         if (CDR(CDR(call)) != R_NilValue) {
             llvm::Value* rhs = compileExpression(CAR(CDR(CDR(call))));
-            return B::create(b, lhs, rhs, b.rho(), call)->r();
+            return B::create(b, lhs, rhs, b.rho(), call)->result();
         } else {
-            return U::create(b, lhs, b.rho(), call)->r();
+            return U::create(b, lhs, b.rho(), call)->result();
         }
     }
 
     template <typename B> llvm::Value* compileBinary(SEXP call) {
         llvm::Value* lhs = compileExpression(CAR(CDR(call)));
         llvm::Value* rhs = compileExpression(CAR(CDR(CDR(call))));
-        return B::create(b, lhs, rhs, b.rho(), call)->r();
+        return B::create(b, lhs, rhs, b.rho(), call)->result();
     }
 
     template <typename U> llvm::Value* compileUnary(SEXP call) {
         llvm::Value* op = compileExpression(CAR(CDR(call)));
-        return U::create(b, op, b.rho(), call)->r();
+        return U::create(b, op, b.rho(), call)->result();
     }
 
     ir::Builder b;

@@ -1,5 +1,7 @@
 #include "Builder.h"
-#include "Intrinsics.h"
+#include "primitive_calls.h"
+
+#include "Verifier.h"
 
 using namespace llvm;
 
@@ -67,11 +69,46 @@ Builder::ICContext::ICContext(std::string name, JITModule* m,
     args_.push_back(stackmapId);
 }
 
+llvm::BasicBlock* Builder::createBasicBlock() {
+    return llvm::BasicBlock::Create(m_->getContext(), "", c_->f);
+}
+
+llvm::BasicBlock* Builder::createBasicBlock(std::string const& name) {
+    return llvm::BasicBlock::Create(m_->getContext(), name, c_->f);
+}
+
 void Builder::openFunction(std::string const& name, SEXP ast, SEXP formals) {
     if (c_ != nullptr)
         contextStack_.push(c_);
     c_ = new ClosureContext(name, m_, formals);
     c_->addConstantPoolObject(ast);
+}
+
+SEXP Builder::closeFunction() {
+    assert((contextStack_.empty() or (contextStack_.top()->f != c_->f)) and
+           "Not a function context");
+
+    ClosureContext* cc = dynamic_cast<ClosureContext*>(c_);
+    SEXP result = module()->getNativeSXP(cc->formals, c_->cp[0], c_->cp, c_->f);
+    // c_->f->dump();
+    assert(ir::Verifier::check(c_->f));
+    delete c_;
+    if (contextStack_.empty()) {
+        c_ = nullptr;
+    } else {
+        c_ = contextStack_.top();
+        contextStack_.pop();
+    }
+    return result;
+}
+
+llvm::Function* Builder::closeIC() {
+    assert(contextStack_.empty());
+    assert(ir::Verifier::check(c_->f));
+    llvm::Function* f = c_->f;
+    delete c_;
+    c_ = nullptr;
+    return f;
 }
 
 void Builder::openPromise(std::string const& name, SEXP ast) {

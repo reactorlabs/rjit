@@ -101,3 +101,6 @@ execute <- function(n = 150000L) {
     fasta_naive2(n)
 }
 
+#jit.startChrono()
+execute(150000L)
+#jit.endChrono()
