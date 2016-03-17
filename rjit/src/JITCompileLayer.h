@@ -11,6 +11,8 @@
 #include <vector>
 #include <unordered_map>
 
+class StateMap;
+
 namespace rjit {
 
 namespace ir {
@@ -19,6 +21,10 @@ class Builder;
 
 class JITCompileLayer {
   public:
+    llvm::Function* osrInstrument = nullptr;
+    llvm::Function* osrClone = nullptr;
+    StateMap* osrStatemap = nullptr;
+
     typedef std::unordered_map<llvm::Function*, std::vector<uint64_t>>
         FunctionToStackmap;
 

@@ -17,6 +17,8 @@ void* JITSymbolResolver::getSymbolAddress(const std::string& name) const {
     assert(false);
 }
 
+SEXP osrExit(SEXP s, int i) { return s; }
+
 RuntimeDyld::SymbolInfo JITSymbolResolver::findSymbol(const std::string& name) {
     // Unmangle mach-o symbols
     int st = (name[0] == '_') ? 1 : 0;
@@ -37,6 +39,7 @@ RuntimeDyld::SymbolInfo JITSymbolResolver::findSymbol(const std::string& name) {
         check(recordType);
         check(checkType);
         check(recompileFunction);
+        check(osrExit);
 
     } while (false);
 

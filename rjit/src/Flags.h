@@ -10,9 +10,9 @@ class Flag {
         return flag;
     }
 
-    bool recordTypes = false;
-    bool recompileHot = false;
-    bool useTypefeedback = false;
+    bool recordTypes = true;
+    bool recompileHot = true;
+    bool useTypefeedback = true;
     bool unsafeNA = false;
     bool unsafeOpt = false;
     bool printIR = false;
@@ -21,6 +21,7 @@ class Flag {
     bool compileMatrixRead = true;
     bool compileMatrixWrite = true;
     bool compileSuperMatrixWrite = false;
+    bool osr = true;
 };
 }
 

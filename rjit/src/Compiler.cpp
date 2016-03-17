@@ -23,6 +23,8 @@
 #include "ir/primitive_calls.h"
 #include "ir/Ir.h"
 
+#include "StateMap.hpp"
+
 #include "Instrumentation.h"
 #include "api.h"
 
@@ -63,7 +65,7 @@ SEXP Compiler::compileFunction(std::string const& name, SEXP ast, SEXP formals,
     if (!optimize && Flag::singleton().recompileHot) {
         // Check the invocation count and recompile the function if it is hot.
         auto limit =
-            ConstantInt::get(b.getContext(), APInt(32, StringRef("500"), 10));
+            ConstantInt::get(b.getContext(), APInt(32, StringRef("100"), 10));
         auto invocations = ir::InvocationCount::create(b);
         auto condition = ir::IntegerLessThan::create(b, invocations, limit);
         BasicBlock* bRecompile = b.createBasicBlock("recompile");
@@ -81,6 +83,13 @@ SEXP Compiler::compileFunction(std::string const& name, SEXP ast, SEXP formals,
     }
 
     finalizeCompile(ast);
+
+    if (optimize && Flag::singleton().osr) {
+        JITCompileLayer::singleton.osrInstrument = b.f();
+        auto res = StateMap::generateIdentityMapping(b.f());
+        JITCompileLayer::singleton.osrClone = res.first;
+        JITCompileLayer::singleton.osrStatemap = res.second;
+    }
 
     return b.closeFunction();
 }
@@ -157,8 +166,9 @@ Value* Compiler::compileSymbol(SEXP value) {
             TypeInfo inf = tf->get(value);
             if (!Flag::singleton().unsafeOpt && !inf.isAny() &&
                 !inf.isBottom()) {
-                ir::CheckType::create(b, res,
-                                      TypeFeedback::get(b.f())->get(value));
+                res = ir::OsrExit::create(b, res,
+                                          TypeFeedback::get(b.f())->get(value))
+                          ->result();
             }
         }
     }

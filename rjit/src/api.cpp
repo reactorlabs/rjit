@@ -180,6 +180,10 @@ REXPORT SEXP setFlag(SEXP name, SEXP value) {
         rjit::Flag::singleton().printOptIR = val;
         return R_NilValue;
     }
+    if (strcmp("osr", flag) == 0) {
+        rjit::Flag::singleton().osr = val;
+        return R_NilValue;
+    }
     std::cout << "Unknown flag : " << flag << "\n";
     std::cout << " Valid flags are: recordTypes, recompileHot, "
               << "staticNamedMatch, unsafeNA, printIR, printOptIR\n";

@@ -4154,6 +4154,39 @@ class Recompile : public PrimitiveCall {
     }
 };
 
+class OsrExit : public PrimitiveCall {
+  public:
+    OsrExit(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::OsrExit) {}
+
+    static OsrExit* create(Builder& b, ir::Value value, TypeInfo expected) {
+        Sentinel s(b);
+        return insertBefore(s, value, expected);
+    }
+
+    static OsrExit* insertBefore(llvm::Instruction* ins, ir::Value value,
+                                 TypeInfo expected) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(value);
+        args_.push_back(Builder::integer(static_cast<int>(expected)));
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<OsrExit>(ins->getModule()), args_, "", ins);
+
+        return new OsrExit(i);
+    }
+
+    static char const* intrinsicName() { return "osrExit"; }
+
+    static llvm::FunctionType* intrinsicType() {
+        return llvm::FunctionType::get(t::SEXP, {t::SEXP, t::Int}, false);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::OsrExit;
+    }
+};
+
 class CheckType : public PrimitiveCall {
   public:
     CheckType(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::CheckType) {}
@@ -4161,6 +4194,18 @@ class CheckType : public PrimitiveCall {
     static CheckType* create(Builder& b, ir::Value value, TypeInfo expected) {
         Sentinel s(b);
         return insertBefore(s, value, expected);
+    }
+
+    static llvm::CallInst* createUnlinked(llvm::Module* m, llvm::Value* value,
+                                          llvm::Value* expected) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(value);
+        args_.push_back(expected);
+
+        llvm::CallInst* i =
+            llvm::CallInst::Create(primitiveFunction<CheckType>(m), args_, "");
+        return i;
     }
 
     static CheckType* insertBefore(llvm::Instruction* ins, ir::Value value,
@@ -4173,14 +4218,13 @@ class CheckType : public PrimitiveCall {
         llvm::CallInst* i = llvm::CallInst::Create(
             primitiveFunction<CheckType>(ins->getModule()), args_, "", ins);
 
-        Builder::markSafepoint(i);
         return new CheckType(i);
     }
 
     static char const* intrinsicName() { return "checkType"; }
 
     static llvm::FunctionType* intrinsicType() {
-        return llvm::FunctionType::get(t::Void, {t::SEXP, t::Int}, false);
+        return llvm::FunctionType::get(t::Bool, {t::SEXP, t::Int}, false);
     }
 
     static bool classof(Pattern const* s) {
@@ -4211,7 +4255,6 @@ class RecordType : public PrimitiveCall {
         llvm::CallInst* i = llvm::CallInst::Create(
             primitiveFunction<RecordType>(ins->getModule()), args_, "", ins);
 
-        Builder::markSafepoint(i);
         return new RecordType(i);
     }
 
