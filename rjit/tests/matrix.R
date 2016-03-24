@@ -27,6 +27,18 @@ f <- jit.compile(function() {
 stopifnot(matrix(c(2:5),2,2) == f())
 
 f <- jit.compile(function() {
+	a <- matrix(c(1:6),2,3)
+	a[,1]
+})
+stopifnot(c(1,2) == f())
+
+f <- jit.compile(function() {
+	a <- matrix(c(1:6),2,3)
+	a[2,]
+})
+stopifnot(c(2,4,6) == f())
+
+f <- jit.compile(function() {
 	a <- matrix(c(2:5),2,2)
 	b <- a[1,1]
 	b
@@ -94,6 +106,15 @@ f <- jit.compile(function() {
 	a[[,]]
 })
 stopifnot("invalid subscript type 'symbol'" == tryCatch(f(), error = function(e) e$message))
+
+
+# Gives an error
+f <- jit.compile(function() {
+	a <- matrix(c(2:5),2,2)
+	a[[2,]]
+})
+stopifnot("invalid subscript type 'symbol'" == tryCatch(f(), error = function(e) e$message))
+
 
 # Gives an error
 f <- jit.compile(function() {
@@ -204,6 +225,27 @@ stopifnot(c(10,10,10,10) == f())
 
 f <- jit.compile(function() {
 	a <- matrix(c(2:5),2,2)
+	a[,] <- 10
+	a
+})
+stopifnot(c(10,10,10,10) == f())
+
+f <- jit.compile(function() {
+	a <- matrix(c(2:5),2,2)
+	a[,1] <- 10
+	a
+})
+stopifnot(c(10,10,4,5) == f())
+
+f <- jit.compile(function() {
+	a <- matrix(c(2:5),2,2)
+	a[2,] <- 10
+	a
+})
+stopifnot(c(2,10,4,10) == f())
+
+f <- jit.compile(function() {
+	a <- matrix(c(2:5),2,2)
 	g <- function(x){x}
 	a[g(1),g(1)] <- 10
 	a
@@ -302,9 +344,21 @@ stopifnot("attempt to select less than one element" == tryCatch(f(), error = fun
 # Gives an error
 f <- jit.compile(function() {
 	a <- matrix(c(2:5),2,2)
+	a[[,1]] <- 10
+})
+stopifnot("[[ ]] with missing subscript" == tryCatch(f(), error = function(e) e$message))
+
+f <- jit.compile(function() {
+	a <- matrix(c(2:5),2,2)
 	a[[,]] <- 10
 })
 stopifnot("[[ ]] with missing subscript" == tryCatch(f(), error = function(e) e$message))
+
+f <- jit.compile(function() {
+	a <- matrix(c(2:5),2,2)
+	a[[2,]] <- 10
+})
+stopifnot("invalid subscript type 'symbol'" == tryCatch(f(), error = function(e) e$message))
 
 f <- jit.compile(function() {
 	a <- matrix(c(2:5),2,2)

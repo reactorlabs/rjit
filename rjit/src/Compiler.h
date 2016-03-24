@@ -95,6 +95,21 @@ class Compiler {
       */
     llvm::Value* compileParenthesis(SEXP arg);
 
+    /** Compiling the colon language symbol.
+     *
+     */
+    llvm::Value* compileColon(SEXP call);
+
+    /** Compiling the double and langusage symbol.
+     *
+     */
+    llvm::Value* compileDoubleAnd(SEXP call);
+
+    /** Compiling the double and language symbol.
+     *
+     */
+    llvm::Value* compileDoubleOR(SEXP call);
+
     /** Compiling vector access on single bracket.
      *
      */
@@ -229,7 +244,7 @@ class Compiler {
     /** Helper function to determine which case store assignment and retrieval
         can handle.
     */
-    bool caseHandledIndex(SEXP index);
+    bool emptyIndex(SEXP index);
     bool caseHandledVector(SEXP vector);
 
     /** Compiles the switch statement.

@@ -10,6 +10,13 @@ f <- jit.compile(function() {
 stopifnot(c(5,3,4,5) == f())
 
 f <- jit.compile(function() {
+	a <- c(2:5)
+	a[] <- 5
+	a
+})
+stopifnot(c(5,5,5,5) == f())
+
+f <- jit.compile(function() {
         a <- 2
         g <- function(){a[1] <-3}
         a
@@ -114,6 +121,13 @@ f <- jit.compile(function() {
 	a
 })
 stopifnot(c(5,3,4,5) == f())
+
+f <- jit.compile(function() {
+	a <- c(2:5)
+	a[[]] <- 5
+	a
+})
+stopifnot("[[ ]] with missing subscript" == tryCatch(f(), error = function(e) e$message))
 
 f <- jit.compile(function() {
         a <- 2

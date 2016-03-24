@@ -25,6 +25,12 @@ f <- jit.compile(function() {
 stopifnot(2 == f())
 
 f <- jit.compile(function() {
+	a <- c(1:5)
+	a[]
+})
+stopifnot(c(1:5) == f())
+
+f <- jit.compile(function() {
 	a <- c(2:5)
 	a[2 - 1]
 })
@@ -207,6 +213,12 @@ f <- jit.compile(function() {
 	a[[0]]
 })
 stopifnot("attempt to select less than one element" == tryCatch(f(), error = function(e) e$message))
+
+f <- jit.compile(function() {
+	a <- c(1:5)
+	a[[]]
+})
+stopifnot("invalid subscript type 'symbol'" == tryCatch(f(), error = function(e) e$message))
 
 # Null index
 

@@ -142,12 +142,13 @@ Value* Compiler::compileExpression(SEXP value) {
 }
 
 /** Compiles a symbol, which reads as variable read using genericGetVar
- * intrinsic.
+    intrinsic.
   */
 Value* Compiler::compileSymbol(SEXP value) {
     assert(TYPEOF(value) == SYMSXP);
     auto name = CHAR(PRINTNAME(value));
     assert(strlen(name));
+
     Value* res = ir::GenericGetVar::create(b, b.rho(), value)->result();
     if (Flag::singleton().recordTypes && b.isFunction()) {
         auto tf = TypeFeedback::get(b.f());
@@ -277,7 +278,7 @@ Value* Compiler::compileIntrinsic(SEXP call) {
     CASE(symbol::DoubleBracket)
     return compileDoubleBracket(call);
     CASE(symbol::Colon)
-    return nullptr;
+    return compileColon(call);
     CASE(symbol::Parenthesis)
     return compileParenthesis(CDR(call));
     CASE(symbol::Function)
@@ -372,6 +373,28 @@ Value* Compiler::compileParenthesis(SEXP arg) {
     return result;
 }
 
+/** Compiling colons.
+  */
+Value* Compiler::compileColon(SEXP call) {
+    return nullptr;
+
+    SEXP expression = CDR(call);
+    SEXP lhs = CAR(expression);
+    SEXP rhs = CAR(CDR(expression));
+    if (lhs == R_NilValue || rhs == R_NilValue) {
+        return nullptr;
+    }
+
+    Value* resultLHS = compileExpression(lhs);
+    Value* resultRHS = compileExpression(rhs);
+    assert(resultLHS);
+    assert(resultRHS);
+
+    b.setResultVisible(true);
+    return ir::ColonValue::create(b, resultLHS, resultRHS, b.rho(), call)
+        ->result();
+}
+
 /** Compile vector access (single bracket).
     The cases that we are not currently handling for vector access is when the
     index being accessed is empty.
@@ -394,41 +417,44 @@ Value* Compiler::compileBracket(SEXP call) {
     // Retrieving the vector and index from the AST.
     SEXP expression = CDR(call);
     SEXP vector = CAR(expression);
-    SEXP indexArg = CDR(expression);
-    SEXP index = CAR(indexArg);
+    SEXP index = CAR(CDR(expression));
 
-    // return nullptr for the cases of the index we do not handle.
-    if (!caseHandledIndex(indexArg)) {
-        return nullptr;
+    Value* resultVector = compileExpression(vector);
+    assert(resultVector);
+
+    Value* resultIndex = nullptr;
+    if (emptyIndex(index)) {
+        resultIndex = ir::Constant::create(b, index)->result();
+    } else {
+        resultIndex = compileExpression(index);
     }
 
     // Checks the AST is matrix access (and not array access).
     if (CDDR(expression) != R_NilValue && CDDDR(expression) == R_NilValue &&
         Flag::singleton().compileMatrixRead) {
 
-        SEXP colArg = CDDR(expression);
-        SEXP col = CAR(colArg);
+        SEXP col = CAR(CDDR(expression));
+        Value* resultCol = nullptr;
 
         // Ensuring we handle the column value of the matrix.
-        if (!caseHandledIndex(colArg)) {
-            return nullptr;
+        if (emptyIndex(col)) {
+            resultCol = ir::Constant::create(b, col)->result();
+        } else {
+            resultCol = compileExpression(col);
         }
 
-        return compileMatrix(call, vector, index, col);
+        b.setResultVisible(true);
+        return ir::GetMatrixValue::create(b, resultVector, resultIndex,
+                                          resultCol, b.rho(), call)
+            ->result();
 
         // Vector access for single bracket.
     } else if (CDDR(expression) == R_NilValue) {
-
-        Value* resultVector = compileExpression(vector);
-        assert(vector);
-
-        Value* resultIndex = compileExpression(index);
 
         b.setResultVisible(true);
         return ir::GetDispatchValue::create(b, resultVector, resultIndex,
                                             b.rho(), call)
             ->result();
-
         // TODO need to handle n-dimen array access.
     } else {
         return nullptr;
@@ -454,12 +480,16 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
     // Retrieving the vector and index from the AST.
     SEXP expression = CDR(call);
     SEXP vector = CAR(expression);
-    SEXP indexArg = CDR(expression);
-    SEXP index = CAR(indexArg);
+    SEXP index = CAR(CDR(expression));
 
-    // return nullptr for the cases of the index we do not handle.
-    if (!caseHandledIndex(indexArg)) {
-        return nullptr;
+    Value* resultVector = compileExpression(vector);
+    assert(resultVector);
+
+    Value* resultIndex = nullptr;
+    if (emptyIndex(index)) {
+        resultIndex = ir::Constant::create(b, index)->result();
+    } else {
+        resultIndex = compileExpression(index);
     }
 
     // Checks the AST that the expression is matrix access (and not array
@@ -467,23 +497,23 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
     if (CDDR(expression) != R_NilValue && CDDDR(expression) == R_NilValue &&
         Flag::singleton().compileMatrixRead) {
 
-        SEXP colArg = CDDR(expression);
-        SEXP col = CAR(colArg);
+        SEXP col = CAR(CDDR(expression));
+        Value* resultCol = nullptr;
 
-        // Making sure we handle the column value of the matrix.
-        if (!caseHandledIndex(colArg)) {
-            return nullptr;
+        // Ensuring we handle the column value of the matrix.
+        if (emptyIndex(col)) {
+            resultCol = ir::Constant::create(b, col)->result();
+        } else {
+            resultCol = compileExpression(col);
         }
 
-        return compileDoubleMatrix(call, vector, index, col);
+        b.setResultVisible(true);
+        return ir::GetMatrixValue2::create(b, resultVector, resultIndex,
+                                           resultCol, b.rho(), call)
+            ->result();
 
         // Vector access for double bracket.
     } else if (CDDR(expression) == R_NilValue) {
-
-        Value* resultVector = compileExpression(vector);
-        assert(vector);
-
-        Value* resultIndex = compileExpression(index);
 
         b.setResultVisible(true);
         return ir::GetDispatchValue2::create(b, resultVector, resultIndex,
@@ -496,44 +526,6 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
     }
 }
 
-/** Compiling matrix access (single bracket).
-    To access this case set the compileMatrixRead/Write flag in Flag.h to true.
-    All the checks are done, this method simply creates the
-    primtive function.
-*/
-Value* Compiler::compileMatrix(SEXP call, SEXP vector, SEXP row, SEXP col) {
-
-    Value* resultVector = compileExpression(vector);
-    assert(vector);
-
-    Value* resultRow = compileExpression(row);
-    Value* resultCol = compileExpression(col);
-    b.setResultVisible(true);
-
-    return ir::GetMatrixValue::create(b, resultVector, resultRow, resultCol,
-                                      b.rho(), call)
-        ->result();
-}
-
-/** Compiling matrix access (double bracket).
-    To access this case set the compileMatrixRead/Write flag in Flag.h to true.
-    All the checks are done, this method simply creates the
-    primtive function.
-*/
-Value* Compiler::compileDoubleMatrix(SEXP call, SEXP vector, SEXP row,
-                                     SEXP col) {
-
-    Value* resultVector = compileExpression(vector);
-    assert(vector);
-    Value* resultRow = compileExpression(row);
-    Value* resultCol = compileExpression(col);
-    b.setResultVisible(true);
-
-    return ir::GetMatrixValue2::create(b, resultVector, resultRow, resultCol,
-                                       b.rho(), call)
-        ->result();
-}
-
 /** Compiling single bracket vector assignment ( and super assignment).
 */
 
@@ -543,7 +535,13 @@ Value* Compiler::compileAssignBracket(SEXP call, SEXP vector, SEXP index,
     Value* resultVector = compileExpression(vector);
     assert(resultVector);
     Value* resultVal = compileExpression(value);
-    Value* resultIndex = compileExpression(index);
+
+    Value* resultIndex = nullptr;
+    if (emptyIndex(index)) {
+        resultIndex = ir::Constant::create(b, index)->result();
+    } else {
+        resultIndex = compileExpression(index);
+    }
 
     // Create the primitive function for super assignment.
     if (super) {
@@ -570,8 +568,20 @@ Value* Compiler::compileAssignMatrix(SEXP call, SEXP vector, SEXP row, SEXP col,
     Value* resultVector = compileExpression(vector);
     assert(resultVector);
     Value* resultVal = compileExpression(value);
-    Value* resultRow = compileExpression(row);
-    Value* resultCol = compileExpression(col);
+
+    Value* resultRow = nullptr;
+    if (emptyIndex(row)) {
+        resultRow = ir::Constant::create(b, row)->result();
+    } else {
+        resultRow = compileExpression(row);
+    }
+
+    Value* resultCol = nullptr;
+    if (emptyIndex(col)) {
+        resultCol = ir::Constant::create(b, col)->result();
+    } else {
+        resultCol = compileExpression(col);
+    }
 
     // Super assignment for matrices
     if (super) {
@@ -599,7 +609,13 @@ Value* Compiler::compileAssignDoubleBracket(SEXP call, SEXP vector, SEXP index,
     Value* resultVector = compileExpression(vector);
     assert(resultVector);
     Value* resultVal = compileExpression(value);
-    Value* resultIndex = compileExpression(index);
+
+    Value* resultIndex = nullptr;
+    if (emptyIndex(index)) {
+        resultIndex = ir::Constant::create(b, index)->result();
+    } else {
+        resultIndex = compileExpression(index);
+    }
 
     // Create the primitive function for super assignment.
     if (super) {
@@ -628,8 +644,20 @@ Value* Compiler::compileAssignDoubleMatrix(SEXP call, SEXP vector, SEXP row,
     Value* resultVector = compileExpression(vector);
     assert(resultVector);
     Value* resultVal = compileExpression(value);
-    Value* resultRow = compileExpression(row);
-    Value* resultCol = compileExpression(col);
+
+    Value* resultRow = nullptr;
+    if (emptyIndex(row)) {
+        resultRow = ir::Constant::create(b, row)->result();
+    } else {
+        resultRow = compileExpression(row);
+    }
+
+    Value* resultCol = nullptr;
+    if (emptyIndex(col)) {
+        resultCol = ir::Constant::create(b, col)->result();
+    } else {
+        resultCol = compileExpression(col);
+    }
 
     // Super assignment for double bracket matrices
     if (super) {
@@ -650,15 +678,15 @@ Value* Compiler::compileAssignDoubleMatrix(SEXP call, SEXP vector, SEXP row,
 
 /** The index of a vector can not be empty.
 */
-bool Compiler::caseHandledIndex(SEXP index) {
+bool Compiler::emptyIndex(SEXP index) {
 
     // TODO handle the case when the index is empty.
     // In this case only the "relevant" attributes of vector are retained.
-    if (TYPEOF(CAR(index)) == SYMSXP && !strlen(CHAR(PRINTNAME(CAR(index))))) {
-        return false;
+    if (TYPEOF(index) == SYMSXP && !strlen(CHAR(PRINTNAME(index)))) {
+        return true;
     }
 
-    return true;
+    return false;
 }
 
 /** We only handle vectors that are symbols for vector assignment.
@@ -702,32 +730,26 @@ Value* Compiler::compileAssignment(SEXP e) {
     // Check if the LHS is a language object
     if (TYPEOF(lhs) == LANGSXP && CDR(lhs) && CDDR(lhs)) {
         SEXP vector = CAR(CDR(lhs));
-        SEXP indexArg = CDDR(lhs);
-        SEXP index = CAR(indexArg);
+        SEXP index = CAR(CDDR(lhs));
 
         // Check we handle the index and vector.
-        if (caseHandledIndex(indexArg) && caseHandledVector(vector)) {
+        if (caseHandledVector(vector)) {
 
             // Matrix assignment
             if (CDDDR(lhs) != R_NilValue && CDR(CDDDR(lhs)) == R_NilValue &&
                 Flag::singleton().compileMatrixWrite) {
-                SEXP colArg = CDDDR(lhs);
 
-                if (caseHandledIndex(colArg)) {
+                SEXP col = CAR(CDDDR(lhs));
+                // Single bracket matrix assignment
+                if (CAR(lhs) == symbol::Bracket) {
+                    return compileAssignMatrix(lhs, vector, index, col, rhs,
+                                               false);
+                }
 
-                    SEXP col = CAR(colArg);
-
-                    // Single bracket matrix assignment
-                    if (CAR(lhs) == symbol::Bracket) {
-                        return compileAssignMatrix(lhs, vector, index, col, rhs,
-                                                   false);
-                    }
-
-                    // Double bracket matrix assignment
-                    if (CAR(lhs) == symbol::DoubleBracket) {
-                        return compileAssignDoubleMatrix(lhs, vector, index,
-                                                         col, rhs, false);
-                    }
+                // Double bracket matrix assignment
+                if (CAR(lhs) == symbol::DoubleBracket) {
+                    return compileAssignDoubleMatrix(lhs, vector, index, col,
+                                                     rhs, false);
                 }
             }
 
@@ -779,31 +801,27 @@ Value* Compiler::compileSuperAssignment(SEXP e) {
     // Check if the LHS is a language object
     if (TYPEOF(lhs) == LANGSXP && CDR(lhs) && CDDR(lhs)) {
         SEXP vector = CAR(CDR(lhs));
-        SEXP indexArg = CDDR(lhs);
-        SEXP index = CAR(indexArg);
+        SEXP index = CAR(CDDR(lhs));
 
         // Check we handle the index and vector.
-        if (caseHandledIndex(indexArg) && caseHandledVector(vector)) {
+        if (caseHandledVector(vector)) {
 
             // Matrix assignment (NOT being handled in this release).
             if (CDDDR(lhs) != R_NilValue && CDR(CDDDR(lhs)) == R_NilValue &&
                 Flag::singleton().compileSuperMatrixWrite) {
-                SEXP colArg = CDDDR(lhs);
 
-                if (caseHandledIndex(colArg)) {
-                    SEXP col = CAR(colArg);
+                SEXP col = CAR(CDDDR(lhs));
 
-                    // Single bracket matrix assignment
-                    if (CAR(lhs) == symbol::Bracket) {
-                        return compileAssignMatrix(lhs, vector, index, col, rhs,
-                                                   true);
-                    }
+                // Single bracket matrix assignment
+                if (CAR(lhs) == symbol::Bracket) {
+                    return compileAssignMatrix(lhs, vector, index, col, rhs,
+                                               true);
+                }
 
-                    // Double bracket matrix assignment
-                    if (CAR(lhs) == symbol::DoubleBracket) {
-                        return compileAssignDoubleMatrix(lhs, vector, index,
-                                                         col, rhs, true);
-                    }
+                // Double bracket matrix assignment
+                if (CAR(lhs) == symbol::DoubleBracket) {
+                    return compileAssignDoubleMatrix(lhs, vector, index, col,
+                                                     rhs, true);
                 }
             }
 

@@ -15,7 +15,7 @@ g <- function(f, e, d, c, b, a) {
 
 f <- function() {
     res <- 0
-    for (i in 1:100000) {
+    for (i in 1:10000) {
         res <- res + g(4, 5, 6, a=1, b=2, c=3)
     }
     res
@@ -23,10 +23,12 @@ f <- function() {
 
 # R would be quite slow  to run these
 # Lets instead see how fast the bytecode compiler in R runs them
-require(compiler)
-f <- cmpfun(f)
-h <- cmpfun(h)
-print(system.time(f()))
+y <- function(){
+    require(compiler)
+    f <- cmpfun(f)
+    h <- cmpfun(h)
+    print(system.time(f()))
+}
 
 # Now lets see rjit
 source("loadRjit")
@@ -45,31 +47,46 @@ recompile <- function() {
 }
 
 # lets run the example native
-recompile()
-print(system.time(f()))
+a <- function(){
+    recompile()
+    print(system.time(f()))
+}
 
 # now lets start recording the types
-jit.setFlag("recordTypes", TRUE)
-recompile()
-print(system.time(f()))
+b <- function(){
+    jit.setFlag("recordTypes", TRUE)
+    recompile()
+    print(system.time(f()))
+}
 
 # uh this is slow, but look we got some useful info
-jit.printTypefeedback(h)
-jit.printTypefeedback(g)
+
+c <- function(){
+    jit.printTypefeedback(h)
+    jit.printTypefeedback(g)
+}
 
 # now let put this to use
-jit.setFlag("useTypefeedback", TRUE)
-jit.setFlag("recompileHot", TRUE)
-recompile()
-print(system.time(f()))
+
+d <- function(){
+    jit.setFlag("useTypefeedback", TRUE)
+    jit.setFlag("recompileHot", TRUE)
+    recompile()
+    print(system.time(f()))
+}
 
 # well its, not too exciting yet, since we are really stupid about redundant checks
 # let's disable them for a second
-jit.setFlag("unsafeOpt", TRUE)
-recompile()
-print(system.time(f()))
+
+e <- function(){
+    jit.setFlag("unsafeOpt", TRUE)
+    recompile()
+    print(system.time(f()))
+}
 
 # now lets do something about the named arguments:
-jit.setFlag("staticNamedMatch", TRUE)
-recompile()
-print(system.time(f()))
+x <- function(){
+    jit.setFlag("staticNamedMatch", TRUE)
+    recompile()
+    print(system.time(f()))
+}

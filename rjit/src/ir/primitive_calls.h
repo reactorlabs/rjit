@@ -442,6 +442,69 @@ class GetForLoopValue : public PrimitiveCall {
     }
 };
 
+/* Primitive function for colon values.
+*/
+
+class ColonValue : public PrimitiveCall {
+  public:
+    llvm::Value* lhs() { return getValue(0); }
+    llvm::Value* rhs() { return getValue(1); }
+    llvm::Value* rho() { return getValue(2); }
+    llvm::Value* constantPool() { return getValue(3); }
+
+    int call() { return getValueInt(4); }
+    SEXP callValue() {
+        llvm::Function* f = ins()->getParent()->getParent();
+        JITModule* m = static_cast<JITModule*>(f->getParent());
+        return VECTOR_ELT(m->constPool(f), call());
+    }
+    SEXP call(Builder const& b) { return b.constantPool(call()); }
+
+    ColonValue(llvm::Instruction* ins) : PrimitiveCall(ins, Kind::ColonValue) {}
+
+    static ColonValue* create(Builder& b, ir::Value lhs, ir::Value rhs,
+                              ir::Value rho, SEXP call) {
+        Sentinel s(b);
+        return insertBefore(s, lhs, rhs, rho, b.consts(),
+                            Builder::integer(b.constantPoolIndex(call)));
+    }
+
+    static ColonValue* insertBefore(llvm::Instruction* ins, ir::Value lhs,
+                                    ir::Value rhs, ir::Value rho,
+                                    ir::Value constantPool, ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(lhs);
+        args_.push_back(rhs);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<ColonValue>(ins->getModule()), args_, "", ins);
+
+        Builder::markSafepoint(i);
+        return new ColonValue(i);
+    }
+
+    static ColonValue* insertBefore(Pattern* p, ir::Value lhs, ir::Value rhs,
+                                    ir::Value rho, ir::Value constantPool,
+                                    ir::Value call) {
+
+        return insertBefore(p->first(), lhs, rhs, rho, constantPool, call);
+    }
+
+    static char const* intrinsicName() { return "colonValue"; }
+
+    static llvm::FunctionType* intrinsicType() {
+        return llvm::FunctionType::get(
+            t::SEXP, {t::SEXP, t::SEXP, t::SEXP, t::SEXP, t::Int}, false);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::ColonValue;
+    }
+};
+
 /** Read and retrieves the value of a vector index for single bracket.
 */
 class GetDispatchValue : public PrimitiveCall {
