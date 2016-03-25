@@ -279,6 +279,10 @@ Value* Compiler::compileIntrinsic(SEXP call) {
     return compileDoubleBracket(call);
     CASE(symbol::Colon)
     return compileColon(call);
+    CASE(symbol::DoubleAnd)
+    return compileDoubleAnd(call);
+    CASE(symbol::DoubleOr)
+    return compileDoubleOr(call);
     CASE(symbol::Parenthesis)
     return compileParenthesis(CDR(call));
     CASE(symbol::Function)
@@ -393,6 +397,39 @@ Value* Compiler::compileColon(SEXP call) {
     b.setResultVisible(true);
     return ir::ColonValue::create(b, resultLHS, resultRHS, b.rho(), call)
         ->result();
+}
+
+/** Compiling double and.
+  */
+Value* Compiler::compileDoubleAnd(SEXP call) {
+    return nullptr;
+
+    SEXP expression = CDR(call);
+    SEXP lhs = CAR(expression);
+    SEXP rhs = CAR(CDR(expression));
+
+    if (lhs == R_NilValue || rhs == R_NilValue) {
+        return nullptr;
+    }
+
+    // Value* resultLHS = compileExpression(lhs);
+    // Value* resultRHS = compileExpression(rhs);
+}
+
+/** Compiling double or.
+  */
+Value* Compiler::compileDoubleOr(SEXP call) {
+    return nullptr;
+
+    SEXP expression = CDR(call);
+    SEXP lhs = CAR(expression);
+    SEXP rhs = CAR(CDR(expression));
+    if (lhs == R_NilValue || rhs == R_NilValue) {
+        return nullptr;
+    }
+
+    // Value* resultLHS = compileExpression(lhs);
+    // Value* resultRHS = compileExpression(rhs);
 }
 
 /** Compile vector access (single bracket).

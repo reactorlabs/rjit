@@ -108,7 +108,7 @@ class Compiler {
     /** Compiling the double and language symbol.
      *
      */
-    llvm::Value* compileDoubleOR(SEXP call);
+    llvm::Value* compileDoubleOr(SEXP call);
 
     /** Compiling vector access on single bracket.
      *
