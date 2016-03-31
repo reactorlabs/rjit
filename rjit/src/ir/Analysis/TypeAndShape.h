@@ -91,6 +91,9 @@ class TypeAndShapePass : public ir::Fixpoint<ir::AState<TypeInfo>> {
             Value(Value::Type::Any, Value::Size::Any, Value::Attrib::Any);
     }
 
+    /** Match case for the colon operator.
+    */
+
     bool dispatch(llvm::BasicBlock::iterator& i) override;
 };
 
