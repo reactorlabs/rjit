@@ -246,7 +246,9 @@ class Compiler {
     */
     bool emptyIndex(SEXP index);
     bool caseHandledVector(SEXP vector);
-    bool caseHandledLogic(SEXP logic);
+    bool logicCasesNotHandled(SEXP logic);
+    bool colonCasesNotHandled(SEXP logic);
+
     /** Compiles the switch statement.
 
       There are two kinds of switch - integral and character one and they differ

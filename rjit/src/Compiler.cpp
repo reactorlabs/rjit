@@ -380,12 +380,12 @@ Value* Compiler::compileParenthesis(SEXP arg) {
 /** Compiling colons.
   */
 Value* Compiler::compileColon(SEXP call) {
-    return nullptr;
 
     SEXP expression = CDR(call);
     SEXP lhs = CAR(expression);
     SEXP rhs = CAR(CDR(expression));
-    if (lhs == R_NilValue || rhs == R_NilValue) {
+
+    if (colonCasesNotHandled(lhs) || colonCasesNotHandled(rhs)) {
         return nullptr;
     }
 
@@ -410,7 +410,7 @@ Value* Compiler::compileDoubleAnd(SEXP call) {
     SEXP lhs = CAR(expression);
     SEXP rhs = CAR(CDR(expression));
 
-    if (caseHandledLogic(lhs) || caseHandledLogic(rhs)) {
+    if (logicCasesNotHandled(lhs) || logicCasesNotHandled(rhs)) {
         return nullptr;
     }
 
@@ -452,7 +452,7 @@ Value* Compiler::compileDoubleOr(SEXP call) {
     SEXP lhs = CAR(expression);
     SEXP rhs = CAR(CDR(expression));
 
-    if (caseHandledLogic(lhs) || caseHandledLogic(rhs)) {
+    if (logicCasesNotHandled(lhs) || logicCasesNotHandled(rhs)) {
         return nullptr;
     }
 
@@ -792,9 +792,10 @@ bool Compiler::caseHandledVector(SEXP vector) {
     return true;
 }
 
-/**
+/** Returns true for all the cases currently not being handled for
+    && and ||
 */
-bool Compiler::caseHandledLogic(SEXP logic) {
+bool Compiler::logicCasesNotHandled(SEXP logic) {
 
     // For vector assignment only vectors that are symbols are handled.
     if (logic == R_NilValue) {
@@ -804,6 +805,26 @@ bool Compiler::caseHandledLogic(SEXP logic) {
     } else if (TYPEOF(logic) == BUILTINSXP) {
         return true;
     } else if (TYPEOF(logic) == LANGSXP) {
+        // TODO I really need to handle this case!
+        return true;
+    }
+
+    return false;
+}
+
+/** Returns true for all the cases currently not being handled for :
+*/
+bool Compiler::colonCasesNotHandled(SEXP logic) {
+
+    // For vector assignment only vectors that are symbols are handled.
+    if (logic == R_NilValue) {
+        return true;
+    } else if (TYPEOF(logic) == SPECIALSXP) {
+        return true;
+    } else if (TYPEOF(logic) == BUILTINSXP) {
+        return true;
+    } else if (TYPEOF(logic) == LANGSXP && TYPEOF(CAR(logic)) != SYMSXP) {
+        // TODO I really need to handle this case!
         return true;
     }
 
