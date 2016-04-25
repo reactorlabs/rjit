@@ -11,8 +11,8 @@ class Flag {
     }
 
     bool recordTypes = false;
-    bool recompileHot = true;
-    bool useTypefeedback = true;
+    bool recompileHot = false;
+    bool useTypefeedback = false;
     bool unsafeNA = false;
     bool unsafeOpt = false;
     bool printIR = false;

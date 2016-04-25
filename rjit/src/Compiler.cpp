@@ -425,20 +425,22 @@ Value* Compiler::compileDoubleAnd(SEXP call) {
 
     // // When lhs is false, return lhs
     b.setBlock(lhsFalse);
+    lhsValue = ir::ConvertToLogical::create(b, resultLHS, lhs)->result();
     lhsFalse = b.block();
     ir::Branch::create(b, next);
 
     // When lhs is true, return rhs
     b.setBlock(lhsTrue);
     Value* resultRHS = compileExpression(rhs);
+    Value* rhsValue = ir::ConvertToLogical::create(b, resultRHS, rhs)->result();
     lhsTrue = b.block();
     ir::Branch::create(b, next);
 
     // Setting the phi node
     b.setBlock(next);
     PHINode* phi = PHINode::Create(t::SEXP, 2, "doubleAndBranch", b);
-    phi->addIncoming(resultLHS, lhsFalse);
-    phi->addIncoming(resultRHS, lhsTrue);
+    phi->addIncoming(lhsValue, lhsFalse);
+    phi->addIncoming(rhsValue, lhsTrue);
 
     b.setResultVisible(true);
     return phi;
@@ -468,19 +470,21 @@ Value* Compiler::compileDoubleOr(SEXP call) {
     // // When lhs is false, return rhs
     b.setBlock(lhsFalse);
     Value* resultRHS = compileExpression(rhs);
+    Value* rhsValue = ir::ConvertToLogical::create(b, resultRHS, rhs)->result();
     lhsFalse = b.block();
     ir::Branch::create(b, next);
 
     // When lhs is true, return lhs
     b.setBlock(lhsTrue);
+    lhsValue = ir::ConvertToLogical::create(b, resultLHS, lhs)->result();
     lhsTrue = b.block();
     ir::Branch::create(b, next);
 
     // Setting the phi node
     b.setBlock(next);
     PHINode* phi = PHINode::Create(t::SEXP, 2, "doubleOrBranch", b);
-    phi->addIncoming(resultRHS, lhsFalse);
-    phi->addIncoming(resultLHS, lhsTrue);
+    phi->addIncoming(rhsValue, lhsFalse);
+    phi->addIncoming(lhsValue, lhsTrue);
 
     b.setResultVisible(true);
     return phi;
@@ -550,7 +554,8 @@ Value* Compiler::compileBracket(SEXP call) {
     }
     // N-dimen single bracket array access.
     else if (CDDDR(expression) != R_NilValue) {
-        return nullptr;
+        // return nullptr;
+
         std::vector<llvm::Value*> args;
         args.push_back(resultIndex);
         SEXP indexRest = CDDR(expression);
@@ -972,15 +977,22 @@ Value* Compiler::compileAssignment(SEXP e) {
 
     SEXP expr = CDR(e);
 
-    if (TYPEOF(CAR(expr)) == SYMSXP || TYPEOF(CAR(expr)) == BUILTINSXP) {
+    // Assignment to symbols
+    if (TYPEOF(CAR(expr)) == SYMSXP) {
         Value* v = compileExpression(CAR(CDR(expr)));
         ir::GenericSetVar::create(b, v, b.rho(), CAR(expr));
         b.setResultVisible(false);
         return v;
     }
 
-    // How would you assign to a builtin function?
-    // Let's take a closer look at what the bytecode compiler does.
+    // Complex assignment to builtin functions
+    // if (TYPEOF(CAR(expr)) == BUILTINSXP) {
+    //     Value* lhsResult = compileExpression(CAR(expr));
+    //     Value* rhsResult = compileExpression(CAR(CDR(expr)));
+    //     ir::GenericSetBuiltin::create(b, lhsResult, rhsResult, b.rho(), e);
+    //     b.setResultVisible(false);
+    //     return rhs;
+    // }
 
     // Retrieve the LHS and RHS of the assignment from the AST.
     SEXP lhs = CAR(expr);
@@ -1171,6 +1183,7 @@ Value* Compiler::compileCondition(SEXP e) {
     // true case has to be always present
     b.setBlock(ifTrue);
     Value* trueResult = compileExpression(trueAst);
+    b.setResultVisible(true);
     ir::Branch::create(b, next);
     ifTrue = b.block();
 
@@ -1193,7 +1206,6 @@ Value* Compiler::compileCondition(SEXP e) {
     phi->addIncoming(trueResult, ifTrue);
     phi->addIncoming(falseResult, ifFalse);
 
-    b.setResultVisible(true);
     return phi;
 }
 

@@ -34,6 +34,16 @@ f <- jit.compile(function(){
 stopifnot(length(f()) == 2)
 
 f <- jit.compile(function(){
+  2 && 2
+})
+stopifnot(f() == TRUE)
+
+f <- jit.compile(function(){
+  (2 && 2) == 2
+})
+stopifnot(f() == FALSE)
+
+f <- jit.compile(function(){
   TRUE && TRUE
 })
 stopifnot(f() == TRUE)
@@ -61,7 +71,17 @@ f <- jit.compile(function(){
 stopifnot(f() == 1)
 
 f <- jit.compile(function(){
-  TRUE|| TRUE
+  2 || 2
+})
+stopifnot(f() == TRUE)
+
+f <- jit.compile(function(){
+  (2 || 2) == 2
+})
+stopifnot(f() == FALSE)
+
+f <- jit.compile(function(){
+  TRUE || TRUE
 })
 stopifnot(f() == TRUE)
 
