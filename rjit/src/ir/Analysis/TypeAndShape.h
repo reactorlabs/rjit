@@ -93,14 +93,15 @@ class TypeAndShapePass : public ir::Fixpoint<ir::AState<TypeInfo>> {
 
     /** Match case for the colon operator.
     */
+    match colonOpt(ir::ColonValue* p) {
+        state[p] =
+            Value(Value::Type::Integer, Value::Size::Any, Value::Attrib::Any);
+    }
 
     /** If we see a pattern we don't match otherwise, assume its result is
      * top.
      */
-    void defaultMatch(ir::Pattern* p) override {
-        state[p] =
-            Value(Value::Type::Any, Value::Size::Any, Value::Attrib::Any);
-    }
+    void defaultMatch(ir::Pattern* p) override { state[p] = Value::any(); }
 
     bool dispatch(llvm::BasicBlock::iterator& i) override;
 };

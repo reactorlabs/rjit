@@ -6,6 +6,8 @@
 #include "RDefs.h"
 
 #include <set>
+#include <vector>
+#include <initializer_list>
 
 namespace rjit {
 
@@ -141,6 +143,12 @@ class Compiler {
      *
      */
     llvm::Value* compileAssignMatrix(SEXP call, SEXP vector, SEXP row, SEXP col,
+                                     SEXP value, bool super);
+
+    /** Compiling N-dimen array assignment on single bracket.
+     *
+     */
+    llvm::Value* compileAssignNArray(SEXP call, SEXP vector, SEXP index,
                                      SEXP value, bool super);
 
     /** Compiling vector assignment on double bracket.

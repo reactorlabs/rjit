@@ -48,6 +48,10 @@ DECLARE(Ellipsis, "...");
 DECLARE(Colon, ":");
 DECLARE(DoubleAnd, "&&");
 DECLARE(DoubleOr, "||");
+DECLARE(Mod, "%%");
+DECLARE(ModMul, "%*%");
+DECLARE(ModDiv, "%/%");
+DECLARE(VMatch, "%in%");
 
 #undef DECLARE
 } // namespace symbol

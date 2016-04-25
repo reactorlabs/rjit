@@ -18,10 +18,10 @@ f <- jit.compile(function(){
 })
 stopifnot(f() == 5:6)
 
-# f <- jit.compile(function(){
-#   4 + 1 : 2 - 1
-# })
-# stopifnot(f() == 4:5)
+f <- jit.compile(function(){
+  4 + 1 : 2 - 1
+})
+stopifnot(f() == 4:5)
 
 f <- jit.compile(function(){
   (4 + 1) : (2 - 1)

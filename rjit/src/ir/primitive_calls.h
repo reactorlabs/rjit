@@ -638,6 +638,84 @@ class GetMatrixValue : public PrimitiveCall {
     }
 };
 
+/** Disable marking safepoints for this primitive call, as safepoints does
+    not support var_args.
+*/
+class GetNArrayValue : public PrimitiveCall {
+  public:
+    llvm::Value* vec() { return getValue(0); }
+    int dimen() { return getValueInt(1); }
+    llvm::Value* rho() { return getValue(2); }
+    llvm::Value* constantPool() { return getValue(3); }
+
+    int call() { return getValueInt(4); }
+    SEXP callValue() {
+        llvm::Function* f = ins()->getParent()->getParent();
+        JITModule* m = static_cast<JITModule*>(f->getParent());
+        return VECTOR_ELT(m->constPool(f), call());
+    }
+    SEXP call(Builder const& b) { return b.constantPool(call()); }
+
+    // std::vector<llvm::Value*> index() { return getVectorValue(1); }
+
+    GetNArrayValue(llvm::Instruction* ins)
+        : PrimitiveCall(ins, Kind::GetNArrayValue) {}
+
+    static GetNArrayValue* create(Builder& b, ir::Value vec, ir::Value dimen,
+                                  ir::Value rho, SEXP call,
+                                  std::vector<llvm::Value*> index) {
+        Sentinel s(b);
+        return insertBefore(s, vec, dimen, rho, b.consts(),
+                            Builder::integer(b.constantPoolIndex(call)), index);
+    }
+
+    static GetNArrayValue* insertBefore(llvm::Instruction* ins, ir::Value vec,
+                                        ir::Value dimen, ir::Value rho,
+                                        ir::Value constantPool, ir::Value call,
+                                        std::vector<llvm::Value*> index) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(vec);
+        args_.push_back(dimen);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        while (!index.empty()) {
+            args_.push_back(index.back());
+            index.pop_back();
+        }
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GetNArrayValue>(ins->getModule()), args_, "",
+            ins);
+
+        // Builder::markSafepoint(i);
+        return new GetNArrayValue(i);
+    }
+
+    static GetNArrayValue* insertBefore(Pattern* p, ir::Value vec,
+                                        ir::Value dimen, ir::Value rho,
+                                        ir::Value constantPool, ir::Value call,
+                                        std::vector<llvm::Value*> index) {
+
+        return insertBefore(p->first(), vec, dimen, rho, constantPool, call,
+                            index);
+    }
+
+    static char const* intrinsicName() { return "getNArrayValue"; }
+
+    static llvm::FunctionType* intrinsicType() {
+        return llvm::FunctionType::get(
+            t::SEXP, {t::SEXP, t::Int, t::SEXP, t::SEXP, t::Int, t::SEXP},
+            true);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::GetNArrayValue;
+    }
+};
+
 /** Read and retrieves the value of a vector index for double bracket.
  */
 
@@ -769,6 +847,84 @@ class GetMatrixValue2 : public PrimitiveCall {
 
     static bool classof(Pattern const* s) {
         return s->getKind() == Kind::GetMatrixValue2;
+    }
+};
+
+/** Disable marking safepoints for this primitive call, as safepoints does
+    not support var_args.
+*/
+class GetNArrayValue2 : public PrimitiveCall {
+  public:
+    llvm::Value* vec() { return getValue(0); }
+    int dimen() { return getValueInt(1); }
+    llvm::Value* rho() { return getValue(2); }
+    llvm::Value* constantPool() { return getValue(3); }
+
+    int call() { return getValueInt(4); }
+    SEXP callValue() {
+        llvm::Function* f = ins()->getParent()->getParent();
+        JITModule* m = static_cast<JITModule*>(f->getParent());
+        return VECTOR_ELT(m->constPool(f), call());
+    }
+    SEXP call(Builder const& b) { return b.constantPool(call()); }
+
+    // std::vector<llvm::Value*> index() { return getVectorValue(1); }
+
+    GetNArrayValue2(llvm::Instruction* ins)
+        : PrimitiveCall(ins, Kind::GetNArrayValue2) {}
+
+    static GetNArrayValue2* create(Builder& b, ir::Value vec, ir::Value dimen,
+                                   ir::Value rho, SEXP call,
+                                   std::vector<llvm::Value*> index) {
+        Sentinel s(b);
+        return insertBefore(s, vec, dimen, rho, b.consts(),
+                            Builder::integer(b.constantPoolIndex(call)), index);
+    }
+
+    static GetNArrayValue2* insertBefore(llvm::Instruction* ins, ir::Value vec,
+                                         ir::Value dimen, ir::Value rho,
+                                         ir::Value constantPool, ir::Value call,
+                                         std::vector<llvm::Value*> index) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(vec);
+        args_.push_back(dimen);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        while (!index.empty()) {
+            args_.push_back(index.back());
+            index.pop_back();
+        }
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GetNArrayValue2>(ins->getModule()), args_, "",
+            ins);
+
+        // Builder::markSafepoint(i);
+        return new GetNArrayValue2(i);
+    }
+
+    static GetNArrayValue2* insertBefore(Pattern* p, ir::Value vec,
+                                         ir::Value dimen, ir::Value rho,
+                                         ir::Value constantPool, ir::Value call,
+                                         std::vector<llvm::Value*> index) {
+
+        return insertBefore(p->first(), vec, dimen, rho, constantPool, call,
+                            index);
+    }
+
+    static char const* intrinsicName() { return "getNArrayValue2"; }
+
+    static llvm::FunctionType* intrinsicType() {
+        return llvm::FunctionType::get(
+            t::SEXP, {t::SEXP, t::Int, t::SEXP, t::SEXP, t::Int, t::SEXP},
+            true);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::GetNArrayValue2;
     }
 };
 
@@ -926,6 +1082,87 @@ class AssignMatrixValue : public PrimitiveCall {
 
     static bool classof(Pattern const* s) {
         return s->getKind() == Kind::AssignMatrixValue;
+    }
+};
+
+/** Disable marking safepoints for this primitive call, as safepoints does
+    not support var_args.
+*/
+class AssignNArrayValue : public PrimitiveCall {
+  public:
+    llvm::Value* vec() { return getValue(0); }
+    int dimen() { return getValueInt(1); }
+    llvm::Value* value() { return getValue(2); }
+    llvm::Value* rho() { return getValue(3); }
+    llvm::Value* constantPool() { return getValue(4); }
+
+    int call() { return getValueInt(5); }
+    SEXP callValue() {
+        llvm::Function* f = ins()->getParent()->getParent();
+        JITModule* m = static_cast<JITModule*>(f->getParent());
+        return VECTOR_ELT(m->constPool(f), call());
+    }
+    SEXP call(Builder const& b) { return b.constantPool(call()); }
+
+    // std::vector<llvm::Value*> index() { return getVectorValue(1); }
+
+    AssignNArrayValue(llvm::Instruction* ins)
+        : PrimitiveCall(ins, Kind::AssignNArrayValue) {}
+
+    static AssignNArrayValue* create(Builder& b, ir::Value vec, ir::Value dimen,
+                                     ir::Value value, ir::Value rho, SEXP call,
+                                     std::vector<llvm::Value*> index) {
+        Sentinel s(b);
+        return insertBefore(s, vec, dimen, value, rho, b.consts(),
+                            Builder::integer(b.constantPoolIndex(call)), index);
+    }
+
+    static AssignNArrayValue*
+    insertBefore(llvm::Instruction* ins, ir::Value vec, ir::Value dimen,
+                 ir::Value value, ir::Value rho, ir::Value constantPool,
+                 ir::Value call, std::vector<llvm::Value*> index) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(vec);
+        args_.push_back(dimen);
+        args_.push_back(value);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        while (!index.empty()) {
+            args_.push_back(index.back());
+            index.pop_back();
+        }
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<AssignNArrayValue>(ins->getModule()), args_, "",
+            ins);
+
+        // Builder::markSafepoint(i);
+        return new AssignNArrayValue(i);
+    }
+
+    static AssignNArrayValue*
+    insertBefore(Pattern* p, ir::Value vec, ir::Value dimen, ir::Value value,
+                 ir::Value rho, ir::Value constantPool, ir::Value call,
+                 std::vector<llvm::Value*> index) {
+
+        return insertBefore(p->first(), vec, dimen, value, rho, constantPool,
+                            call, index);
+    }
+
+    static char const* intrinsicName() { return "assignNArrayValue"; }
+
+    static llvm::FunctionType* intrinsicType() {
+        return llvm::FunctionType::get(
+            t::SEXP,
+            {t::SEXP, t::Int, t::SEXP, t::SEXP, t::SEXP, t::Int, t::SEXP},
+            true);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::AssignNArrayValue;
     }
 };
 

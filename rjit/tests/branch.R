@@ -54,6 +54,13 @@ f <- jit.compile(function(){
 stopifnot(f() == FALSE)
 
 f <- jit.compile(function(){
+  x <- 1
+  FALSE && (x <- 10)
+  x
+})
+stopifnot(f() == 1)
+
+f <- jit.compile(function(){
   TRUE|| TRUE
 })
 stopifnot(f() == TRUE)
@@ -72,6 +79,13 @@ f <- jit.compile(function(){
   FALSE || FALSE
 })
 stopifnot(f() == FALSE)
+
+f <- jit.compile(function(){
+  x <- 1
+  TRUE || (x <- 10)
+  x
+})
+stopifnot(f() == 1)
 
 f <- jit.compile(function(){
   if (TRUE && TRUE) 3

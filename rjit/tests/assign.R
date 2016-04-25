@@ -510,3 +510,28 @@ f <- jit.compile(function(){
 	x
 })
 stopifnot("[[ ]] with missing subscript" == tryCatch(f(), error = function(e) e$message))
+
+
+####################### N-Dimen #######################
+
+f <- jit.compile(function() {
+	
+	m <- array(c(1:3),c(1:3))
+	m[1,1,1] <- 10
+	m[1,,]
+})
+stopifnot(matrix(c(10,2,3,1,2,3),2,3) == f())
+
+f <- jit.compile(function() {
+	
+	m <- array(c(1:3),c(1:3))
+	m[1,1,1] 
+})
+stopifnot(1 == f())
+
+f <- jit.compile(function() {
+	
+	m <- array(c(1:3),c(1:3))
+	m[,,1]
+})
+stopifnot(c(1,2) == f())

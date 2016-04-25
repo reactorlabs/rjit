@@ -280,3 +280,27 @@ f <- jit.compile(function() {
 	g(a)[[g(1+1)]]
 })
 stopifnot(2 == f())
+
+
+####################### N-Dimen #######################
+
+f <- jit.compile(function() {
+	
+	m <- array(c(1:3),c(1:3))
+	m[1,1,1]
+})
+stopifnot(1 == f())
+
+f <- jit.compile(function() {
+	
+	m <- array(c(1:3),c(1:3))
+	m[,,1]
+})
+stopifnot(c(1,2) == f())
+
+f <- jit.compile(function() {
+	
+	m <- array(c(1:3),c(1:3))
+	m[1,,]
+})
+stopifnot(matrix(c(1,2,3,1,2,3),2,3) == f())

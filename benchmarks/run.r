@@ -107,7 +107,7 @@ calclog <- function(fileNames){
 	   medNR$bottom_quantile[m] = quantile(normRjit[2:numberofruns], c(0.25))
 
 	   #if the compilation time (run1) is two times greater than the largest non-compilation run then it is stored in large_CT 
-	   if(normRjit[1] > max(normRjit[2:numberofruns])*2){
+	   if(normRjit[1] > max(normRjit[2:numberofruns])*1.5){
 	   	medNR$compilation_time[m] = NA
 	   	medNR$large_CT[m] = paste(round(normRjit[1], digits=1)*100, "%", sep="")
 	   } else{
