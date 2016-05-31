@@ -563,6 +563,70 @@ class ColonValue : public PrimitiveCall {
     }
 };
 
+class GetDollarValue : public PrimitiveCall {
+  public:
+    llvm::Value* vec() { return getValue(0); }
+    llvm::Value* index() { return getValue(1); }
+    llvm::Value* rho() { return getValue(2); }
+    llvm::Value* constantPool() { return getValue(3); }
+
+    int call() { return getValueInt(4); }
+    SEXP callValue() {
+        llvm::Function* f = ins()->getParent()->getParent();
+        JITModule* m = static_cast<JITModule*>(f->getParent());
+        return VECTOR_ELT(m->constPool(f), call());
+    }
+    SEXP call(Builder const& b) { return b.constantPool(call()); }
+
+    GetDollarValue(llvm::Instruction* ins)
+        : PrimitiveCall(ins, Kind::GetDollarValue) {}
+
+    static GetDollarValue* create(Builder& b, ir::Value vec, ir::Value index,
+                                  ir::Value rho, SEXP call) {
+        Sentinel s(b);
+        return insertBefore(s, vec, index, rho, b.consts(),
+                            Builder::integer(b.constantPoolIndex(call)));
+    }
+
+    static GetDollarValue* insertBefore(llvm::Instruction* ins, ir::Value vec,
+                                        ir::Value index, ir::Value rho,
+                                        ir::Value constantPool,
+                                        ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(vec);
+        args_.push_back(index);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<GetDollarValue>(ins->getModule()), args_, "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new GetDollarValue(i);
+    }
+
+    static GetDollarValue* insertBefore(Pattern* p, ir::Value vec,
+                                        ir::Value index, ir::Value rho,
+                                        ir::Value constantPool,
+                                        ir::Value call) {
+
+        return insertBefore(p->first(), vec, index, rho, constantPool, call);
+    }
+
+    static char const* intrinsicName() { return "getDollarValue"; }
+
+    static llvm::FunctionType* intrinsicType() {
+        return llvm::FunctionType::get(
+            t::SEXP, {t::SEXP, t::SEXP, t::SEXP, t::SEXP, t::Int}, false);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::GetDollarValue;
+    }
+};
+
 /** Read and retrieves the value of a vector index for single bracket.
 */
 class GetDispatchValue : public PrimitiveCall {
@@ -773,88 +837,6 @@ class GetNArrayValue : public PrimitiveCall {
         return s->getKind() == Kind::GetNArrayValue;
     }
 };
-
-// class AssignNArrayValue : public PrimitiveCall {
-//   public:
-//     llvm::Value* vec() { return getValue(0); }
-//     int dimen() { return getValueInt(1); }
-//     llvm::Value* value() { return getValue(2); }
-//     llvm::Value* rho() { return getValue(3); }
-//     llvm::Value* constantPool() { return getValue(4); }
-
-//     int call() { return getValueInt(5); }
-//     SEXP callValue() {
-//         llvm::Function* f = ins()->getParent()->getParent();
-//         JITModule* m = static_cast<JITModule*>(f->getParent());
-//         return VECTOR_ELT(m->constPool(f), call());
-//     }
-//     SEXP call(Builder const& b) { return b.constantPool(call()); }
-
-//     // std::vector<llvm::Value*> index() { return getVectorValue(1); }
-
-//     AssignNArrayValue(llvm::Instruction* ins)
-//         : PrimitiveCall(ins, Kind::AssignNArrayValue) {}
-
-//     static AssignNArrayValue* create(Builder& b, ir::Value vec, ir::Value
-//     dimen,
-//                                      ir::Value value, ir::Value rho, SEXP
-//                                      call,
-//                                      std::vector<llvm::Value*> index) {
-//         Sentinel s(b);
-//         return insertBefore(s, vec, dimen, value, rho, b.consts(),
-//                             Builder::integer(b.constantPoolIndex(call)),
-//                             index);
-//     }
-
-//     static AssignNArrayValue*
-//     insertBefore(llvm::Instruction* ins, ir::Value vec, ir::Value dimen,
-//                  ir::Value value, ir::Value rho, ir::Value constantPool,
-//                  ir::Value call, std::vector<llvm::Value*> index) {
-
-//         std::vector<llvm::Value*> args_;
-//         args_.push_back(vec);
-//         args_.push_back(dimen);
-//         args_.push_back(value);
-//         args_.push_back(rho);
-//         args_.push_back(constantPool);
-//         args_.push_back(call);
-
-//         while (!index.empty()) {
-//             args_.push_back(index.back());
-//             index.pop_back();
-//         }
-
-//         llvm::CallInst* i = llvm::CallInst::Create(
-//             primitiveFunction<AssignNArrayValue>(ins->getModule()), args_,
-//             "",
-//             ins);
-
-//         // Builder::markSafepoint(i);
-//         return new AssignNArrayValue(i);
-//     }
-
-//     static AssignNArrayValue*
-//     insertBefore(Pattern* p, ir::Value vec, ir::Value dimen, ir::Value value,
-//                  ir::Value rho, ir::Value constantPool, ir::Value call,
-//                  std::vector<llvm::Value*> index) {
-
-//         return insertBefore(p->first(), vec, dimen, value, rho, constantPool,
-//                             call, index);
-//     }
-
-//     static char const* intrinsicName() { return "assignNArrayValue"; }
-
-//     static llvm::FunctionType* intrinsicType() {
-//         return llvm::FunctionType::get(
-//             t::SEXP,
-//             {t::SEXP, t::Int, t::SEXP, t::SEXP, t::SEXP, t::Int, t::SEXP},
-//             true);
-//     }
-
-//     static bool classof(Pattern const* s) {
-//         return s->getKind() == Kind::AssignNArrayValue;
-//     }
-// };
 
 /** Read and retrieves the value of a vector index for double bracket.
  */
@@ -1303,6 +1285,162 @@ class AssignNArrayValue : public PrimitiveCall {
 
     static bool classof(Pattern const* s) {
         return s->getKind() == Kind::AssignNArrayValue;
+    }
+};
+
+class AssignFunctionValue : public PrimitiveCall {
+  public:
+    llvm::Value* vec() { return getValue(0); }
+    int dimen() { return getValueInt(1); }
+    llvm::Value* value() { return getValue(2); }
+    llvm::Value* funOP() { return getValue(3); }
+    llvm::Value* rho() { return getValue(4); }
+    llvm::Value* constantPool() { return getValue(5); }
+
+    int call() { return getValueInt(6); }
+    SEXP callValue() {
+        llvm::Function* f = ins()->getParent()->getParent();
+        JITModule* m = static_cast<JITModule*>(f->getParent());
+        return VECTOR_ELT(m->constPool(f), call());
+    }
+    SEXP call(Builder const& b) { return b.constantPool(call()); }
+
+    // std::vector<llvm::Value*> index() { return getVectorValue(1); }
+
+    AssignFunctionValue(llvm::Instruction* ins)
+        : PrimitiveCall(ins, Kind::AssignFunctionValue) {}
+
+    static AssignFunctionValue* create(Builder& b, ir::Value vec,
+                                       ir::Value dimen, ir::Value value,
+                                       ir::Value funOP, ir::Value rho,
+                                       SEXP call,
+                                       std::vector<llvm::Value*> index) {
+        Sentinel s(b);
+        return insertBefore(s, vec, dimen, value, funOP, rho, b.consts(),
+                            Builder::integer(b.constantPoolIndex(call)), index);
+    }
+
+    static AssignFunctionValue*
+    insertBefore(llvm::Instruction* ins, ir::Value vec, ir::Value dimen,
+                 ir::Value value, ir::Value funOP, ir::Value rho,
+                 ir::Value constantPool, ir::Value call,
+                 std::vector<llvm::Value*> index) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(vec);
+        args_.push_back(dimen);
+        args_.push_back(value);
+        args_.push_back(funOP);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        while (!index.empty()) {
+            args_.push_back(index.back());
+            index.pop_back();
+        }
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<AssignFunctionValue>(ins->getModule()), args_, "",
+            ins);
+
+        // Builder::markSafepoint(i);
+        return new AssignFunctionValue(i);
+    }
+
+    static AssignFunctionValue*
+    insertBefore(Pattern* p, ir::Value vec, ir::Value dimen, ir::Value value,
+                 ir::Value funOP, ir::Value rho, ir::Value constantPool,
+                 ir::Value call, std::vector<llvm::Value*> index) {
+
+        return insertBefore(p->first(), vec, dimen, value, funOP, rho,
+                            constantPool, call, index);
+    }
+
+    static char const* intrinsicName() { return "assignFunctionValue"; }
+
+    static llvm::FunctionType* intrinsicType() {
+        return llvm::FunctionType::get(t::SEXP,
+                                       {t::SEXP, t::Int, t::SEXP, t::SEXP,
+                                        t::SEXP, t::SEXP, t::Int, t::SEXP},
+                                       true);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::AssignFunctionValue;
+    }
+};
+
+/** Assignment to variable from $ symbol
+*/
+
+class AssignDollarValue : public PrimitiveCall {
+  public:
+    llvm::Value* vector() { return getValue(0); }
+    llvm::Value* index() { return getValue(1); }
+    llvm::Value* val() { return getValue(2); }
+    llvm::Value* rho() { return getValue(3); }
+    llvm::Value* constantPool() { return getValue(4); }
+
+    int call() { return getValueInt(5); }
+    SEXP callValue() {
+        llvm::Function* f = ins()->getParent()->getParent();
+        JITModule* m = static_cast<JITModule*>(f->getParent());
+        return VECTOR_ELT(m->constPool(f), call());
+    }
+    SEXP call(Builder const& b) { return b.constantPool(call()); }
+
+    AssignDollarValue(llvm::Instruction* ins)
+        : PrimitiveCall(ins, Kind::AssignDollarValue) {}
+
+    static AssignDollarValue* create(Builder& b, ir::Value vector,
+                                     ir::Value index, ir::Value val,
+                                     ir::Value rho, SEXP call) {
+        Sentinel s(b);
+        return insertBefore(s, vector, index, val, rho, b.consts(),
+                            Builder::integer(b.constantPoolIndex(call)));
+    }
+
+    static AssignDollarValue* insertBefore(llvm::Instruction* ins,
+                                           ir::Value vector, ir::Value index,
+                                           ir::Value val, ir::Value rho,
+                                           ir::Value constantPool,
+                                           ir::Value call) {
+
+        std::vector<llvm::Value*> args_;
+        args_.push_back(vector);
+        args_.push_back(index);
+        args_.push_back(val);
+        args_.push_back(rho);
+        args_.push_back(constantPool);
+        args_.push_back(call);
+
+        llvm::CallInst* i = llvm::CallInst::Create(
+            primitiveFunction<AssignDollarValue>(ins->getModule()), args_, "",
+            ins);
+
+        Builder::markSafepoint(i);
+        return new AssignDollarValue(i);
+    }
+
+    static AssignDollarValue*
+    insertBefore(Pattern* p, ir::Value vector, ir::Value index, ir::Value val,
+                 ir::Value rho, ir::Value constantPool, ir::Value call) {
+
+        return insertBefore(p->first(), vector, index, val, rho, constantPool,
+                            call);
+    }
+
+    static char const* intrinsicName() { return "assignDollarValue"; }
+
+    static llvm::FunctionType* intrinsicType() {
+        return llvm::FunctionType::get(
+            t::SEXP, {t::SEXP, t::SEXP, t::SEXP, t::SEXP, t::SEXP, t::Int},
+            false);
+    }
+
+    static bool classof(Pattern const* s) {
+        return s->getKind() == Kind::AssignDollarValue;
     }
 };
 
@@ -2315,65 +2453,76 @@ class GenericSetVar : public PrimitiveCall {
     }
 };
 
-class GenericSetBuiltin : public PrimitiveCall {
+class AssignAttrValue : public PrimitiveCall {
   public:
-    llvm::Value* value() { return getValue(0); }
-    llvm::Value* rho() { return getValue(1); }
-    llvm::Value* constantPool() { return getValue(2); }
+    llvm::Value* object() { return getValue(0); }
+    llvm::Value* attr() { return getValue(1); }
+    llvm::Value* fun() { return getValue(2); }
+    llvm::Value* rho() { return getValue(3); }
+    llvm::Value* constantPool() { return getValue(4); }
 
-    int symbol() { return getValueInt(3); }
-    SEXP symbolValue() {
+    int call() { return getValueInt(5); }
+    SEXP callValue() {
         llvm::Function* f = ins()->getParent()->getParent();
         JITModule* m = static_cast<JITModule*>(f->getParent());
-        return VECTOR_ELT(m->constPool(f), symbol());
+        return VECTOR_ELT(m->constPool(f), call());
     }
-    SEXP symbol(Builder const& b) { return b.constantPool(symbol()); }
+    SEXP call(Builder const& b) { return b.constantPool(call()); }
 
-    GenericSetBuiltin(llvm::Instruction* ins)
-        : PrimitiveCall(ins, Kind::GenericSetBuiltin) {}
+    AssignAttrValue(llvm::Instruction* ins)
+        : PrimitiveCall(ins, Kind::AssignAttrValue) {}
 
-    static GenericSetBuiltin* create(Builder& b, ir::Value lhs, ir::Value rhs,
-                                     llvm::Value* rho, SEXP call) {
+    static AssignAttrValue* create(Builder& b, ir::Value object, ir::Value attr,
+                                   ir::Value fun, ir::Value rhs,
+                                   llvm::Value* rho, SEXP call) {
         Sentinel s(b);
-        return insertBefore(s, lhs, rhs, rho, b.consts(),
+        return insertBefore(s, object, attr, fun, rhs, rho, b.consts(),
                             Builder::integer(b.constantPoolIndex(call)));
     }
 
-    static GenericSetBuiltin*
-    insertBefore(llvm::Instruction* ins, ir::Value lhs, ir::Value rhs,
-                 ir::Value rho, ir::Value constantPool, ir::Value call) {
+    static AssignAttrValue* insertBefore(llvm::Instruction* ins,
+                                         ir::Value object, ir::Value attr,
+                                         ir::Value fun, ir::Value rhs,
+                                         ir::Value rho, ir::Value constantPool,
+                                         ir::Value call) {
 
         std::vector<llvm::Value*> args_;
-        args_.push_back(lhs);
+        args_.push_back(object);
+        args_.push_back(attr);
+        args_.push_back(fun);
         args_.push_back(rhs);
         args_.push_back(rho);
         args_.push_back(constantPool);
         args_.push_back(call);
 
         llvm::CallInst* i = llvm::CallInst::Create(
-            primitiveFunction<GenericSetBuiltin>(ins->getModule()), args_, "",
+            primitiveFunction<AssignAttrValue>(ins->getModule()), args_, "",
             ins);
 
         Builder::markSafepoint(i);
-        return new GenericSetBuiltin(i);
+        return new AssignAttrValue(i);
     }
 
-    static GenericSetBuiltin* insertBefore(Pattern* p, ir::Value lhs,
-                                           ir::Value rhs, ir::Value rho,
-                                           ir::Value constantPool,
-                                           ir::Value call) {
-        return insertBefore(p->first(), lhs, rhs, rho, constantPool, call);
+    static AssignAttrValue* insertBefore(Pattern* p, ir::Value object,
+                                         ir::Value attr, ir::Value fun,
+                                         ir::Value rhs, ir::Value rho,
+                                         ir::Value constantPool,
+                                         ir::Value call) {
+        return insertBefore(p->first(), object, attr, fun, rhs, rho,
+                            constantPool, call);
     }
 
-    static char const* intrinsicName() { return "genericSetBuiltin"; }
+    static char const* intrinsicName() { return "assignAttrValue"; }
 
     static llvm::FunctionType* intrinsicType() {
         return llvm::FunctionType::get(
-            t::Void, {t::SEXP, t::SEXP, t::SEXP, t::SEXP, t::Int}, false);
+            t::Void,
+            {t::SEXP, t::SEXP, t::SEXP, t::SEXP, t::SEXP, t::SEXP, t::Int},
+            false);
     }
 
     static bool classof(Pattern const* s) {
-        return s->getKind() == Kind::GenericSetBuiltin;
+        return s->getKind() == Kind::AssignAttrValue;
     }
 };
 

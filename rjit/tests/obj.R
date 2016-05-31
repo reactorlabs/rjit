@@ -1,4 +1,5 @@
-require("rjit")
+# require("rjit")
+source("loadRjit")
 require(compiler)
 
 t0 <- function(theCompiler) {
@@ -67,6 +68,9 @@ t3(cmpfun)
 t4(cmpfun)
 
 # TODO Fix those
+# f <- jit.compile(t0(jit.compile))
+# f(jit.compile)
+
 t0(jit.compile)
 t1(jit.compile)
 t1a(jit.compile)

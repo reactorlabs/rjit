@@ -13,6 +13,7 @@
 #include "llvm/CodeGen/GCs.h"
 
 #include "Compiler.h"
+#include "ICCompiler.h"
 #include "JITCompileLayer.h"
 #include "StackMap.h"
 #include "StackMapParser.h"
@@ -273,6 +274,8 @@ Value* Compiler::compileIntrinsic(SEXP call) {
 #define CASE(sym) if (CAR(call) == sym)
     CASE(symbol::Block)
     return compileBlock(CDR(call));
+    CASE(symbol::Dollar)
+    return compileDollar(call);
     CASE(symbol::Bracket)
     return compileBracket(call);
     CASE(symbol::DoubleBracket)
@@ -490,6 +493,30 @@ Value* Compiler::compileDoubleOr(SEXP call) {
     return phi;
 }
 
+/** Compiling dollar symbol.
+    */
+Value* Compiler::compileDollar(SEXP call) {
+
+    if (b.getAssignmentLHS()) {
+        return nullptr;
+    }
+
+    // Retrieving the vector and index from the AST.
+    SEXP expression = CDR(call);
+    SEXP vector = CAR(expression);
+    SEXP index = CAR(CDR(expression));
+
+    Value* resultVector = compileExpression(vector);
+    assert(resultVector);
+    assert(TYPEOF(index) == SYMSXP);
+    Value* resultIndex = ir::Constant::create(b, index)->result();
+
+    b.setResultVisible(true);
+    return ir::GetDollarValue::create(b, resultVector, resultIndex, b.rho(),
+                                      call)
+        ->result();
+}
+
 /** Compile vector access (single bracket).
     The cases that we are not currently handling for vector access is when the
     index being accessed is empty.
@@ -554,7 +581,10 @@ Value* Compiler::compileBracket(SEXP call) {
     }
     // N-dimen single bracket array access.
     else if (CDDDR(expression) != R_NilValue) {
-        // return nullptr;
+
+        if (TAG(vector) != R_NilValue || TYPEOF(vector) == LANGSXP) {
+            return nullptr;
+        }
 
         std::vector<llvm::Value*> args;
         args.push_back(resultIndex);
@@ -614,13 +644,13 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
         resultIndex = compileExpression(index);
     }
 
+    // Vector access for double bracket.
     if (CDDR(expression) == R_NilValue) {
 
         b.setResultVisible(true);
         return ir::GetDispatchValue2::create(b, resultVector, resultIndex,
                                              b.rho(), call)
             ->result();
-
     }
 
     // Checks the AST that the expression is matrix access (and not array
@@ -643,13 +673,14 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
         return ir::GetMatrixValue2::create(b, resultVector, resultIndex,
                                            resultCol, b.rho(), call)
             ->result();
-
-        // Vector access for double bracket.
     }
 
     // N-dimen single bracket array access.
     else if (CDDDR(expression) != R_NilValue) {
-        return nullptr;
+
+        if (TAG(vector) != R_NilValue || TYPEOF(vector) == LANGSXP) {
+            return nullptr;
+        }
 
         std::vector<llvm::Value*> args;
         args.push_back(resultIndex);
@@ -676,6 +707,25 @@ Value* Compiler::compileDoubleBracket(SEXP call) {
     } else {
         return nullptr;
     }
+}
+
+/** Compiling dollar assignment.
+*/
+
+Value* Compiler::compileAssignDollar(SEXP call, SEXP vector, SEXP index,
+                                     SEXP value) {
+
+    Value* resultVector = compileExpression(vector);
+    assert(resultVector);
+    Value* resultVal = compileExpression(value);
+    assert(TYPEOF(index) == SYMSXP);
+    Value* resultIndex = ir::Constant::create(b, index)->result();
+
+    ir::AssignDollarValue::create(b, resultVector, resultIndex, resultVal,
+                                  b.rho(), call)
+        ->result();
+    b.setResultVisible(false);
+    return resultVal;
 }
 
 /** Compiling single bracket vector assignment ( and super assignment).
@@ -748,6 +798,58 @@ Value* Compiler::compileAssignMatrix(SEXP call, SEXP vector, SEXP row, SEXP col,
     ir::AssignMatrixValue::create(b, resultVector, resultRow, resultCol,
                                   resultVal, b.rho(), call)
         ->result();
+    b.setResultVisible(false);
+    return resultVal;
+}
+
+Value* Compiler::compileAssignFunction(SEXP call, SEXP vector, SEXP index,
+                                       SEXP value, Value* fun) {
+
+    SEXP expression = CDR(call);
+    Value* resultVector = compileExpression(vector);
+    assert(resultVector);
+    Value* resultVal = compileExpression(value);
+
+    Value* resultIndex = nullptr;
+    std::vector<llvm::Value*> args;
+
+    if (emptyIndex(index)) {
+        resultIndex = ir::Constant::create(b, index)->result();
+    } else {
+        if (index == R_NilValue) {
+            args.push_back(compileArgument(index, R_NilValue));
+            return ir::AssignFunctionValue::create(
+                       b, resultVector, ir::Builder::integer(args.size()),
+                       resultVal, fun, b.rho(), call, args)
+                ->result();
+        }
+        resultIndex = compileArgument(index, R_NilValue);
+    }
+
+    args.push_back(resultIndex);
+    SEXP indexRest = CDDR(expression);
+
+    while (indexRest != R_NilValue) {
+
+        SEXP indValue = CAR(indexRest);
+        if (emptyIndex(indValue)) {
+            resultIndex = ir::Constant::create(b, indValue)->result();
+        } else {
+            if (indValue == R_NilValue) {
+                return nullptr;
+            }
+            resultIndex = compileArgument(indValue, R_NilValue);
+        }
+
+        args.push_back(resultIndex);
+        indexRest = CDR(indexRest);
+    }
+
+    return ir::AssignFunctionValue::create(b, resultVector,
+                                           ir::Builder::integer(args.size()),
+                                           resultVal, fun, b.rho(), call, args)
+        ->result();
+
     b.setResultVisible(false);
     return resultVal;
 }
@@ -909,11 +1011,11 @@ bool Compiler::caseHandledVector(SEXP vector) {
         return true;
     }
 
-    if (TYPEOF(vector) != SYMSXP) {
-        return false;
+    if (TYPEOF(vector) == SYMSXP) {
+        return true;
     }
 
-    return true;
+    return false;
 }
 
 /** Returns true for all the cases currently not being handled for
@@ -985,15 +1087,6 @@ Value* Compiler::compileAssignment(SEXP e) {
         return v;
     }
 
-    // Complex assignment to builtin functions
-    // if (TYPEOF(CAR(expr)) == BUILTINSXP) {
-    //     Value* lhsResult = compileExpression(CAR(expr));
-    //     Value* rhsResult = compileExpression(CAR(CDR(expr)));
-    //     ir::GenericSetBuiltin::create(b, lhsResult, rhsResult, b.rho(), e);
-    //     b.setResultVisible(false);
-    //     return rhs;
-    // }
-
     // Retrieve the LHS and RHS of the assignment from the AST.
     SEXP lhs = CAR(expr);
     SEXP rhs = CAR(CDR(expr));
@@ -1006,45 +1099,65 @@ Value* Compiler::compileAssignment(SEXP e) {
         // Check we handle the index and vector.
         if (caseHandledVector(vector)) {
 
-            // Vector assignmnt
-            if (CDDDR(lhs) == R_NilValue) {
-
-                if (CAR(lhs) == symbol::Bracket) {
+            // Single bracket assignment
+            if (CAR(lhs) == symbol::Bracket) {
+                if (CDDDR(lhs) == R_NilValue) {
                     return compileAssignBracket(lhs, vector, index, rhs, false);
                 }
 
-                if (CAR(lhs) == symbol::DoubleBracket) {
-                    return compileAssignDoubleBracket(lhs, vector, index, rhs,
-                                                      false);
-                }
-            }
-
-            // Matrix assignment
-            if (CDDDR(lhs) != R_NilValue && CDR(CDDDR(lhs)) == R_NilValue &&
-                Flag::singleton().compileMatrixWrite) {
-
-                SEXP col = CAR(CDDDR(lhs));
-                // Single bracket matrix assignment
-                if (CAR(lhs) == symbol::Bracket) {
+                if (CDDDR(lhs) != R_NilValue && CDR(CDDDR(lhs)) == R_NilValue) {
+                    SEXP col = CAR(CDDDR(lhs));
                     return compileAssignMatrix(lhs, vector, index, col, rhs,
                                                false);
                 }
 
-                // Double bracket matrix assignment
-                if (CAR(lhs) == symbol::DoubleBracket) {
+                if (CDR(CDDDR(lhs)) != R_NilValue) {
+                    if (TAG(vector) != R_NilValue ||
+                        TYPEOF(vector) == LANGSXP) {
+                        b.setAssignmentLHS(true);
+                        return nullptr;
+                    } else {
+                        return compileAssignNArray(lhs, vector, index, rhs,
+                                                   false);
+                    }
+                }
+            }
+
+            // Double bracket assignment
+            if (CAR(lhs) == symbol::DoubleBracket) {
+                if (CDDDR(lhs) == R_NilValue) {
+                    return compileAssignDoubleBracket(lhs, vector, index, rhs,
+                                                      false);
+                }
+
+                if (CDDDR(lhs) != R_NilValue && CDR(CDDDR(lhs)) == R_NilValue) {
+                    SEXP col = CAR(CDDDR(lhs));
                     return compileAssignDoubleMatrix(lhs, vector, index, col,
                                                      rhs, false);
                 }
             }
 
-            // N-dimen array assignment
-            // Broken at the moment, there seems to be a dynamic memory error.
-            // The problem is non-determinsic
-            // if (CDR(CDDDR(lhs)) != R_NilValue ) {
-            //     if (CAR(lhs) == symbol::Bracket) {
-            //         return compileAssignNArray(lhs, vector, index, rhs,
-            //                                    false);
+            // if (CAR(lhs) == symbol::Dollar) {
+            //     if (CDDDR(lhs) == R_NilValue){
+            //         return compileAssignDollar(lhs, vector, index, rhs);
             //     }
+            // }
+
+            if (TYPEOF(CAR(lhs)) == SYMSXP && CAR(lhs) == symbol::Attr) {
+                Value* object = compileExpression(vector);
+                Value* attribute = compileExpression(index);
+                Value* fun = compileExpression(CAR(e));
+                Value* rhsResult = compileExpression(rhs);
+                b.setResultVisible(false);
+                ir::AssignAttrValue::create(b, object, attribute, fun,
+                                            rhsResult, b.rho(), e);
+                return rhsResult;
+            }
+
+            // if (TYPEOF(CAR(lhs)) == SYMSXP && CDDR(lhs) != R_NilValue &&
+            // index != R_NilValue) {
+            //     Value* fun = compileExpression(CAR(e));
+            //     return  compileAssignFunction(lhs, vector, index, rhs, fun);
             // }
         }
     }

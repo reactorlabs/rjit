@@ -112,6 +112,11 @@ class Compiler {
      */
     llvm::Value* compileDoubleOr(SEXP call);
 
+    /** Compiling dollar symbol.
+     *
+     */
+    llvm::Value* compileDollar(SEXP call);
+
     /** Compiling vector access on single bracket.
      *
      */
@@ -133,6 +138,12 @@ class Compiler {
     llvm::Value* compileDoubleMatrix(SEXP call, SEXP vector, SEXP row,
                                      SEXP col);
 
+    /** Compiling dollar assignment.
+     *
+     */
+    llvm::Value* compileAssignDollar(SEXP call, SEXP vector, SEXP index,
+                                     SEXP value);
+
     /** Compiling vector assignment on single bracket.
      *
      */
@@ -144,6 +155,12 @@ class Compiler {
      */
     llvm::Value* compileAssignMatrix(SEXP call, SEXP vector, SEXP row, SEXP col,
                                      SEXP value, bool super);
+
+    /** Compiling N-dimen array assignment on single bracket.
+     *
+     */
+    llvm::Value* compileAssignFunction(SEXP call, SEXP vector, SEXP index,
+                                       SEXP value, Value* fun);
 
     /** Compiling N-dimen array assignment on single bracket.
      *

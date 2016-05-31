@@ -49,6 +49,8 @@ DECLARE(Mod, "%%");
 DECLARE(ModMul, "%*%");
 DECLARE(ModDiv, "%/%");
 DECLARE(VMatch, "%in%");
+DECLARE(Attr, "attr");
+DECLARE(Dollar, "$");
 
 #undef DECLARE
 } // namespace symbol

@@ -535,3 +535,13 @@ f <- jit.compile(function() {
 	m[,,1]
 })
 stopifnot(c(1,2) == f())
+
+
+####################### Dollar Symbol #######################
+
+f <- jit.compile(function(){
+	x <- list(1)
+	x$a <- 2
+	x$a
+})
+stopifnot(2 == f())

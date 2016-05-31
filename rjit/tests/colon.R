@@ -1,3 +1,5 @@
+require("rjit")
+
 f <- jit.compile(function(){
   1:4
 })
