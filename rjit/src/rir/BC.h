@@ -10,27 +10,29 @@
 
 #include "BC_inc.h"
 
+#include "../Protect.h"
+
 namespace rjit {
 namespace rir {
 
 namespace {
 
-immediate_t decodeImmediate(BC_t bc, BC_t* pc) {
-    immediate_t immediate = {0};
+BC::immediate_t decodeImmediate(BC_t bc, BC_t* pc) {
+    BC::immediate_t immediate = {0};
     switch (bc) {
     case BC_t::push:
     case BC_t::getfun:
     case BC_t::getvar:
-    case BC_t::call_name:
     case BC_t::check_special:
         immediate.pool = *(pool_idx_t*)pc;
         break;
     case BC_t::call:
+        immediate.call_args = *(call_args_t*)pc;
+        break;
     case BC_t::load_arg:
         immediate.numArgs = *(num_args_t*)pc;
         break;
     case BC_t::mkprom:
-    case BC_t::push_arg:
         immediate.fun = *(fun_idx_t*)pc;
         break;
     case BC_t::jmp:
@@ -69,7 +71,7 @@ immediate_t decodeImmediate(BC_t bc, BC_t* pc) {
 }
 }
 
-const BC BC::advance(BC_t** pc) {
+BC BC::advance(BC_t** pc) {
     BC_t bc = **pc;
     BC cur(bc, decodeImmediate(bc, (*pc) + 1));
     *pc = (BC_t*)((uintptr_t)(*pc) + cur.size());
@@ -78,39 +80,38 @@ const BC BC::advance(BC_t** pc) {
 
 class CodeStream;
 
+// list of individual bytecode sizes
 static size_t immediate_size[(size_t)BC_t::num_of] = {
-    (size_t)-1,         // invalid
-    sizeof(pool_idx_t), // push
-    sizeof(pool_idx_t), // getfun
-    sizeof(pool_idx_t), // getvar
-    sizeof(num_args_t), // call
-    sizeof(pool_idx_t), // call_name
-    sizeof(fun_idx_t),  // mkprom
-    0,                  // mkclosure
-    0,                  // ret
-    0,                  // force
-    0,                  // pop
-    sizeof(num_args_t), // load_arg
-    0,                  // get_ast
-    0,                  // setvar
-    0,                  // numargi
-    0,                  // to_bool
-    sizeof(jmp_t),      // jmp_true
-    sizeof(jmp_t),      // jmp_false
-    sizeof(jmp_t),      // jmp
-    0,                  // lti
-    0,                  // eqi
-    0,                  // force_all
-    sizeof(int),        // pushi
-    0,                  // dupi
-    0,                  // load_argi
-    0,                  // inci
-    0,                  // dup
-    0,                  // add
-    0,                  // sub
-    0,                  // lt
-    sizeof(fun_idx_t),  // push_arg
-    sizeof(pool_idx_t), // check_special
+    (size_t)-1,          // invalid
+    sizeof(pool_idx_t),  // push
+    sizeof(pool_idx_t),  // getfun
+    sizeof(pool_idx_t),  // getvar
+    sizeof(call_args_t), // call
+    sizeof(fun_idx_t),   // mkprom
+    0,                   // mkclosure
+    0,                   // ret
+    0,                   // force
+    0,                   // pop
+    sizeof(num_args_t),  // load_arg
+    0,                   // get_ast
+    0,                   // setvar
+    0,                   // numargi
+    0,                   // to_bool
+    sizeof(jmp_t),       // jmp_true
+    sizeof(jmp_t),       // jmp_false
+    sizeof(jmp_t),       // jmp
+    0,                   // lti
+    0,                   // eqi
+    0,                   // force_all
+    sizeof(int),         // pushi
+    0,                   // dupi
+    0,                   // load_argi
+    0,                   // inci
+    0,                   // dup
+    0,                   // add
+    0,                   // sub
+    0,                   // lt
+    sizeof(pool_idx_t),  // check_special
 };
 
 template <typename T>
@@ -132,24 +133,27 @@ const BC BC::ret() { return BC(BC_t::ret); }
 const BC BC::force() { return BC(BC_t::force); }
 const BC BC::force_all() { return BC(BC_t::force_all); }
 const BC BC::pop() { return BC(BC_t::pop); }
-const BC BC::call(num_args_t numArgs) { return BC(BC_t::call, {numArgs}); }
-const BC BC::call_name(SEXP names) {
-    return BC(BC_t::call_name, {Pool::instance().insert(names)});
-}
 const BC BC::push(SEXP constant) {
-    return BC(BC_t::push, {Pool::instance().insert(constant)});
+    immediate_t i;
+    i.pool = Pool::instance().insert(constant);
+    return BC(BC_t::push, i);
 }
 const BC BC::getfun(SEXP sym) {
-    return BC(BC_t::getfun, {Pool::instance().insert(sym)});
+    immediate_t i;
+    i.pool = Pool::instance().insert(sym);
+    return BC(BC_t::getfun, i);
 }
 const BC BC::getvar(SEXP sym) {
-    return BC(BC_t::getvar, {Pool::instance().insert(sym)});
+    immediate_t i;
+    i.pool = Pool::instance().insert(sym);
+    return BC(BC_t::getvar, i);
 }
 const BC BC::check_special(SEXP sym) {
-    return BC(BC_t::check_special, {Pool::instance().insert(sym)});
+    immediate_t i;
+    i.pool = Pool::instance().insert(sym);
+    return BC(BC_t::check_special, i);
 }
 const BC BC::mkprom(fun_idx_t prom) { return BC(BC_t::mkprom, {prom}); }
-const BC BC::push_arg(fun_idx_t prom) { return BC(BC_t::push_arg, {prom}); }
 const BC BC::load_arg(num_args_t arg) { return BC(BC_t::load_arg, {arg}); }
 const BC BC::get_ast() { return BC(BC_t::get_ast); }
 const BC BC::setvar() { return BC(BC_t::setvar); }
@@ -185,63 +189,6 @@ const BC BC::mkclosure() { return BC(BC_t::mkclosure); }
 const BC BC::add() { return BC(BC_t::add); }
 const BC BC::sub() { return BC(BC_t::sub); }
 const BC BC::lt() { return BC(BC_t::lt); }
-
-class AstMap {
-    size_t size;
-    unsigned* pos;
-    SEXP* ast;
-
-  public:
-    AstMap(std::map<unsigned, SEXP>& astMap) {
-        size = astMap.size();
-        pos = new unsigned[size];
-        ast = new SEXP[size];
-        unsigned i = 0;
-        for (auto e : astMap) {
-            pos[i] = e.first;
-            ast[i] = e.second;
-            i++;
-        }
-    }
-
-    ~AstMap() {
-        delete pos;
-        delete ast;
-    }
-
-    SEXP at(unsigned p) {
-        if (size == 0)
-            return nullptr;
-
-        size_t f = 0;
-
-        while (f < size && pos[f] < p)
-            f++;
-
-        if (pos[f] != p)
-            return nullptr;
-
-        return ast[f];
-    }
-};
-
-class Code {
-  public:
-    size_t size;
-    BC_t* bc;
-    SEXP ast;
-    AstMap astMap;
-
-    Code(size_t size, BC_t* bc, SEXP ast, std::map<unsigned, SEXP>& astMap)
-        : size(size), bc(bc), ast(ast), astMap(astMap){};
-    ~Code() { delete bc; }
-
-    void print();
-
-    BC_t* end() { return (BC_t*)((uintptr_t)bc + size); }
-
-    SEXP getAst(BC_t* pc) { return astMap.at((uintptr_t)pc - (uintptr_t)bc); }
-};
 
 } // rir
 } // rjit

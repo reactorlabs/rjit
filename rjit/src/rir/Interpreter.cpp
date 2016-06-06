@@ -41,14 +41,14 @@ SEXP jit(SEXP fun) {
     Compiler c(BODY(fun), FORMALS(fun));
 
     SEXP bc = mkBCCls(c.finalize(), FORMALS(fun), RList(FORMALS(fun)).length(),
-                      false, CLOENV(fun));
+                      BCClosure::CC::envLazy, CLOENV(fun));
     return bc;
 }
 
 SEXP jit(SEXP ast, SEXP formals, SEXP env) {
     Compiler c(ast, formals);
-    SEXP bc =
-        mkBCCls(c.finalize(), formals, RList(formals).length(), false, env);
+    SEXP bc = mkBCCls(c.finalize(), formals, RList(formals).length(),
+                      BCClosure::CC::envLazy, env);
     return bc;
 }
 
@@ -96,15 +96,15 @@ class Stack {
 };
 
 // =============================================================================
-// === Interpreter Datastructures
+// ==== Interpreter Datastructures
 
 // The stacks
 
 static Stack<SEXP> stack;
 Stack<int> stacki;
-Stack<fun_idx_t> callArgs;
 
 // =============================================================================
+// ==== Helper : for not yet implemented primitives we call the gnur ones
 
 static INLINE SEXP callPrimitive(SEXP (*primfun)(SEXP, SEXP, SEXP, SEXP),
                                  SEXP call, SEXP op, SEXP env,
@@ -138,22 +138,24 @@ static INLINE SEXP callPrimitive(SEXP (*primfun)(SEXP, SEXP, SEXP, SEXP),
 }
 
 // =============================================================================
-// == Interpreter loop
+// ==== Interpreter call wrappers
 //
 
 static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
                     SEXP call);
 
-static INLINE void evalCallArgs(Function* fun, num_args_t nargs, SEXP env) {
+static INLINE void evalCallArgs(Function* fun, int args[], num_args_t nargs,
+                                SEXP env) {
 
     for (size_t i = 0; i < nargs; ++i) {
-        size_t off = nargs - i - 1;
-        fun_idx_t idx = callArgs.peek(off);
-        SEXP arg = rirEval(fun, idx, env, 0, fun->code[idx]->ast);
-        stack.push(arg);
+        fun_idx_t idx = args[i];
+        if (idx == MISSING_ARG_IDX) {
+            stack.push(R_MissingArg);
+        } else {
+            SEXP arg = rirEval(fun, idx, env, 0, fun->code[idx]->ast);
+            stack.push(arg);
+        }
     }
-
-    callArgs.pop(nargs);
 }
 
 static INLINE SEXP callSpecial(SEXP call, SEXP op, SEXP env) {
@@ -164,10 +166,10 @@ static INLINE SEXP callSpecial(SEXP call, SEXP op, SEXP env) {
     return primfun(call, op, CDR(call), env);
 }
 
-static INLINE SEXP callBuiltin(Function* caller, SEXP call, SEXP op,
+static INLINE SEXP callBuiltin(Function* caller, SEXP call, SEXP op, int args[],
                                num_args_t nargs, SEXP env) {
 
-    evalCallArgs(caller, nargs, env);
+    evalCallArgs(caller, args, nargs, env);
 
     // call, op, args, rho
     SEXP (*primfun)(SEXP, SEXP, SEXP, SEXP) = 
@@ -176,32 +178,47 @@ static INLINE SEXP callBuiltin(Function* caller, SEXP call, SEXP op,
     return callPrimitive(primfun, call, op, env, nargs);
 }
 
-static INLINE SEXP callClosure(Function* caller, BCClosure* cls,
+static INLINE SEXP callClosure(Function* caller, BCClosure* cls, int args[],
                                num_args_t nargs, SEXP env, SEXP call) {
 
     assert(cls->nargs == VARIADIC_ARGS || cls->nargs == nargs);
 
-    if (cls->eager) {
+    switch (cls->cc) {
+    case BCClosure::CC::stackEager: {
         assert(!cls->env);
-        evalCallArgs(caller, nargs, env);
+        evalCallArgs(caller, args, nargs, env);
         return rirEval(cls->fun, 0, env, nargs, call);
     }
 
-    if (cls->env) {
-        SEXP args = R_NilValue;
-
+    case BCClosure::CC::stackLazy: {
         for (size_t i = 0; i < nargs; ++i) {
-            fun_idx_t idx = callArgs.peek(nargs - 1 - i);
+            fun_idx_t idx = args[i];
             if (idx == MISSING_ARG_IDX) {
-                args = CONS_NR(R_MissingArg, args);
+                stack.push(R_MissingArg);
             } else {
                 SEXP prom = mkBCProm(caller, idx, env);
-                args = CONS_NR(prom, args);
+                stack.push(prom);
             }
         }
-        callArgs.pop(nargs);
+        SEXP res = rirEval(cls->fun, 0, env, nargs, call);
+        stack.pop(nargs);
+        return res;
+    }
 
-        SEXP newEnv = Rf_NewEnvironment(cls->formals, args, cls->env);
+    case BCClosure::CC::envLazy: {
+        SEXP argslist = R_NilValue;
+
+        for (size_t i = 0; i < nargs; ++i) {
+            fun_idx_t idx = args[i];
+            if (idx == MISSING_ARG_IDX) {
+                argslist = CONS_NR(R_MissingArg, argslist);
+            } else {
+                SEXP prom = mkBCProm(caller, idx, env);
+                argslist = CONS_NR(prom, argslist);
+            }
+        }
+
+        SEXP newEnv = Rf_NewEnvironment(cls->formals, argslist, cls->env);
         stack.push(newEnv);
 
         SEXP res = rirEval(cls->fun, 0, newEnv, nargs, call);
@@ -209,24 +226,12 @@ static INLINE SEXP callClosure(Function* caller, BCClosure* cls,
 
         return res;
     }
-
-    for (size_t i = 0; i < nargs; ++i) {
-        fun_idx_t idx = callArgs.peek(nargs - 1 - i);
-        if (idx == MISSING_ARG_IDX) {
-            stack.push(R_MissingArg);
-        } else {
-            SEXP prom = mkBCProm(caller, callArgs.peek(nargs - 1 - i), env);
-            stack.push(prom);
-        }
     }
-    callArgs.pop(nargs);
-
-    SEXP res = rirEval(cls->fun, 0, env, nargs, call);
-    stack.pop(nargs);
-    return res;
+    assert(false);
+    return nullptr;
 }
 
-static INLINE SEXP doCall(Function* caller, SEXP call, SEXP callee,
+static INLINE SEXP doCall(Function* caller, SEXP call, SEXP callee, int args[],
                           num_args_t nargs, SEXP env) {
     size_t bp = stack.size();
     size_t bpi = stacki.size();
@@ -237,11 +242,11 @@ static INLINE SEXP doCall(Function* caller, SEXP call, SEXP callee,
         res = callSpecial(call, callee, env);
         break;
     case BUILTINSXP:
-        res = callBuiltin(caller, call, callee, nargs, env);
+        res = callBuiltin(caller, call, callee, args, nargs, env);
         break;
     case BCCodeType:
         assert(isBCCls(callee));
-        res = callClosure(caller, getBCCls(callee), nargs, env, call);
+        res = callClosure(caller, getBCCls(callee), args, nargs, env, call);
         break;
     default:
         assert(false);
@@ -258,6 +263,10 @@ static INLINE SEXP forcePromise(BCProm* prom, SEXP wrapper) {
     prom->val(wrapper, res);
     return res;
 }
+
+// =============================================================================
+// ==== Interpreter main loop
+//
 
 static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
                     SEXP call) {
@@ -287,7 +296,7 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
         return Pool::instance().get(i);
     };
 
-    // Main loop
+    // Main BC_t dispatch
     while (true) {
         switch (BC::readBC(&pc)) {
         case BC_t::to_bool: {
@@ -459,11 +468,6 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
             break;
         }
 
-        case BC_t::push_arg: {
-            callArgs.push(BC::readImmediate<fun_idx_t>(&pc));
-            break;
-        }
-
         case BC_t::mkprom: {
             fun_idx_t idx = BC::readImmediate<fun_idx_t>(&pc);
             SEXP prom = mkBCProm(fun, idx, env);
@@ -472,148 +476,132 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
             break;
         }
 
-        case BC_t::call_name: {
-            SEXP n = loadConst();
+        case BC_t::call: {
+            call_args_t callArgs = BC::readImmediate<call_args_t>(&pc);
+
+            SEXP args_ = Pool::instance().get(callArgs.args);
+            int* args = INTEGER(args_);
+            int nargs = Rf_length(args_);
+
             SEXP cls = stack.pop();
-            num_args_t nargs = RVector(n).size();
 
-            switch (Rinternals::typeof(cls)) {
-            // Primitives do not care about names
-            case SPECIALSXP:
-            case BUILTINSXP:
-                break;
-            case BCCodeType: {
-                assert(isBCCls(cls));
-                BCClosure* bcls = getBCCls(cls);
-                RVector names(n);
-                RList formals(bcls->formals);
+            if (callArgs.names) {
+                RVector names(Pool::instance().get(callArgs.names));
+                switch (Rinternals::typeof(cls)) {
+                // Primitives do not care about names
+                case SPECIALSXP:
+                case BUILTINSXP:
+                    break;
+                case BCCodeType: {
+                    assert(isBCCls(cls));
+                    BCClosure* bcls = getBCCls(cls);
+                    RList formals(bcls->formals);
 
-                std::vector<int> matched(formals.length());
-                std::vector<bool> used(formals.length());
+                    std::vector<int> matched(formals.length());
+                    std::vector<bool> used(formals.length());
 
-                int finger = 0;
-                int positional = 0;
+                    int finger = 0;
+                    int positional = 0;
 
-                // TODO dotdotdot
+                    // TODO dotdotdot
 
-                // Match given arguments to formal arguments:
-                // Go through all the formal arguments
-                for (auto formal = formals.begin(); formal != RList::end();
-                     ++formal, ++finger) {
-                    bool found = false;
+                    // Match given arguments to formal arguments:
+                    // Go through all the formal arguments
+                    for (auto formal = formals.begin(); formal != RList::end();
+                         ++formal, ++finger) {
+                        bool found = false;
 
-                    // Check if any of the supplied args has a matching tag
-                    {
-                        int current = 0;
-                        for (auto supplied : names) {
-                            if (used[current] || supplied == R_NilValue)
-                                continue;
-                            if (formal.tag() != supplied)
-                                continue;
+                        // Check if any of the supplied args has a matching tag
+                        {
+                            int current = 0;
+                            for (auto supplied : names) {
+                                if (used[current] || supplied == R_NilValue)
+                                    continue;
+                                if (formal.tag() != supplied)
+                                    continue;
 
-                            // TODO err: same name given twice!
-                            assert(!found);
-
-                            // std::cout << "Arg " <<
-                            // CHAR(PRINTNAME(formal.tag()))
-                            //           << " matched at pos " << current <<
-                            //           "\n";
-
-                            found = true;
-                            matched[finger] =
-                                callArgs.peek(nargs - current - 1);
-                            used[current] = 1;
-
-                            current++;
-                        }
-                    }
-
-                    // Check if any of the supplied args has a partially
-                    // matching tag
-                    if (!found) {
-                        int current = 0;
-                        for (auto supplied : names) {
-                            if (used[current] || supplied == R_NilValue)
-                                continue;
-
-                            std::string given(CHAR(PRINTNAME(supplied)));
-                            std::string f(CHAR(PRINTNAME(formal.tag())));
-                            if (f.compare(0, given.length(), given) != 0)
-                                continue;
-
-                            // TODO err: same name given twice!
-                            assert(!found);
-
-                            // std::cout << "Arg " <<
-                            // CHAR(PRINTNAME(formal.tag()))
-                            //           << " partially matched at pos " <<
-                            //           current << "\n";
-
-                            found = true;
-                            matched[finger] =
-                                callArgs.peek(nargs - current - 1);
-                            used[current] = 1;
-
-                            current++;
-                        }
-                    }
-
-                    // No match -> find the next untagged (ie. positional)
-                    // argument
-                    if (!found)
-                        while (positional < nargs) {
-                            if (names[positional++] == R_NilValue) {
-                                // std::cout << "Arg " <<
-                                // CHAR(PRINTNAME(formal.tag()))
-                                //           << " at pos " << positional - 1 <<
-                                //           "\n";
+                                // TODO err: same name given twice!
+                                assert(!found);
 
                                 found = true;
-                                matched[finger] =
-                                    callArgs.peek(nargs - positional);
-                                used[positional - 1] = 1;
-                                break;
+                                matched[finger] = args[current];
+                                used[current] = 1;
+
+                                current++;
                             }
                         }
 
-                    // No more positional args left?
-                    if (!found) {
-                        // std::cout << "Arg " << CHAR(PRINTNAME(formal.tag()))
-                        //           << " is missing\n";
-                        matched[finger] = MISSING_ARG_IDX;
+                        // Check if any of the supplied args has a partially
+                        // matching tag
+                        if (!found) {
+                            int current = 0;
+                            for (auto supplied : names) {
+                                if (used[current] || supplied == R_NilValue)
+                                    continue;
+
+                                std::string given(CHAR(PRINTNAME(supplied)));
+                                std::string f(CHAR(PRINTNAME(formal.tag())));
+                                if (f.compare(0, given.length(), given) != 0)
+                                    continue;
+
+                                // TODO err: same name given twice!
+                                assert(!found);
+
+                                found = true;
+                                matched[finger] = args[current];
+                                used[current] = 1;
+
+                                current++;
+                            }
+                        }
+
+                        // No match -> find the next untagged (ie. positional)
+                        // argument
+                        if (!found)
+                            while (positional < nargs) {
+                                if (names[positional++] == R_NilValue) {
+                                    found = true;
+                                    matched[finger] = args[positional - 1];
+                                    used[positional - 1] = 1;
+                                    break;
+                                }
+                            }
+
+                        // No more positional args left?
+                        if (!found) {
+                            matched[finger] = MISSING_ARG_IDX;
+                        }
+                    }
+
+                    // Replace call args on the stack by the reordered match
+                    SEXP res = doCall(fun, cur->getAst(pc), cls, matched.data(),
+                                      matched.size(), env);
+                    stack.push(res);
+                    break;
+                }
+                default:
+                    assert(false);
+                    break;
+                }
+            } else {
+                if (isBCCls(cls)) {
+                    num_args_t expected = getBCCls(cls)->nargs;
+                    if (expected != VARIADIC_ARGS) {
+                        if (nargs < expected) {
+                            std::vector<int> allArgs(expected, MISSING_ARG_IDX);
+                            memcpy(allArgs.data(), args, nargs * sizeof(SEXP));
+                            SEXP res =
+                                doCall(fun, cur->getAst(pc), cls,
+                                       allArgs.data(), allArgs.size(), env);
+                            stack.push(res);
+                            break;
+                        }
                     }
                 }
-
-                // Replace call args on the stack by the reordered match
-                callArgs.pop(nargs);
-                for (auto i = matched.rbegin(); i != matched.rend(); ++i) {
-                    callArgs.push(*i);
-                }
-                nargs = matched.size();
+                SEXP res = doCall(fun, cur->getAst(pc), cls, args, nargs, env);
+                stack.push(res);
                 break;
             }
-            default:
-                assert(false);
-                break;
-            }
-            SEXP res = doCall(fun, cur->getAst(pc), cls, nargs, env);
-            stack.push(res);
-            break;
-        }
-
-        case BC_t::call: {
-            SEXP cls = stack.pop();
-            num_args_t nargs = BC::readImmediate<num_args_t>(&pc);
-            if (isBCCls(cls)) {
-                size_t expected = getBCCls(cls)->nargs;
-                if (expected != VARIADIC_ARGS)
-                    while (nargs < expected) {
-                        nargs++;
-                        callArgs.push(MISSING_ARG_IDX);
-                    }
-            }
-            SEXP res = doCall(fun, cur->getAst(pc), cls, nargs, env);
-            stack.push(res);
             break;
         }
 
