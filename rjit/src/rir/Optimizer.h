@@ -21,7 +21,7 @@ void optimize(CodeStream& cs, Function* fun, Code* cur);
 BC_t* doInlineIf(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
                  BC_t* end) {
 
-    cs << BC::check_special(symbol::If);
+    cs << BC::check_primitive(symbol::If);
 
     BC bc = BC::advance(&pc);
 
@@ -51,10 +51,29 @@ BC_t* doInlineIf(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
     return pc;
 }
 
+BC_t* doInlinePar(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
+                  BC_t* end) {
+
+    cs << BC::check_primitive(symbol::Parenthesis);
+
+    BC bc = BC::advance(&pc);
+
+    assert(bc.bc == BC_t::call);
+    SEXP args_ = bc.immediateCallArgs();
+    int* args = INTEGER(args_);
+    int nargs = Rf_length(args_);
+
+    assert(nargs == 1);
+
+    optimize(cs, fun, fun->code[args[0]]);
+
+    return pc;
+}
+
 BC_t* doInlineBlock(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
                     BC_t* end) {
 
-    cs << BC::check_special(symbol::Block);
+    cs << BC::check_primitive(symbol::Block);
 
     BC bc = BC::advance(&pc);
 
@@ -66,6 +85,72 @@ BC_t* doInlineBlock(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
     for (int i = 0; i < nargs; ++i) {
         optimize(cs, fun, fun->code[args[i]]);
     }
+
+    return pc;
+}
+
+BC_t* doInlineSub(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
+                  BC_t* end) {
+
+    cs << BC::check_primitive(symbol::Sub);
+
+    BC bc = BC::advance(&pc);
+
+    assert(bc.bc == BC_t::call);
+
+    SEXP args_ = bc.immediateCallArgs();
+    int* args = INTEGER(args_);
+    int nargs = Rf_length(args_);
+    assert(nargs == 2);
+
+    optimize(cs, fun, fun->code[args[0]]);
+    optimize(cs, fun, fun->code[args[1]]);
+
+    cs << BC::sub();
+
+    return pc;
+}
+
+BC_t* doInlineLt(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
+                 BC_t* end) {
+
+    cs << BC::check_primitive(symbol::Lt);
+
+    BC bc = BC::advance(&pc);
+
+    assert(bc.bc == BC_t::call);
+
+    SEXP args_ = bc.immediateCallArgs();
+    int* args = INTEGER(args_);
+    int nargs = Rf_length(args_);
+    assert(nargs == 2);
+
+    optimize(cs, fun, fun->code[args[0]]);
+    optimize(cs, fun, fun->code[args[1]]);
+
+    cs << BC::lt();
+
+    return pc;
+}
+
+BC_t* doInlineAdd(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
+                  BC_t* end) {
+
+    cs << BC::check_primitive(symbol::Add);
+
+    BC bc = BC::advance(&pc);
+
+    assert(bc.bc == BC_t::call);
+
+    SEXP args_ = bc.immediateCallArgs();
+    int* args = INTEGER(args_);
+    int nargs = Rf_length(args_);
+    assert(nargs == 2);
+
+    optimize(cs, fun, fun->code[args[0]]);
+    optimize(cs, fun, fun->code[args[1]]);
+
+    cs << BC::add();
 
     return pc;
 }
@@ -87,6 +172,23 @@ void optimize(CodeStream& cs, Function* fun, Code* cur) {
                 pc = doInlineBlock(cs, fun, cur, pc, end);
                 continue;
             }
+            if (bc.immediateConst() == symbol::Lt) {
+                pc = doInlineLt(cs, fun, cur, pc, end);
+                continue;
+            }
+            if (bc.immediateConst() == symbol::Add) {
+                pc = doInlineAdd(cs, fun, cur, pc, end);
+                continue;
+            }
+            if (bc.immediateConst() == symbol::Sub) {
+                pc = doInlineSub(cs, fun, cur, pc, end);
+                continue;
+            }
+            if (bc.immediateConst() == symbol::Parenthesis) {
+                pc = doInlinePar(cs, fun, cur, pc, end);
+                continue;
+            }
+
             break;
 
         case BC_t::ret:
@@ -115,6 +217,7 @@ void optimize_(Function* fun, fun_idx_t idx) {
     opt << BC::ret();
 
     Code* optCode = opt.toCode();
+    delete fun->code[idx];
     fun->code[idx] = optCode;
 }
 }

@@ -384,10 +384,11 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
             break;
         }
 
-        case BC_t::check_special: {
+        case BC_t::check_primitive: {
             SEXP sym = loadConst();
             SEXP val = findVar(sym, env);
-            assert(TYPEOF(val) == SPECIALSXP);
+            // TODO better check
+            assert(TYPEOF(val) == SPECIALSXP || TYPEOF(val) == BUILTINSXP);
             break;
         }
 
