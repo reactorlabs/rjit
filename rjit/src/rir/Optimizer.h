@@ -96,8 +96,14 @@ BC_t* doInlineSub(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
     assert(bc.bc == BC_t::call);
     fun_idx_t* args = bc.immediateCallArgs();
     num_args_t nargs = bc.immediateCallNargs();
-    assert(nargs == 2);
 
+    if (nargs == 1) {
+        cs << BC::push(0.0);
+        optimize(cs, fun, fun->code[args[0]]);
+        cs << BC::sub();
+        return pc;
+    }
+    assert(nargs == 2);
     optimize(cs, fun, fun->code[args[0]]);
     optimize(cs, fun, fun->code[args[1]]);
 
@@ -136,8 +142,8 @@ BC_t* doInlineAdd(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
     assert(bc.bc == BC_t::call);
     fun_idx_t* args = bc.immediateCallArgs();
     num_args_t nargs = bc.immediateCallNargs();
-    assert(nargs == 2);
 
+    assert(nargs == 2);
     optimize(cs, fun, fun->code[args[0]]);
     optimize(cs, fun, fun->code[args[1]]);
 
