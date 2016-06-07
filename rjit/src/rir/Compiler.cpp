@@ -114,10 +114,11 @@ Function* Compiler::finalize() {
     OpenFunction* f = new OpenFunction;
 
     compileFunction(f, exp, formals);
-    Optimizer::optimize(f);
 
     Function* res = f->finalize();
     delete f;
+
+    Optimizer::optimize(res);
     return res;
 }
 }
