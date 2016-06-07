@@ -11,6 +11,8 @@
 namespace rjit {
 namespace rir {
 
+class OpenFunction;
+
 // Function is an array of code objects. Usually contained in a BCClosure
 class Function {
   public:
@@ -18,16 +20,7 @@ class Function {
 
     Function() {}
 
-    void addCode(fun_idx_t pos, Code* c) {
-        assert(pos < code.size());
-        code[pos] = c;
-    }
-
-    fun_idx_t next() {
-        code.push_back(nullptr);
-        assert(code.size() < MAX_FUN_IDX);
-        return code.size() - 1;
-    }
+    friend OpenFunction;
 };
 }
 }

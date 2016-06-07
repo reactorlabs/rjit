@@ -1,5 +1,6 @@
 #include "Primitives.h"
 #include "CodeStream.h"
+#include "OpenFunction.h"
 #include "../RIntlns.h"
 #include "../RList.h"
 
@@ -24,10 +25,11 @@ bool compileBuiltin(CodeStream& cs, int builtin_id) {
         return true;
     }
 
-    if (name.compare("-") == 0) {
-        cs << BC::sub() << BC::ret();
-        return true;
-    }
+    // TODO : unary!
+    //    if (name.compare("-") == 0) {
+    //        cs << BC::sub() << BC::ret();
+    //        return true;
+    //    }
 
     if (name.compare("for") == 0) {
         // TODO
@@ -120,8 +122,8 @@ bool compileSpecial(CodeStream& cs, int special_id) {
 } // namespace
 
 SEXP Primitives::doCompilePrimitive(SEXP fun) {
-    Function* f = new Function;
-    CodeStream cs(f, fun);
+    OpenFunction* f = new OpenFunction();
+    CodeStream& cs = f->addCode(fun);
 
     int idx = Rinternals::primoffset(fun);
     bool success = false;
@@ -139,11 +141,11 @@ SEXP Primitives::doCompilePrimitive(SEXP fun) {
 
     if (success) {
         cs << BC::ret();
-        cs.finalize();
-        cls = mkBCCls(f, FORMALS(fun), VARIADIC_ARGS,
+        cls = mkBCCls(f->finalize(), FORMALS(fun), VARIADIC_ARGS,
                       TYPEOF(fun) == BUILTINSXP ? BCClosure::CC::stackEager
                                                 : BCClosure::CC::stackLazy,
                       nullptr);
+        delete f;
         PrimitivesCache[idx] = cls;
     }
 

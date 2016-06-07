@@ -6,8 +6,8 @@
 #include <cstring>
 
 #include "Pool.h"
-#include "Function.h"
 #include "BC.h"
+#include "Code.h"
 
 namespace rjit {
 namespace rir {
@@ -20,9 +20,8 @@ class CodeStream {
     unsigned pos = 0;
     unsigned size = 1024;
 
-    Function* fun;
     SEXP ast;
-    fun_idx_t insertPoint;
+    fun_idx_t idx;
 
     std::map<unsigned, SEXP> astMap;
 
@@ -38,16 +37,15 @@ class CodeStream {
     }
 
     void patchpoint(Label l) {
+        assert(l >= 0);
+        assert((unsigned)l < label2pos.size());
         patchpoints[pos] = l;
         insert((jmp_t)0);
     }
 
-    CodeStream(Function* fun, SEXP ast)
-        : fun(fun), ast(ast), insertPoint(fun->next()) {
-        code = new std::vector<char>(1024);
-    }
+    fun_idx_t getIdx() { return idx; }
 
-    CodeStream(SEXP ast) : fun(nullptr), ast(ast), insertPoint(-1) {
+    CodeStream(SEXP ast, fun_idx_t idx) : ast(ast), idx(idx) {
         code = new std::vector<char>(1024);
     }
 
@@ -59,12 +57,6 @@ class CodeStream {
     CodeStream& operator<<(Label label) {
         label2pos[label] = pos;
         return *this;
-    }
-
-    fun_idx_t finalize() {
-        assert(fun);
-        fun->addCode(insertPoint, toCode());
-        return insertPoint;
     }
 
     template <typename T>
