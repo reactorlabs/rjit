@@ -38,6 +38,8 @@ class RVector {
 
     explicit operator SEXP() { return vector; }
 
+    SEXP getVec() { return vector; }
+
     SEXP operator[](size_t idx);
 
     RVectorIter begin() { return RVectorIter(this, 0); }

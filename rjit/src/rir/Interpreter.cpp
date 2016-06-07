@@ -497,25 +497,45 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
                     BCClosure* bcls = getBCCls(cls);
                     RList formals(bcls->formals);
 
-                    std::vector<int> matched(formals.length());
+                    // matched can't take just an int, it must be able to
+                    // also take a list of ints.
+
+                    // If I make matched a vector of SEXP or simply use RVector
+                    // what would happen?
+
+                    std::vector<SEXP> matched(formals.length());
                     std::vector<bool> used(formals.length());
 
                     int finger = 0;
                     int positional = 0;
 
                     // TODO dotdotdot
+                    // If the formal arguments contain an ellipsis
+                    // then set up the named arguments as normal - both full
+                    // name and partial.
+                    // All other arguments are collected into a RList (with the
+                    // correct positioning)
 
                     // Match given arguments to formal arguments:
                     // Go through all the formal arguments
                     for (auto formal = formals.begin(); formal != RList::end();
                          ++formal, ++finger) {
                         bool found = false;
+                        bool ellipsis = false;
+
+                        // it should be a RList instead of a std::vector
+                        RVector ellipArg(nargs);
+
+                        if (formal.tag() == symbol::Ellipsis) {
+                            ellipsis = true;
+                        }
 
                         // Check if any of the supplied args has a matching tag
                         {
                             int current = 0;
                             for (auto supplied : names) {
-                                if (used[current] || supplied == R_NilValue)
+                                if (used[current] || supplied == R_NilValue ||
+                                    ellipsis)
                                     continue;
                                 if (formal.tag() != supplied)
                                     continue;
@@ -524,7 +544,9 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
                                 assert(!found);
 
                                 found = true;
-                                matched[finger] = args[current];
+                                SEXP temp = allocVector(INTSXP, 1);
+                                INTEGER(temp)[0] = args[current];
+                                matched[finger] = temp;
                                 used[current] = 1;
 
                                 current++;
@@ -536,7 +558,8 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
                         if (!found) {
                             int current = 0;
                             for (auto supplied : names) {
-                                if (used[current] || supplied == R_NilValue)
+                                if (used[current] || supplied == R_NilValue ||
+                                    ellipsis)
                                     continue;
 
                                 std::string given(CHAR(PRINTNAME(supplied)));
@@ -548,7 +571,9 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
                                 assert(!found);
 
                                 found = true;
-                                matched[finger] = args[current];
+                                SEXP temp = allocVector(INTSXP, 1);
+                                INTEGER(temp)[0] = args[current];
+                                matched[finger] = temp;
                                 used[current] = 1;
 
                                 current++;
@@ -557,26 +582,70 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
 
                         // No match -> find the next untagged (ie. positional)
                         // argument
-                        if (!found)
+                        if (!found) {
+                            bool temp = false;
                             while (positional < nargs) {
-                                if (names[positional++] == R_NilValue) {
-                                    found = true;
-                                    matched[finger] = args[positional - 1];
-                                    used[positional - 1] = 1;
-                                    break;
+                                if (names[positional] == R_NilValue &&
+                                    !used[positional]) {
+                                    if (ellipsis) {
+                                        found = true;
+                                        SEXP tempV = allocVector(INTSXP, 1);
+                                        INTEGER(tempV)[0] = args[positional];
+                                        ellipArg.insert(tempV);
+                                        used[positional] = 1;
+                                    } else {
+                                        found = true;
+                                        SEXP tempV = allocVector(INTSXP, 1);
+                                        INTEGER(tempV)[0] = args[positional];
+                                        matched[finger] = tempV;
+                                        used[positional] = 1;
+                                        break;
+                                    }
+                                    // add named arguments that's not in the
+                                    // formal argument of
+                                    // the function definition into the ellipsis
+                                    // vector
+                                } else if (names[positional] != R_NilValue &&
+                                           ellipsis) {
+                                    for (auto f = formals.begin();
+                                         f != RList::end(); ++f) {
+                                        if (f.tag() == names[positional]) {
+                                            temp = true;
+                                        }
+                                    }
+                                    if (!temp) {
+                                        found = true;
+                                        SEXP tempV = allocVector(INTSXP, 1);
+                                        INTEGER(tempV)[0] = args[positional];
+                                        ellipArg.insert(tempV);
+                                        used[positional] = 1;
+                                        temp = false;
+                                    }
                                 }
+                                positional++;
                             }
+                            if (ellipsis) {
+                                matched[finger] = ellipArg.getVec();
+                            }
+                        }
 
                         // No more positional args left?
+                        // (i.e. when there are more formal args than the number
+                        // of
+                        // arguments supplied by the function call.)
                         if (!found) {
-                            matched[finger] = MISSING_ARG_IDX;
+                            SEXP tempV = allocVector(INTSXP, 1);
+                            INTEGER(tempV)[0] = MISSING_ARG_IDX;
+                            matched[finger] = tempV;
                         }
                     }
 
+                    // TODO uncomment this - it's just to commit
                     // Replace call args on the stack by the reordered match
-                    SEXP res = doCall(fun, cur->getAst(pc), cls, matched.data(),
-                                      matched.size(), env);
-                    stack.push(res);
+                    // SEXP res = doCall(fun, cur->getAst(pc), cls,
+                    // matched.data(),
+                    //                   matched.size(), env);
+                    // stack.push(res);
                     break;
                 }
                 default:
