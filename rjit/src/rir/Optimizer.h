@@ -26,9 +26,8 @@ BC_t* doInlineIf(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
     BC bc = BC::advance(&pc);
 
     assert(bc.bc == BC_t::call);
-    SEXP args_ = bc.immediateCallArgs();
-    int* args = INTEGER(args_);
-    int nargs = Rf_length(args_);
+    fun_idx_t* args = bc.immediateCallArgs();
+    num_args_t nargs = bc.immediateCallNargs();
 
     Label trueBranch = cs.mkLabel();
     Label nextBranch = cs.mkLabel();
@@ -59,9 +58,8 @@ BC_t* doInlinePar(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
     BC bc = BC::advance(&pc);
 
     assert(bc.bc == BC_t::call);
-    SEXP args_ = bc.immediateCallArgs();
-    int* args = INTEGER(args_);
-    int nargs = Rf_length(args_);
+    fun_idx_t* args = bc.immediateCallArgs();
+    num_args_t nargs = bc.immediateCallNargs();
 
     assert(nargs == 1);
 
@@ -78,9 +76,8 @@ BC_t* doInlineBlock(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
     BC bc = BC::advance(&pc);
 
     assert(bc.bc == BC_t::call);
-    SEXP args_ = bc.immediateCallArgs();
-    int* args = INTEGER(args_);
-    int nargs = Rf_length(args_);
+    fun_idx_t* args = bc.immediateCallArgs();
+    num_args_t nargs = bc.immediateCallNargs();
 
     for (int i = 0; i < nargs; ++i) {
         optimize(cs, fun, fun->code[args[i]]);
@@ -97,10 +94,8 @@ BC_t* doInlineSub(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
     BC bc = BC::advance(&pc);
 
     assert(bc.bc == BC_t::call);
-
-    SEXP args_ = bc.immediateCallArgs();
-    int* args = INTEGER(args_);
-    int nargs = Rf_length(args_);
+    fun_idx_t* args = bc.immediateCallArgs();
+    num_args_t nargs = bc.immediateCallNargs();
     assert(nargs == 2);
 
     optimize(cs, fun, fun->code[args[0]]);
@@ -119,10 +114,8 @@ BC_t* doInlineLt(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
     BC bc = BC::advance(&pc);
 
     assert(bc.bc == BC_t::call);
-
-    SEXP args_ = bc.immediateCallArgs();
-    int* args = INTEGER(args_);
-    int nargs = Rf_length(args_);
+    fun_idx_t* args = bc.immediateCallArgs();
+    num_args_t nargs = bc.immediateCallNargs();
     assert(nargs == 2);
 
     optimize(cs, fun, fun->code[args[0]]);
@@ -141,10 +134,8 @@ BC_t* doInlineAdd(CodeStream& cs, Function* fun, Code* cur, BC_t* pc,
     BC bc = BC::advance(&pc);
 
     assert(bc.bc == BC_t::call);
-
-    SEXP args_ = bc.immediateCallArgs();
-    int* args = INTEGER(args_);
-    int nargs = Rf_length(args_);
+    fun_idx_t* args = bc.immediateCallArgs();
+    num_args_t nargs = bc.immediateCallNargs();
     assert(nargs == 2);
 
     optimize(cs, fun, fun->code[args[0]]);
@@ -195,9 +186,10 @@ void optimize(CodeStream& cs, Function* fun, Code* cur) {
             continue;
 
         case BC_t::call: {
-            SEXP args = bc.immediateCallArgs();
-            for (int i = 0; i < Rf_length(args); ++i) {
-                optimize_(fun, INTEGER(args)[i]);
+            fun_idx_t* args = bc.immediateCallArgs();
+            num_args_t nargs = bc.immediateCallNargs();
+            for (int i = 0; i < nargs; ++i) {
+                optimize_(fun, args[i]);
             }
             break;
         }

@@ -144,8 +144,8 @@ static INLINE SEXP callPrimitive(SEXP (*primfun)(SEXP, SEXP, SEXP, SEXP),
 static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
                     SEXP call);
 
-static INLINE void evalCallArgs(Function* fun, int args[], num_args_t nargs,
-                                SEXP env) {
+static INLINE void evalCallArgs(Function* fun, fun_idx_t args[],
+                                num_args_t nargs, SEXP env) {
 
     for (size_t i = 0; i < nargs; ++i) {
         fun_idx_t idx = args[i];
@@ -166,8 +166,8 @@ static INLINE SEXP callSpecial(SEXP call, SEXP op, SEXP env) {
     return primfun(call, op, CDR(call), env);
 }
 
-static INLINE SEXP callBuiltin(Function* caller, SEXP call, SEXP op, int args[],
-                               num_args_t nargs, SEXP env) {
+static INLINE SEXP callBuiltin(Function* caller, SEXP call, SEXP op,
+                               fun_idx_t args[], num_args_t nargs, SEXP env) {
 
     evalCallArgs(caller, args, nargs, env);
 
@@ -178,8 +178,9 @@ static INLINE SEXP callBuiltin(Function* caller, SEXP call, SEXP op, int args[],
     return callPrimitive(primfun, call, op, env, nargs);
 }
 
-static INLINE SEXP callClosure(Function* caller, BCClosure* cls, int args[],
-                               num_args_t nargs, SEXP env, SEXP call) {
+static INLINE SEXP callClosure(Function* caller, BCClosure* cls,
+                               fun_idx_t args[], num_args_t nargs, SEXP env,
+                               SEXP call) {
 
     assert(cls->nargs == VARIADIC_ARGS || cls->nargs == nargs);
 
@@ -231,8 +232,8 @@ static INLINE SEXP callClosure(Function* caller, BCClosure* cls, int args[],
     return nullptr;
 }
 
-static INLINE SEXP doCall(Function* caller, SEXP call, SEXP callee, int args[],
-                          num_args_t nargs, SEXP env) {
+static INLINE SEXP doCall(Function* caller, SEXP call, SEXP callee,
+                          fun_idx_t args[], num_args_t nargs, SEXP env) {
     size_t bp = stack.size();
     size_t bpi = stacki.size();
 
@@ -480,9 +481,11 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
         case BC_t::call: {
             call_args_t callArgs = BC::readImmediate<call_args_t>(&pc);
 
+            // Duplicated from immediateCallArgs / immediateCallNargs for
+            // performance
             SEXP args_ = Pool::instance().get(callArgs.args);
-            int* args = INTEGER(args_);
-            int nargs = Rf_length(args_);
+            fun_idx_t* args = (fun_idx_t*)RAW(args_);
+            num_args_t nargs = Rf_length(args_) / sizeof(fun_idx_t);
 
             SEXP cls = stack.pop();
 
@@ -498,7 +501,7 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
                     BCClosure* bcls = getBCCls(cls);
                     RList formals(bcls->formals);
 
-                    std::vector<int> matched(formals.length());
+                    std::vector<fun_idx_t> matched(formals.length());
                     std::vector<bool> used(formals.length());
 
                     int finger = 0;
@@ -589,8 +592,10 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
                     num_args_t expected = getBCCls(cls)->nargs;
                     if (expected != VARIADIC_ARGS) {
                         if (nargs < expected) {
-                            std::vector<int> allArgs(expected, MISSING_ARG_IDX);
-                            memcpy(allArgs.data(), args, nargs * sizeof(SEXP));
+                            std::vector<fun_idx_t> allArgs(expected,
+                                                           MISSING_ARG_IDX);
+                            memcpy(allArgs.data(), args,
+                                   nargs * sizeof(fun_idx_t));
                             SEXP res =
                                 doCall(fun, cur->getAst(pc), cls,
                                        allArgs.data(), allArgs.size(), env);
