@@ -792,6 +792,7 @@ static SEXP rirEval(Function* fun, fun_idx_t c, SEXP env, num_args_t numArgs,
 
         case BC_t::num_of:
         case BC_t::invalid:
+        case BC_t::label:
             assert(false);
         }
     }

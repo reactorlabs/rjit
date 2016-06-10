@@ -1,6 +1,10 @@
 #ifndef RIR_CODE
 #define RIR_CODE
 
+#include "BC_inc.h"
+
+#include <map>
+
 namespace rjit {
 namespace rir {
 
