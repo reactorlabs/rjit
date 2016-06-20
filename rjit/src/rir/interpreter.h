@@ -145,7 +145,7 @@ typedef enum {
 extern "C" {
 #endif
 
-typedef struct CodeObject {
+typedef struct Code {
     /** offset to the beginning of the FunctioObject from this */
     unsigned offset;
     /** Code size, in bytes */
@@ -154,13 +154,13 @@ typedef struct CodeObject {
     unsigned numInsns;
     /** Index to the debug info to retrive the complete AST of the function */
     unsigned ast;
-} CodeObject;
+} Code;
 
 /** Container for function code representation.
 
   Each function consists of a header, followed by code objects. Function objects provide support for iteration
  */
-typedef struct FunctionObject {
+typedef struct Function {
     /** Number of code objects stored in the function. */
     unsigned numObjects;
     /** Total length of the function object.
@@ -169,32 +169,32 @@ typedef struct FunctionObject {
      */
     unsigned size;
     /** Less optimized version. NULL if the current code is unoptimized. */
-    struct FunctionObject * parent;
-} FunctionObject;
+    struct Function * parent;
+} Function;
 
 /** Returns the first code object associated with the function.
  */
-CodeObject * begin(FunctionObject * f);
+Code * begin(Function * f);
 
 /** Returns the end of the function as code object, for interation purposes.
  */
-CodeObject * end(FunctionObject * f);
+Code * end(Function * f);
 
 /** Returns the function object parent of the given code.
  */
-FunctionObject * function(CodeObject * c);
+Function * function(Code * c);
 
 /** Returns pointer to the code stream (immediately after header).
  */
-BC_t * code(CodeObject * c);
+BC_t * code(Code * c);
 
 /** Returns pointer to the debug information (after header and code, aligned to ints).
  */
-unsigned * debugInfo(CodeObject *c);
+unsigned * debugInfo(Code *c);
 
 /** Returns the next code object, for iteration purposes.
  */
-CodeObject * next(CodeObject * c);
+Code * next(Code * c);
 
 
 /** Takes size in bytes and returns the number of integers required to store the bytes.
@@ -205,7 +205,7 @@ unsigned sizeInInts(unsigned sizeInBytes);
 
 
 
-SEXP getCodeAST(CodeObject * c);
+SEXP getCodeAST(Code * c);
 
 SEXP getAST(unsigned index);
 
@@ -214,7 +214,7 @@ SEXP getAST(unsigned index);
 
 
 
-SEXP rirEval_c(CodeObject * cure, SEXP env, unsigned numArgs);
+SEXP rirEval_c(Code * cure, SEXP env, unsigned numArgs);
 
 
 

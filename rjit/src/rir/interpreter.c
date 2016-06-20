@@ -17,28 +17,28 @@ extern SEXP forcePromise(SEXP);
 
 
 
-CodeObject * begin(FunctionObject * f) {
-    return (CodeObject *)(f + 1);
+Code * begin(Function * f) {
+    return (Code *)(f + 1);
 }
 
-CodeObject * end(FunctionObject * f) {
-    return (CodeObject *)((char *)f + f->size);
+Code * end(Function * f) {
+    return (Code *)((char *)f + f->size);
 }
 
-FunctionObject * function(CodeObject * c) {
-    return (FunctionObject *)((char *)c - c->offset);
+Function * function(Code * c) {
+    return (Function *)((char *)c - c->offset);
 }
 
-BC_t * code(CodeObject * c) {
+BC_t * code(Code * c) {
     return (BC_t *)(c + 1);
 }
 
-unsigned * debugInfo(CodeObject *c) {
+unsigned * debugInfo(Code *c) {
     return (unsigned *)(c + 1) + sizeInInts(c->size);
 }
 
-CodeObject * next(CodeObject * c) {
-   return (CodeObject *)((char*)(c + 1) + sizeInInts(c->size) * 4 + c->numInsns);
+Code * next(Code * c) {
+   return (Code *)((char*)(c + 1) + sizeInInts(c->size) * 4 + c->numInsns);
 }
 
 unsigned sizeInInts(unsigned sizeInBytes) {
@@ -49,7 +49,7 @@ unsigned sizeInInts(unsigned sizeInBytes) {
 }
 
 
-SEXP getCodeAST(CodeObject * c) {
+SEXP getCodeAST(Code * c) {
     return getAST(c->ast);
 }
 
@@ -155,7 +155,7 @@ INLINE unsigned readArgInex(BC_t **  pc) {
 // Interpreter op  & support
 // -----------------------------------------------------------------------------
 
-INLINE SEXP getCurrentCall(CodeObject * cur, BC_t * pc, SEXP call) {
+INLINE SEXP getCurrentCall(Code * cur, BC_t * pc, SEXP call) {
     // TODO find proper ast and return it
     return call;
 }
@@ -173,7 +173,7 @@ INLINE SEXP loadConst(BC_t ** pc) {
 
 
 
-SEXP rirEval_c(CodeObject * cur, SEXP env, unsigned numArgs) {
+SEXP rirEval_c(Code * cur, SEXP env, unsigned numArgs) {
     SEXP call = getCodeAST(cur);
     // cannot be register because of the read functions taking address of it
     BC_t * pc = code(cur);
