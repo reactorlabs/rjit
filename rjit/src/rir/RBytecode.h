@@ -10,6 +10,7 @@
 namespace rjit {
 namespace rir {
 
+
 /** TODO We basically want the functionality of mkPROMSXP, line 2333 memory.c.
 
   As a hack I am just using one of the old rjit bytecodes which did exactly the same.
