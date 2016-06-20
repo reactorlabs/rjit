@@ -343,22 +343,22 @@ SEXP rirEval_c(CodeObject * cur, SEXP env, unsigned numArgs) {
             break;
         }
         case mkprom: {
-            fun_idx_t idx = readFunctionIndex(&pc);
-            SEXP prom;
-            /*SEXP prom = mkBCProm(cur->children[idx], env);
-            assert(cur->children.size() > idx); */
-            Stack_push(&stack, prom);
+            assert(false);
+            /*fun_idx_t idx = readFunctionIndex(&pc);
+            SEXP prom = mkBCProm(cur->children[idx], env);
+            assert(cur->children.size() > idx);
+            Stack_push(&stack, prom); */
             break;
         }
 
-        case call: {
+        case BC_call: {
             assert(false);
         }
 
         case load_arg: {
-            unsigned a = readArgIndex(&px);
+            unsigned a = readArgIndex(&pc);
             assert(a < numArgs);
-            stack.push(getArg(a, numArgs, bp));
+            Stack_push(&stack, getArg(a, numArgs, bp));
             break;
         }
 
@@ -486,7 +486,7 @@ SEXP rirEval_c(CodeObject * cur, SEXP env, unsigned numArgs) {
                 static SEXP op = getPrimitive("-");
                 static CCODE primfun = getPrimfun("-");
                 SEXP res = callPrimitive(primfun, getCurrentCall(), op, env,
-                                         {lhs, rhs});
+                                      git    {lhs, rhs});
                 stack.push(res);
             }
             break;
@@ -513,18 +513,17 @@ SEXP rirEval_c(CodeObject * cur, SEXP env, unsigned numArgs) {
         case num_of:
         case invalid:
             assert(false);
-        }
-
-
-
-
-
-
-
         default:
             assert(false && "Not implemented (yet)");
-
         }
+
+
+
+
+
+
+
+
     }
     return NULL;
 }

@@ -43,7 +43,7 @@ typedef enum {
     //  code object indices) and a list of name tags of the arguments.
     // I: {arguments, names}
     // S: -N
-    call,
+    BC_call,
 
     // Create a promise
     // I: promise code object index
