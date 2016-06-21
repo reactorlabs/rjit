@@ -395,21 +395,53 @@ INLINE size_t addSource(SEXP value) {
 // ------------------------------------------------------------------------------------------------------------------------------------------------------
 // bytecode basics
 
+
+    def_instr(invalid_,   0,    0,   0,   0) // invalid operation
+    def_instr(push_,      0,    0,   0,   0) // push a constant to the stack
+    def_instr(ldfun_,     0,    0,   0,   0) // load function from env
+    def_instr(ldvar_,     0,    0,   0,   0) // load variable from env
+    def_instr(call_,      0,    0,   0,   0) // call fun
+    def_instr(promise_,   0,    0,   0,   0) // create promise
+    def_instr(close_,     0,    0,   0,   0) // create closure
+    def_instr(ret_,       0,    0,   0,   0) // return
+    def_instr(force_,     0,    0,   0,   0) // eval promise
+    def_instr(pop_,       0,    0,   0,   0) // pop tos
+    def_instr(pusharg_,   0,    0,   0,   0) // push argument to stack
+    def_instr(asast_,     0,    0,   0,   0) // pop promise, push ast
+    def_instr(stvar_,     0,    0,   0,   0) // ??
+    def_instr(numargi_,   0,    0,   0,   0) // ??
+    def_instr(asbool_,    0,    0,   0,   0) // convert ?? on tos to bool
+    def_instr(condjmp_,   0,    0,   0,   0) // jump … if true
+    def_instr(jmp_,       0,    0,   0,   0) // unconditional jump
+    def_instr(lti_,       0,    0,   0,   0) // less than on ints
+    def_instr(eqi_,       0,    0,   0,   0) // equality on ints
+    def_instr(pushi_,     0,    0,   0,   0) // push int
+    def_instr(dupi_,      0,    0,   0,   0) // dup int
+    def_instr(dup_,       0,    0,   0,   0) // dup tos
+    def_instr(add_,       0,    0,   0,   0) // +
+    def_instr(sub_,       0,    0,   0,   0) // -
+    def_instr(lt_,        0,    0,   0,   0) // <
+    def_instr(isspecial_, 0,    0,   0,   0) // ??
+    def_instr(isfun_,     0,    0,   0,   0) // check tos is a function
+    def_instr(end_,       0,    0,   0,   0)
+
+    
+
   // enums in C are not namespaces so I am using OP_ to disambiguate
 typedef enum {
-    OP_Invalid,
-    OP_Push,
-    OP_GetFun,
-    OP_GetVar,
-    OP_Call,
-    OP_MkPromise,
-    OP_MKClosure,
-    OP_Ret,
-    OP_Force,
-    OP_Pop,
-    OP_LoadArg,
-    OP_GetAst,
-    OP_SetVar,
+    invalid_, // -- --> --
+    push_,  //
+    ldfun_,
+    ldvar_,
+    call_,
+    promise_,
+    close_,
+    ret_,
+    force_,
+    pop_,
+    rdarg_,
+    ldast_,
+    stvar_,
     OP_NumArg_I,
     OP_ToBool,
     OP_JmpTrue,
