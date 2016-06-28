@@ -4,6 +4,8 @@
 #include <cassert>
 #include <map>
 
+#include <queue>
+#include "CodeVerifier.h"
 #include "BC_inc.h"
 
 namespace rjit {
@@ -36,22 +38,17 @@ class Code {
         // Indice is only set when a new AstMap is created
         // this probably should create, i.e. in CodeStream.h
         // the indice will be updated when a new ast is added in
-        unsigned* ind;
-
 
       public:
         AstMap& operator=(AstMap&& from) {
             delete pos;
             delete ast;
-            delete ind;
             size = from.size;
             pos = from.pos;
             ast = from.ast;
-            ind = from.ind;
             from.size = 0;
             from.pos = nullptr;
             from.ast = nullptr;
-            from.ind = nullptr;
             return *this;
         }
 
@@ -62,25 +59,16 @@ class Code {
             size = astMap.size();
             pos = new unsigned[size];
             ast = new SEXP[size];
-            ind = new unsigned[size];
             unsigned i = 0;
             for (auto e : astMap) {
                 pos[i] = e.first;
                 ast[i] = e.second;
-
-                if (e.second){
-                    ind[i] = i+1
-                } else {
-                    ind[i] = 0;
-                }
-                i++;
             }
         }
 
         ~AstMap() {
             delete pos;
             delete ast;
-            delete ind;
         }
 
         SEXP at(unsigned p) {
@@ -97,6 +85,10 @@ class Code {
 
             return ast[f];
         }
+
+        size_t astSize(){
+            return size;
+        }
     };
 
     Code(size_t size, BC_t* bc, SEXP ast, size_t astSize, unsigned* astPos,
@@ -108,14 +100,16 @@ class Code {
     BC_t* bc;
     SEXP ast;
     AstMap astMap;
+    size_t instrSize;
+    std::vector<int> astInstr;
 
     /** Promises used in the code object. */
     std::vector<Code*> children;
 
-    Code() : size(0), bc(nullptr), ast(nullptr), astMap(0, nullptr, nullptr) {}
+    Code() : size(0), bc(nullptr), ast(nullptr), astMap(0, nullptr, nullptr), instrSize(0) {}
 
-    Code(size_t size, BC_t* bc, SEXP ast, std::map<unsigned, SEXP>& astMap)
-        : size(size), bc(bc), ast(ast), astMap(astMap){};
+    Code(size_t size, BC_t* bc, SEXP ast, std::map<unsigned, SEXP>& astMap, size_t instrSize, std::vector<int> astInstr)
+        : size(size), bc(bc), ast(ast), astMap(astMap), instrSize(instrSize) {this->astInstr = astInstr;}
     ~Code() { delete bc; }
 
     void print();
@@ -138,10 +132,12 @@ class Code {
     Code& operator=(Code&& from) {
         delete bc;
         size = from.size;
+        instrSize = from.instrSize;
         bc = from.bc;
         ast = from.ast;
         astMap = std::move(from.astMap);
         children = std::move(from.children);
+        astInstr = std::move(from.astInstr);
         from.size = 0;
         from.bc = nullptr;
         return *this;
@@ -154,6 +150,15 @@ class Code {
     unsigned calcSize(unsigned size);
 
     ::Code * createCode();
+
+    size_t codeSize(size_t count);
+
+    size_t * createAst();
+
+    size_t * createTransform(std::queue<Code*> que, size_t* transform);
+
+    size_t * createBlock(size_t* transform);
+
 };
 }
 }

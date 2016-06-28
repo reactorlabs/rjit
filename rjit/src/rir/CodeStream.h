@@ -21,6 +21,7 @@ class CodeStream {
 
     unsigned pos = 0;
     unsigned size = 1024;
+    std::vector<int>astInstr;
 
     Code* current;
 
@@ -92,15 +93,22 @@ class CodeStream {
         }
         *reinterpret_cast<T*>(&(*code)[pos]) = val;
         pos += s;
+        astInstr.push_back(-1);
     }
 
-    void addAst(SEXP ast) { astMap[pos] = ast; }
+    void addAst(SEXP ast) { 
+        astMap[pos] = ast; 
+        astInstr.pop_back();
+        astInstr.push_back(pos);
+    }
 
     Code* toCode() {
         assert(current->size == 0 and current->bc == nullptr);
         size_t size = pos;
 
         current->size = size;
+        current->instrSize = astInstr.size();
+        current->astInstr = astInstr;
         current->bc = toBc();
         current->astMap = Code::AstMap(astMap);
         current->ast = ast;
