@@ -1,5 +1,4 @@
 
-
 #include "Code.h"
 #include "interp.h"
 
@@ -37,7 +36,7 @@ SEXP Code::toFunction() {
     fHdr++;
 
     // now serialize the codes, one by one, first itself, then all the children
-    // keep in mind to update the instructions which deal push promise indices to update 
+    // keep in mind to update the instructions which deal push promise indices to update
     // them so that they push offsets from the beginning
 
     ::Code * codeObject = reinterpret_cast<::Code *>(fHdr);
@@ -178,8 +177,8 @@ unsigned Code::calcSize(){
     unsigned totalSize += sizeof(::Code);
     totalSize += size;
     totalSize += pad4(sizeof(::Code)+size);
-    totalSize += astMap.astSize();
-    
+    totalSize += astMap.size;
+
     for (Code * c : children){
         totalSize += c->calcSize();
     }
@@ -189,3 +188,4 @@ unsigned Code::calcSize(){
 
 } // namespace rir
 } // namespace rjit
+
